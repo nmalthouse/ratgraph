@@ -1,7 +1,7 @@
 const std = @import("std");
 const font = @import("font.zig");
 const sdl = @import("SDL.zig");
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 const Glyph = font.Glyph;
 const PROFILE = true;
 

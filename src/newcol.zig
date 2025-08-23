@@ -11,48 +11,52 @@ pub fn ColCtx(DIM: usize, FT: type) type {
     return struct {
         pub const V = [DIM]FT;
         pub const ZeroV = [_]FT{0} ** DIM;
+
+        fn DimMixin(comptime dim: usize) type {
+            return switch (dim) {
+                else => struct {},
+                2 => struct {
+                    pub fn detectCollision(r1: anytype, r2: anytype, goal: anytype, other_i: ID_TYPE) ?CollisionResult {
+                        return detectCollisionRaw(
+                            .{
+                                .p = [2]FT{ r1.x, r1.y },
+                                .x = [2]FT{ r1.w, r1.h },
+                            },
+                            .{
+                                .p = [2]FT{ r2.x, r2.y },
+                                .x = [2]FT{ r2.w, r2.h },
+                            },
+                            [2]FT{ goal.x, goal.y },
+                            other_i,
+                        );
+                    }
+
+                    pub fn rectToAABB(r: anytype) AABB {
+                        return .{
+                            .p = [2]FT{ r.x, r.y },
+                            .x = [2]FT{ r.w, r.h },
+                        };
+                    }
+                },
+                3 => struct {
+                    pub fn detectCollision(c1: anytype, c2: anytype, goal: anytype, other_i: ID_TYPE) ?CollisionResult {
+                        return detectCollisionRaw(
+                            .{ .p = c1.pos.data, .x = c1.ext.data },
+                            .{ .p = c2.pos.data, .x = c2.ext.data },
+                            goal.data,
+                            other_i,
+                        );
+                    }
+                },
+            };
+        }
         const AABB = struct {
             p: V,
             x: V,
         };
         const Plane = [DIM]V;
 
-        pub usingnamespace switch (DIM) {
-            2 => struct {
-                pub fn detectCollision(r1: anytype, r2: anytype, goal: anytype, other_i: ID_TYPE) ?CollisionResult {
-                    return detectCollisionRaw(
-                        .{
-                            .p = [2]FT{ r1.x, r1.y },
-                            .x = [2]FT{ r1.w, r1.h },
-                        },
-                        .{
-                            .p = [2]FT{ r2.x, r2.y },
-                            .x = [2]FT{ r2.w, r2.h },
-                        },
-                        [2]FT{ goal.x, goal.y },
-                        other_i,
-                    );
-                }
-
-                pub fn rectToAABB(r: anytype) AABB {
-                    return .{
-                        .p = [2]FT{ r.x, r.y },
-                        .x = [2]FT{ r.w, r.h },
-                    };
-                }
-            },
-            3 => struct {
-                pub fn detectCollision(c1: anytype, c2: anytype, goal: anytype, other_i: ID_TYPE) ?CollisionResult {
-                    return detectCollisionRaw(
-                        .{ .p = c1.pos.data, .x = c1.ext.data },
-                        .{ .p = c2.pos.data, .x = c2.ext.data },
-                        goal.data,
-                        other_i,
-                    );
-                }
-            },
-            else => struct {},
-        };
+        pub const extra = DimMixin(DIM);
 
         /// a[i] - b[i]
         pub fn subV(a: V, b: V) V {

@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("graphics/c.zig");
+const c = @import("graphics/c.zig").c;
 pub const GL = @import("graphics/gl.zig");
 pub const graph = @import("graphics.zig");
 pub const za = @import("zalgebra");

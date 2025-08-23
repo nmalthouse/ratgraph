@@ -1,4 +1,4 @@
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 pub const za = @import("zalgebra");
 const std = @import("std");
 pub const glID = c.GLuint;

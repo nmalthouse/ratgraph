@@ -1,4 +1,4 @@
-pub usingnamespace @cImport({
+pub const c = @cImport({
     //DLLs
     //@cInclude("SDL3/SDL_main.h"); //Not sure
     @cInclude("SDL3/SDL.h");

@@ -74,13 +74,11 @@ const deg = std.math.radiansToDegrees;
 const gui_app = @import("gui_app.zig");
 const Os9Gui = gui_app.Os9Gui;
 const itm = 0.0254;
-const c = struct {
-    usingnamespace graph.c;
-    usingnamespace @cImport({
-        @cInclude("AL/al.h");
-        @cInclude("AL/alc.h");
-    });
-};
+const c = graph.c;
+const AL = @cImport({
+    @cInclude("AL/al.h");
+    @cInclude("AL/alc.h");
+});
 const log = std.log.scoped(.game);
 
 //making it work
@@ -603,30 +601,30 @@ fn getLightMatrix(fov: f32, aspect: f32, near: f32, far: f32, cam_view: Mat4, li
 }
 
 pub fn checkAl() void {
-    const err = c.alGetError();
+    const err = AL.alGetError();
     const msg = switch (err) {
-        c.AL_INVALID_NAME => "name",
-        c.AL_INVALID_ENUM => "enum",
-        c.AL_INVALID_VALUE => "val",
-        c.AL_INVALID_OPERATION => "op",
-        c.AL_OUT_OF_MEMORY => "OOM",
+        AL.AL_INVALID_NAME => "name",
+        AL.AL_INVALID_ENUM => "enum",
+        AL.AL_INVALID_VALUE => "val",
+        AL.AL_INVALID_OPERATION => "op",
+        AL.AL_OUT_OF_MEMORY => "OOM",
 
         else => return,
     };
     std.debug.print("OPEN AL ERR: {s}\n", .{msg});
 }
 
-fn loadOgg(alloc: std.mem.Allocator, filename: [*c]const u8, pos: V3f) !c.ALuint {
-    var audio_source: c.ALuint = 0;
-    c.alGenSources(1, &audio_source);
-    c.alSourcef(audio_source, c.AL_PITCH, 1);
-    c.alSourcef(audio_source, c.AL_GAIN, 1);
-    c.alSource3f(audio_source, c.AL_POSITION, pos.x(), pos.y(), pos.z());
-    c.alSource3f(audio_source, c.AL_VELOCITY, 0, 0, 0);
-    c.alSourcei(audio_source, c.AL_LOOPING, c.AL_FALSE);
-    c.alSourcei(audio_source, c.AL_SOURCE_RELATIVE, c.AL_TRUE);
-    var audio_buf: c.ALuint = 0;
-    c.alGenBuffers(1, &audio_buf);
+fn loadOgg(alloc: std.mem.Allocator, filename: [*c]const u8, pos: V3f) !AL.ALuint {
+    var audio_source: AL.ALuint = 0;
+    AL.alGenSources(1, &audio_source);
+    AL.alSourcef(audio_source, AL.AL_PITCH, 1);
+    AL.alSourcef(audio_source, AL.AL_GAIN, 1);
+    AL.alSource3f(audio_source, AL.AL_POSITION, pos.x(), pos.y(), pos.z());
+    AL.alSource3f(audio_source, AL.AL_VELOCITY, 0, 0, 0);
+    AL.alSourcei(audio_source, AL.AL_LOOPING, AL.AL_FALSE);
+    AL.alSourcei(audio_source, AL.AL_SOURCE_RELATIVE, AL.AL_TRUE);
+    var audio_buf: AL.ALuint = 0;
+    AL.alGenBuffers(1, &audio_buf);
 
     var channels: c_int = 0;
     var sample_rate: c_int = 0;
@@ -634,8 +632,8 @@ fn loadOgg(alloc: std.mem.Allocator, filename: [*c]const u8, pos: V3f) !c.ALuint
     const ogg = c.stb_vorbis_decode_filename(filename, &channels, &sample_rate, output);
     std.debug.print("ogg len {d} {d}\n", .{ ogg, sample_rate });
 
-    c.alBufferData(audio_buf, c.AL_FORMAT_MONO16, output.*, @intCast(ogg - @mod(ogg, 4)), sample_rate);
-    c.alSourcei(audio_source, c.AL_BUFFER, @intCast(audio_buf));
+    AL.alBufferData(audio_buf, AL.AL_FORMAT_MONO16, output.*, @intCast(ogg - @mod(ogg, 4)), sample_rate);
+    AL.alSourcei(audio_source, AL.AL_BUFFER, @intCast(audio_buf));
     return audio_source;
 }
 
@@ -1169,40 +1167,40 @@ pub fn game_main() !void {
     var win = try graph.SDL.Window.createWindow("zig-game-engine", .{});
     defer win.destroyWindow();
 
-    const device = c.alcOpenDevice(null);
+    const device = AL.alcOpenDevice(null);
     if (device == null) {
         std.debug.print("shoot\n", .{});
     }
 
-    const al_ctx = c.alcCreateContext(device, null);
-    if (c.alcMakeContextCurrent(al_ctx) == 0) {
+    const al_ctx = AL.alcCreateContext(device, null);
+    if (AL.alcMakeContextCurrent(al_ctx) == 0) {
         std.debug.print("no current\n", .{});
     }
-    c.alListener3f(c.AL_POSITION, 0, 0, 0);
-    c.alListener3f(c.AL_VELOCITY, 0, 0, 0);
-    c.alListenerfv(c.AL_ORIENTATION, &[_]f32{ 0, 0, 1, 0, 1, 0 });
+    AL.alListener3f(AL.AL_POSITION, 0, 0, 0);
+    AL.alListener3f(AL.AL_VELOCITY, 0, 0, 0);
+    AL.alListenerfv(AL.AL_ORIENTATION, &[_]f32{ 0, 0, 1, 0, 1, 0 });
 
-    c.alDistanceModel(c.AL_INVERSE_DISTANCE);
-    c.alDopplerFactor(0);
+    AL.alDistanceModel(AL.AL_INVERSE_DISTANCE);
+    AL.alDopplerFactor(0);
     checkAl();
 
-    var audio_source: c.ALuint = 0;
-    c.alGenSources(1, &audio_source);
-    c.alSourcef(audio_source, c.AL_PITCH, 1);
-    c.alSourcef(audio_source, c.AL_GAIN, 3);
-    c.alSource3f(audio_source, c.AL_POSITION, 5, 1, -32);
-    c.alSource3f(audio_source, c.AL_VELOCITY, 0, 0, 0);
-    c.alSourcei(audio_source, c.AL_LOOPING, c.AL_TRUE);
+    var audio_source: AL.ALuint = 0;
+    AL.alGenSources(1, &audio_source);
+    AL.alSourcef(audio_source, AL.AL_PITCH, 1);
+    AL.alSourcef(audio_source, AL.AL_GAIN, 3);
+    AL.alSource3f(audio_source, AL.AL_POSITION, 5, 1, -32);
+    AL.alSource3f(audio_source, AL.AL_VELOCITY, 0, 0, 0);
+    AL.alSourcei(audio_source, AL.AL_LOOPING, AL.AL_TRUE);
 
-    var audio_buf: c.ALuint = 0;
-    c.alGenBuffers(1, &audio_buf);
+    var audio_buf: AL.ALuint = 0;
+    AL.alGenBuffers(1, &audio_buf);
     var channels: c_int = 0;
     var sample_rate: c_int = 0;
     var output: ?*c_short = null;
     const ogg = c.stb_vorbis_decode_filename("3d_asset/mono.ogg", &channels, &sample_rate, &output);
 
-    c.alBufferData(audio_buf, c.AL_FORMAT_MONO16, output, @intCast(ogg), sample_rate);
-    c.alSourcei(audio_source, c.AL_BUFFER, @intCast(audio_buf));
+    AL.alBufferData(audio_buf, AL.AL_FORMAT_MONO16, output, @intCast(ogg), sample_rate);
+    AL.alSourcei(audio_source, AL.AL_BUFFER, @intCast(audio_buf));
 
     var day_timer = try std.time.Timer.start();
     const day_length = std.time.ns_per_s * 60;
@@ -1644,7 +1642,7 @@ pub fn game_main() !void {
                 //std.debug.print("LOOP{d}\n", .{i_2});
                 var cols = std.ArrayList(ColType.CollisionResult).init(arena);
                 for (world.cubes.items, 0..) |lum, ii| {
-                    if (ColType.detectCollision(cam_bb, lum.cube, goal, @intCast(ii))) |col| {
+                    if (ColType.extra.detectCollision(cam_bb, lum.cube, goal, @intCast(ii))) |col| {
                         try cols.append(col);
                     }
                 }
@@ -1695,8 +1693,8 @@ pub fn game_main() !void {
         const cam_far = 500;
         const cmatrix = third_cam.getMatrix(screen_aspect, cam_near, cam_far);
 
-        c.alListener3f(c.AL_POSITION, camera.pos.x(), camera.pos.y(), camera.pos.z());
-        c.alListenerfv(c.AL_ORIENTATION, &[_]f32{ camera.front.x(), camera.front.y(), camera.front.z(), 0, 1, 0 });
+        AL.alListener3f(AL.AL_POSITION, camera.pos.x(), camera.pos.y(), camera.pos.z());
+        AL.alListenerfv(AL.AL_ORIENTATION, &[_]f32{ camera.front.x(), camera.front.y(), camera.front.z(), 0, 1, 0 });
 
         var point = V3f.zero();
         if (false) {
@@ -2421,15 +2419,15 @@ pub fn game_main() !void {
                             if (os9gui.button("go home"))
                                 camera.pos = camera_spawn;
                             if (os9gui.button("music"))
-                                c.alSourcePlay(audio_source);
+                                AL.alSourcePlay(audio_source);
 
                             os9gui.sliderEx(&camera.fov, 30, 120, "fov {d:.0}", .{camera.fov});
                             if (os9gui.checkbox("wireframe", &gcfg.draw_wireframe)) {
                                 graph.c.glPolygonMode(graph.c.GL_FRONT_AND_BACK, if (gcfg.draw_wireframe) graph.c.GL_LINE else graph.c.GL_FILL);
-                                c.alSourcePlay(ls);
+                                AL.alSourcePlay(ls);
                             }
                             if (os9gui.checkbox("thirdperson", &gcfg.draw_thirdperson))
-                                c.alSourcePlay(ls);
+                                AL.alSourcePlay(ls);
                             os9gui.hr();
 
                             try os9gui.enumCombo("current tool", .{}, &tool);

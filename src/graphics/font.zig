@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 const Alloc = std.mem.Allocator;
 const Dir = std.fs.Dir;
 const SparseSet = @import("sparse_set.zig").SparseSet;

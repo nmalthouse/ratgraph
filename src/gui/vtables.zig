@@ -8,18 +8,46 @@ pub const Rec = graph.Rec;
 const AL = std.mem.Allocator;
 
 pub const Widget = struct {
+    const tx = @import("widget_textbox.zig");
     //TOdo need a widget that is really cool. Like really cool.
     //"resizable tabs"
-    pub usingnamespace @import("widget_textbox.zig");
-    pub usingnamespace @import("widget_basic.zig");
-    pub usingnamespace @import("widget_combo.zig");
-    pub usingnamespace @import("widget_colorpicker.zig");
-    pub usingnamespace @import("widget_slider.zig");
-    pub usingnamespace @import("widget_tabs.zig");
-    pub usingnamespace @import("widget_textviewer.zig");
-    pub usingnamespace @import("widget_dynamic_table.zig");
-    pub usingnamespace @import("widget_texture.zig");
-    pub usingnamespace @import("widget_static_slider.zig");
+    pub const NumberDummy = tx.NumberDummy;
+    pub const TextboxNumber = tx.TextboxNumber;
+    pub const NumberDummyfn = tx.NumberDummyFn;
+    pub const NumberParseFn = tx.NumberParseFn;
+    pub const TextboxOptions = tx.TextboxOptions;
+    pub const Textbox = tx.Textbox;
+
+    const bs = @import("widget_basic.zig");
+    pub const VScroll = bs.VScroll;
+    pub const Checkbox = bs.Checkbox;
+    pub const Button = bs.Button;
+    pub const ScrollBar = bs.ScrollBar;
+    pub const Text = bs.Text;
+
+    const co = @import("widget_combo.zig");
+    pub const ComboOpts = co.ComboOpts;
+    pub const Combo = co.Combo;
+    pub const ComboUser = co.ComboUser;
+    pub const ComboGeneric = co.ComboGeneric;
+
+    pub const Colorpicker = @import("widget_colorpicker.zig").Colorpicker;
+
+    const sl = @import("widget_slider.zig");
+    pub const SliderOptions = sl.SliderOptions;
+    pub const Slider = sl.Slider;
+    pub const SliderGeneric = sl.SliderGeneric;
+
+    pub const Tabs = @import("widget_tabs.zig").Tabs;
+    pub const TextView = @import("widget_textviewer.zig").TextView;
+    pub const DynamicTable = @import("widget_dynamic_table.zig").DynamicTable;
+    pub const GLTexture = @import("widget_texture.zig").GLTexture;
+
+    const st = @import("widget_static_slider.zig");
+    pub const ALLOWED_CHAR = st.ALLOWED_CHAR;
+    pub const Slide = st.Slide;
+    pub const StaticSlider = st.StaticSlider;
+    pub const StaticSliderOpts = st.StaticSliderOpts;
 };
 
 pub fn getVt(comptime T: type, vt: anytype) *T {

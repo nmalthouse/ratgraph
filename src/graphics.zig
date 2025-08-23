@@ -1,5 +1,5 @@
 const std = @import("std");
-pub const c = @import("graphics/c.zig");
+pub const c = @import("graphics/c.zig").c;
 pub const za = @import("zalgebra");
 pub const ArgGen = @import("arg_gen.zig");
 
