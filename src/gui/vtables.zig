@@ -558,7 +558,7 @@ pub const Gui = struct {
     scale: f32 = 2,
 
     font: *graph.FontInterface,
-    tint: u32 = 0x999999ff,
+    tint: u32 = 0xffff_ffff,
 
     pub fn init(alloc: AL, win: *graph.SDL.Window, cache_dir: std.fs.Dir, style_dir: std.fs.Dir, font: *graph.FontInterface) !Self {
         return Gui{

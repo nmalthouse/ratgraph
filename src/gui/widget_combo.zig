@@ -55,6 +55,8 @@ pub fn ComboUser(user_data: type) type {
             search_string: []const u8 = "", //This string is allocated by the textbox
             vscroll_vt: ?*VScroll = null,
 
+            search_list: std.ArrayList(usize),
+
             pub fn buildWindow(vt: *iWindow, gui: *Gui, area: Rect) void {
                 const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
                 self.area.area = area;
@@ -102,16 +104,29 @@ pub fn ComboUser(user_data: type) type {
                 const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
                 var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area.area };
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
-                const count = p.opts.count;
-                //const vscr: *VScroll = @alignCast(@fieldParentPtr("vt", self.area.children.items[1]));
-                //vscr.updateCount(count);
-                if (index >= count) return;
-                const do_search = self.search_string.len > 0;
+                const total_count = p.opts.count;
 
-                for (index..count) |i| {
+                const do_search = self.search_string.len > 0;
+                if (do_search) {
+                    self.search_list.clearRetainingCapacity();
+                    for (0..total_count) |i| {
+                        const name = p.opts.name_cb(p.opts.user_vt, i, gui, p.user);
+                        if (searchMatch(name, self.search_string))
+                            self.search_list.append(i) catch return;
+                    }
+                }
+
+                const count = if (do_search) self.search_list.items.len else total_count;
+
+                if (self.vscroll_vt) |vscr|
+                    vscr.updateCount(count);
+                if (index >= count) return;
+
+                for (index..count) |pre_i| {
+                    if (do_search and pre_i >= self.search_list.items.len) continue; //Sanity
+                    const i = if (do_search) self.search_list.items[pre_i] else pre_i;
                     const name = p.opts.name_cb(p.opts.user_vt, i, gui, p.user);
                     //if (do_search and !std.mem.containsAtLeast(u8, name, 1, self.search_string)) continue;
-                    if (do_search and !searchMatch(name, self.search_string)) continue;
                     area.addChild(gui, win, Widget.Button.build(
                         gui,
                         ly.getArea(),
@@ -125,6 +140,7 @@ pub fn ComboUser(user_data: type) type {
             pub fn deinit(vt: *iWindow, gui: *Gui) void {
                 const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
                 vt.deinit(gui);
+                self.search_list.deinit();
                 gui.alloc.destroy(self);
             }
 
@@ -203,6 +219,7 @@ pub fn ComboUser(user_data: type) type {
                     &PoppedWindow.deinit,
                     &popped.area,
                 ),
+                .search_list = std.ArrayList(usize).init(gui.alloc),
                 .area = iArea.init(gui, area),
                 .name = "noname",
             };
