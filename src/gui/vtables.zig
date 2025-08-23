@@ -5,6 +5,7 @@ pub const Dctx = graph.ImmediateDrawingContext;
 pub const GuiConfig = Os9Gui.GuiConfig;
 pub const Rect = graph.Rect;
 pub const Rec = graph.Rec;
+pub const Uid = u64;
 const AL = std.mem.Allocator;
 
 pub const Widget = struct {
@@ -17,6 +18,8 @@ pub const Widget = struct {
     pub const NumberParseFn = tx.NumberParseFn;
     pub const TextboxOptions = tx.TextboxOptions;
     pub const Textbox = tx.Textbox;
+
+    pub const BtnContextWindow = @import("window_context.zig").BtnContextWindow;
 
     const bs = @import("widget_basic.zig");
     pub const VScroll = bs.VScroll;

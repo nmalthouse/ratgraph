@@ -161,12 +161,12 @@ pub const VScroll = struct {
 };
 
 pub const Checkbox = struct {
-    pub const CommitCb = *const fn (*iArea, *Gui, bool, user_id: usize) void;
+    pub const CommitCb = *const fn (*iArea, *Gui, bool, user_id: g.Uid) void;
     pub const Opts = struct {
         bool_ptr: ?*bool = null,
         cb_fn: ?CommitCb = null,
         cb_vt: ?*iArea = null,
-        user_id: usize = 0,
+        user_id: g.Uid = 0,
     };
     vt: iArea,
 
@@ -276,11 +276,11 @@ pub const Checkbox = struct {
 };
 
 pub const Button = struct {
-    pub const ButtonCallbackT = *const fn (*iArea, usize, *Gui, *iWindow) void;
+    pub const ButtonCallbackT = *const fn (*iArea, g.Uid, *Gui, *iWindow) void;
     pub const Opts = struct {
         cb_vt: ?*iArea = null,
         cb_fn: ?ButtonCallbackT = null,
-        id: usize = 0,
+        id: g.Uid = 0,
         custom_draw: ?*const fn (*iArea, DrawState) void = null,
         user_1: u32 = 0,
     };

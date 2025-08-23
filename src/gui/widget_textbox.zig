@@ -416,6 +416,7 @@ pub const Textbox = struct {
     }
 
     fn paste(self: *Self) !void {
+        self.changed = true;
         try self.deleteSelection();
         const clip = try getClipboard(self.codepoints.allocator);
         defer self.codepoints.allocator.free(clip);
@@ -502,7 +503,6 @@ pub const Textbox = struct {
         const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
         const nearest_glyph = (cb.gui.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false));
         switch (cb.btn) {
-            else => {},
             .left => {
                 if (nearest_glyph) |u_i| {
                     self.setHead(u_i, 0, true);
@@ -516,6 +516,28 @@ pub const Textbox = struct {
                 }
                 self.paste() catch {};
             },
+            .right => {
+                const bi = g.Widget.BtnContextWindow.buttonId;
+                const r_win = g.Widget.BtnContextWindow.create(
+                    cb.gui,
+                    cb.pos,
+                    &.{ .{ bi("copy"), "Copy" }, .{ bi("paste"), "Paste" } },
+                    rightClickMenuBtn,
+                    vt,
+                ) catch return;
+                cb.gui.setTransientWindow(r_win);
+            },
+        }
+    }
+
+    fn rightClickMenuBtn(vt: *iArea, id: g.Uid, gui: *Gui, _: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        vt.dirty(gui);
+        const bi = g.Widget.BtnContextWindow.buttonId;
+        switch (id) {
+            bi("copy") => setClipboard(self.codepoints.allocator, self.getSelectionSlice()) catch return,
+            bi("paste") => self.paste() catch return,
+            else => {},
         }
     }
 
