@@ -402,26 +402,7 @@ pub const Textbox = struct {
                             try setClipboard(tb.codepoints.allocator, tb.getSelectionSlice());
                         },
                         .paste => {
-                            try tb.deleteSelection();
-                            const clip = try getClipboard(tb.codepoints.allocator);
-                            defer tb.codepoints.allocator.free(clip);
-                            // creating a utf8view ensures the paste contains valid unicode and allows us to find the length
-                            if (std.unicode.Utf8View.init(clip)) |clip_view| {
-                                var clip_it = clip_view.iterator();
-                                var len: usize = 0;
-                                while (clip_it.nextCodepointSlice()) |_|
-                                    len += 1;
-                                if (self.options.max_len) |ml| { //If the paste will exceed bounds don't paste anything
-                                    if (tb.codepoints.items.len + len > ml)
-                                        continue;
-                                }
-                                try tb.codepoints.insertSlice(@intCast(tb.head), clip);
-                                tb.head += @intCast(clip.len);
-                                tb.tail = tb.head;
-                            } else |err| switch (err) {
-                                //error.InvalidUtf8 => Context.log.err("Paste was not valid unicode!", .{}),
-                                error.InvalidUtf8 => std.debug.print("Paste was not valid unicode!", .{}),
-                            }
+                            try self.paste();
                         },
                     }
                 }
@@ -432,6 +413,29 @@ pub const Textbox = struct {
             },
         }
         self.calculateDrawStart(textArea(vt.area, ev.gui), ev.gui.style.config.text_h, ev.gui);
+    }
+
+    fn paste(self: *Self) !void {
+        try self.deleteSelection();
+        const clip = try getClipboard(self.codepoints.allocator);
+        defer self.codepoints.allocator.free(clip);
+        // creating a utf8view ensures the paste contains valid unicode and allows us to find the length
+        if (std.unicode.Utf8View.init(clip)) |clip_view| {
+            var clip_it = clip_view.iterator();
+            var len: usize = 0;
+            while (clip_it.nextCodepointSlice()) |_|
+                len += 1;
+            if (self.options.max_len) |ml| { //If the paste will exceed bounds don't paste anything
+                if (self.codepoints.items.len + len > ml)
+                    return;
+            }
+            try self.codepoints.insertSlice(@intCast(self.head), clip);
+            self.head += @intCast(clip.len);
+            self.tail = self.head;
+        } else |err| switch (err) {
+            //error.InvalidUtf8 => Context.log.err("Paste was not valid unicode!", .{}),
+            error.InvalidUtf8 => std.debug.print("Paste was not valid unicode!", .{}),
+        }
     }
 
     pub fn draw(vt: *iArea, d: g.DrawState) void {
@@ -496,11 +500,23 @@ pub const Textbox = struct {
         const sz = cb.gui.style.config.text_h;
         const ar = textArea(vt.area, cb.gui);
         const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
-        if (cb.gui.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false)) |u_i| {
-            self.setHead(u_i, 0, true);
-            cb.gui.grabMouse(&mouseGrabbed, vt, win, cb.btn);
+        const nearest_glyph = (cb.gui.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false));
+        switch (cb.btn) {
+            else => {},
+            .left => {
+                if (nearest_glyph) |u_i| {
+                    self.setHead(u_i, 0, true);
+                    cb.gui.grabMouse(&mouseGrabbed, vt, win, cb.btn);
+                }
+                self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.style.config.text_h, cb.gui);
+            },
+            .middle => {
+                if (nearest_glyph) |u_i| {
+                    self.setHead(u_i, 0, true);
+                }
+                self.paste() catch {};
+            },
         }
-        self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.style.config.text_h, cb.gui);
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
