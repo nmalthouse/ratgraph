@@ -72,6 +72,11 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
         /// dense_index_lut is parallel to dense, mapping dense indices to global indices
         dense_index_lut: std.ArrayList(index_type),
 
+        // Optimize insertions
+        _had_removal: bool = true,
+
+        _freelist: std.ArrayList(index_type),
+
         pub fn denseIterator(self: *Self) Iterator {
             return Iterator{ .dense = &self.dense, .index = 0, .dense_index_lut = &self.dense_index_lut, .i = 0 };
         }
@@ -81,6 +86,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
                 .sparse = std.ArrayList(index_type).init(alloc),
                 .dense_index_lut = std.ArrayList(index_type).init(alloc),
                 .dense = std.ArrayList(child_type).init(alloc),
+                ._freelist = std.ArrayList(index_type).init(alloc),
             };
             return ret;
         }
@@ -110,12 +116,14 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             self.sparse.deinit();
             self.dense_index_lut.deinit();
             self.dense.deinit();
+            self._freelist.deinit();
         }
 
         pub fn empty(self: *Self) !void {
             try self.sparse.resize(0);
             try self.dense_index_lut.resize(0);
             try self.dense.resize(0);
+            try self._freelist.resize(0);
         }
 
         pub fn insert(self: *Self, index: index_type, item: child_type) !void {
@@ -126,9 +134,10 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
                 try self.sparse.appendNTimes(sparse_null_marker, index - self.sparse.items.len + 1);
 
             const dense_index = blk: {
-                for (self.dense_index_lut.items, 0..) |dense_item, i| {
-                    if (dense_item == dense_null_marker) {
-                        break :blk i;
+                if (self._had_removal) {
+                    if (self._freelist.pop()) |free| {
+                        if (free < self.dense_index_lut.items.len)
+                            break :blk free;
                     }
                 }
                 const new_size = self.dense_index_lut.items.len + 1;
@@ -136,6 +145,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
                 try self.dense.resize(new_size);
                 break :blk self.dense_index_lut.items.len - 1;
             };
+            self._had_removal = false;
 
             self.sparse.items[index] = @as(index_type, @intCast(dense_index));
             self.dense.items[dense_index] = item;
@@ -197,8 +207,11 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             return self.sparse.items[index];
         }
 
+        /// iterators remain valid
         pub fn remove(self: *Self, index: index_type) !child_type {
+            self._had_removal = true;
             const di = try self.getDenseIndex(index);
+            try self._freelist.append(di);
             self.sparse.items[index] = sparse_null_marker;
             //get copy of component to remove
             //set dense sparse_index value to dense_null_marker;
