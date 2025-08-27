@@ -521,9 +521,11 @@ pub const Textbox = struct {
                 const r_win = g.Widget.BtnContextWindow.create(
                     cb.gui,
                     cb.pos,
-                    &.{ .{ bi("copy"), "Copy" }, .{ bi("paste"), "Paste" } },
-                    rightClickMenuBtn,
-                    vt,
+                    .{
+                        .buttons = &.{ .{ bi("copy"), "Copy" }, .{ bi("paste"), "Paste" } },
+                        .btn_cb = rightClickMenuBtn,
+                        .btn_vt = vt,
+                    },
                 ) catch return;
                 cb.gui.setTransientWindow(r_win);
             },
