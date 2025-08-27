@@ -167,6 +167,10 @@ pub const Checkbox = struct {
         cb_fn: ?CommitCb = null,
         cb_vt: ?*iArea = null,
         user_id: g.Uid = 0,
+        style: enum {
+            ableton,
+            check,
+        } = .ableton,
     };
     vt: iArea,
 
@@ -188,7 +192,10 @@ pub const Checkbox = struct {
         self.vt.can_tab_focus = true;
         self.vt.onclick = &onclick;
         self.vt.focusEvent = &fevent;
-        self.vt.draw_fn = &draw;
+        self.vt.draw_fn = switch (opts.style) {
+            .ableton => draw,
+            .check => drawCheck,
+        };
         self.vt.deinit_fn = &deinit;
         return &self.vt;
     }
@@ -237,7 +244,7 @@ pub const Checkbox = struct {
         d.ctx.rectLine(inset, ins, 0xff);
     }
 
-    pub fn drawOld(vt: *iArea, d: DrawState) void {
+    pub fn drawCheck(vt: *iArea, d: DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         const is_focused = d.gui.isFocused(vt);
 
