@@ -12,7 +12,6 @@ const USE_SYSTEM_FREETYPE = false;
 
 pub const ToLink = enum {
     freetype,
-    sdl,
     lua,
     openal,
 };
@@ -24,7 +23,6 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
         cdir ++ "/libepoxy/build/include",
         cdir ++ "/miniz/build",
         cdir ++ "/miniz",
-        cdir ++ "/SDL/include",
         cdir ++ "/freetype",
         cdir ++ "/stb",
         cdir,
@@ -45,6 +43,10 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
         cdir ++ "/stb_rect_pack.c",
         cdir ++ "/stb_truetype.c",
         cdir ++ "/libspng/spng/spng.c",
+        cdir ++ "/miniz/miniz.c",
+        cdir ++ "/miniz/miniz_zip.c",
+        cdir ++ "/miniz/miniz_tinfl.c",
+        cdir ++ "/miniz/miniz_tdef.c",
     };
 
     if (LUA_SRC) |lsrc| {
@@ -68,10 +70,7 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
                 mod.addObjectFile(b.path(cdir ++ "/freetype_build/buildwin/libfreetype.a"));
             }
 
-            mod.addObjectFile(b.path(cdir ++ "/SDL/buildwin/libSDL3.a"));
-            mod.addObjectFile(b.path(cdir ++ "/SDL/buildwin/libSDL_uclibc.a"));
             mod.addObjectFile(b.path(cdir ++ "/libepoxy/buildwin/src/libepoxy.a"));
-            mod.addObjectFile(b.path(cdir ++ "/miniz/buildwin/libminiz.a"));
 
             //These all come from sdl/buildwin/sdl3.pc
             mod.linkSystemLibrary("m", .{});
@@ -99,14 +98,9 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
             for (tolink) |tl| {
                 const str = switch (tl) {
                     .lua => "lua",
-                    .sdl => "SDL3",
                     .freetype => "freetype",
                     .openal => "openal",
                 };
-                if (tl == .sdl) {
-                    mod.addObjectFile(b.path(cdir ++ "/SDL/build/libSDL3.a"));
-                    continue;
-                }
                 if (tl == .freetype and !USE_SYSTEM_FREETYPE) {
                     mod.addObjectFile(b.path(cdir ++ "/freetype_build/build/libfreetype.a"));
                     //mod.linkSystemLibrary("bzip2", .{});
@@ -115,7 +109,6 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
                 mod.linkSystemLibrary(str, .{ .preferred_link_mode = .static });
             }
             mod.addObjectFile(b.path(cdir ++ "/libepoxy/build/src/libepoxy.a"));
-            mod.addObjectFile(b.path(cdir ++ "/miniz/build/libminiz.a"));
             //mod.linkSystemLibrary("epoxy", .{});
             //mod.linkSystemLibrary("z", .{});
         }
@@ -135,7 +128,7 @@ pub fn build(b: *std.Build) void {
         .optimize = mode,
     });
     b.installArtifact(bake);
-    const to_link = [_]ToLink{ .freetype, .sdl, .openal, .lua };
+    const to_link = [_]ToLink{ .freetype, .openal, .lua };
     linkLibrary(b, bake.root_module, &to_link);
 
     const exe = b.addExecutable(.{
@@ -148,7 +141,7 @@ pub fn build(b: *std.Build) void {
 
     linkLibrary(b, exe.root_module, &to_link);
     const m = b.addModule("ratgraph", .{ .root_source_file = b.path("src/graphics.zig"), .target = target });
-    linkLibrary(b, m, &.{ .freetype, .sdl });
+    linkLibrary(b, m, &.{.freetype});
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
@@ -180,6 +173,21 @@ pub fn build(b: *std.Build) void {
     bake.root_module.addImport("zalgebra", zalgebra_module);
     unit_tests.root_module.addImport("zalgebra", zalgebra_module);
     m.addImport("zalgebra", zalgebra_module);
+
+    const sdl_dep = b.dependency("sdl", .{
+        .target = target,
+        .optimize = .ReleaseFast,
+        .preferred_linkage = .static,
+        //.strip = null,
+        //.sanitize_c = null,
+        //.pic = null,
+        //.lto = null,
+        //.emscripten_pthreads = false,
+        //.install_build_config_h = false,
+    });
+    const sdl_lib = sdl_dep.artifact("SDL3");
+    m.linkLibrary(sdl_lib);
+    exe.root_module.linkLibrary(sdl_lib);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request

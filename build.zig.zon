@@ -6,6 +6,10 @@
         .zalgebra = .{
             .path = "zig_libs/zalgebra",
         },
+        .sdl = .{
+            .url = "https://github.com/castholm/SDL/archive/refs/tags/v0.2.6+3.2.20.tar.gz",
+            .hash = "sdl-0.2.6+3.2.20-7uIn9JkjfwGIQ6j3-etow2rCe-Zt16Yj-2gdp9jW7WZ9",
+        },
     },
     .paths = .{
         "",

@@ -18,10 +18,6 @@
 [submodule "c_libs/libepoxy"]
 	path = c_libs/libepoxy
 	url = https://github.com/anholt/libepoxy.git
-[submodule "c_libs/SDL"]
-	path = c_libs/SDL
-	url = https://github.com/libsdl-org/SDL.git
-	branch = release-3.2.16
 [submodule "c_libs/freetype_build"]
 	path = c_libs/freetype_build
 	url = https://gitlab.freedesktop.org/freetype/freetype
