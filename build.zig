@@ -103,14 +103,11 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
                 };
                 if (tl == .freetype and !USE_SYSTEM_FREETYPE) {
                     mod.addObjectFile(b.path(cdir ++ "/freetype_build/build/libfreetype.a"));
-                    //mod.linkSystemLibrary("bzip2", .{});
                     continue;
                 }
                 mod.linkSystemLibrary(str, .{ .preferred_link_mode = .static });
             }
             mod.addObjectFile(b.path(cdir ++ "/libepoxy/build/src/libepoxy.a"));
-            //mod.linkSystemLibrary("epoxy", .{});
-            //mod.linkSystemLibrary("z", .{});
         }
     }
 }

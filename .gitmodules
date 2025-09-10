@@ -6,9 +6,6 @@
 	path = c_libs/stb
 	url = https://github.com/nothings/stb.git
 	branch = master
-[submodule "zig_libs/zalgebra"]
-	path = zig_libs/zalgebra
-    url = https://github.com/kooparse/zalgebra
 [submodule "c_libs/qoi"]
 	path = c_libs/qoi
 	url = https://github.com/phoboslab/qoi.git

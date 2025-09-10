@@ -3,12 +3,13 @@
     .name = .ratgraph,
     .version = "0.0.1",
     .dependencies = .{
-        .zalgebra = .{
-            .path = "zig_libs/zalgebra",
-        },
         .sdl = .{
             .url = "https://github.com/castholm/SDL/archive/refs/tags/v0.2.6+3.2.20.tar.gz",
             .hash = "sdl-0.2.6+3.2.20-7uIn9JkjfwGIQ6j3-etow2rCe-Zt16Yj-2gdp9jW7WZ9",
+        },
+        .zalgebra = .{
+            .url = "git+https://github.com/kooparse/zalgebra.git#7cf3b90edc28a138d666deab5dfde9dce89dff56",
+            .hash = "zalgebra-0.0.0-aaiVSh1nAQDYYHlXEm3nm7G7r7utN4aObxs43TLdjEuc",
         },
     },
     .paths = .{
