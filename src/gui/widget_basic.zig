@@ -170,7 +170,10 @@ pub const Checkbox = struct {
         style: enum {
             ableton,
             check,
+            dropdown,
         } = .ableton,
+
+        cross_color: u32 = 0xff,
     };
     vt: iArea,
 
@@ -195,6 +198,7 @@ pub const Checkbox = struct {
         self.vt.draw_fn = switch (opts.style) {
             .ableton => draw,
             .check => drawCheck,
+            .dropdown => drawDropdown,
         };
         self.vt.deinit_fn = &deinit;
         return &self.vt;
@@ -261,8 +265,8 @@ pub const Checkbox = struct {
         d.ctx.rect(inset, 0xffff_ffff);
         if (self.bool_ptr.*) {
             const inn = inset.inset(ins * 2);
-            d.ctx.line(inn.topL(), inn.botR(), 0xff, ins * 2);
-            d.ctx.line(inn.topR(), inn.botL(), 0xff, ins * 2);
+            d.ctx.line(inn.topL(), inn.botR(), self.opts.cross_color, ins * 2);
+            d.ctx.line(inn.topR(), inn.botL(), self.opts.cross_color, ins * 2);
         }
         //d.ctx.rectTex(
         //    br,
@@ -271,6 +275,28 @@ pub const Checkbox = struct {
         //);
         const tarea = Rec(br.farX() + pad, area.y + pad, area.w - br.farX(), area.h);
         d.ctx.textClipped(tarea, "{s}{s}", .{ self.name, if (is_focused) " [space to toggle]" else "" }, d.textP(null), .left);
+
+        //std.debug.print("{s} says: {any}\n", .{ self.name, self.bool_ptr.* });
+    }
+
+    pub fn drawDropdown(vt: *iArea, d: DrawState) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+
+        const bw = 1;
+        const area = vt.area;
+        const h = area.h;
+        const pad = (area.h - h) / 2;
+        const br = Rect.newV(.{ .x = area.x + bw, .y = area.y + pad }, .{ .x = h, .y = h }).inset(h / 4);
+        d.ctx.rect(vt.area, d.style.config.colors.background);
+
+        const dd = br;
+        const center = dd.center();
+        const v = if (self.bool_ptr.*) [3]graph.Vec2f{ dd.topL(), center, dd.topR() } else [3]graph.Vec2f{ dd.topL(), dd.botL(), center };
+        const cmass = center.sub(v[0].add(v[1].add(v[2])).scale(1.0 / 3.0));
+        d.ctx.triangle(v[0].add(cmass), v[1].add(cmass), v[2].add(cmass), self.opts.cross_color);
+
+        const tarea = Rec(br.farX() + pad, area.y + pad, area.w - br.farX(), area.h);
+        d.ctx.textClipped(tarea, "{s}", .{self.name}, d.textP(null), .left);
 
         //std.debug.print("{s} says: {any}\n", .{ self.name, self.bool_ptr.* });
     }
