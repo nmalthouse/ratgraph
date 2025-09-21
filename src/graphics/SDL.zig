@@ -86,6 +86,24 @@ pub fn getScancodeFromKey(key: keycodes.Keycode) keycodes.Scancode {
     return @enumFromInt(c.SDL_GetScancodeFromKey(@intFromEnum(key), null));
 }
 
+pub const UserEventCb = fn (event: c.SDL_UserEvent) void;
+
+pub fn pushEvent(id: u32, user_code: i32, data1: ?*anyopaque, data2: ?*anyopaque) !void {
+    var ev = c.SDL_Event{ .user = .{
+        .type = id,
+        .reserved = 0,
+        .timestamp = c.SDL_GetTicksNS(),
+        .windowID = 0,
+        .code = user_code,
+        .data1 = data1,
+        .data2 = data2,
+    } };
+    if (!c.SDL_PushEvent(&ev)) {
+        Window.sdlLogErr();
+        return error.failed;
+    }
+}
+
 pub const Window = struct {
     const Self = @This();
     pub const KeyboardStateT = std.bit_set.IntegerBitSet(c.SDL_SCANCODE_COUNT);
@@ -128,6 +146,8 @@ pub const Window = struct {
     text_input_buffer: [256]u8 = undefined,
     text_input: []const u8,
 
+    user_event_cb: ?*const UserEventCb = null,
+
     pub fn sdlLogErr() void {
         log.err("{s}", .{c.SDL_GetError()});
     }
@@ -146,6 +166,10 @@ pub const Window = struct {
         } else {
             _ = c.SDL_HideCursor();
         }
+    }
+
+    pub fn setUserEventCb(self: *Self, cb: *const UserEventCb) void {
+        self.user_event_cb = cb;
     }
 
     //pub fn screenshotGL(self: *const Self,alloc: Alloc,  )void{
@@ -470,6 +494,10 @@ pub const Window = struct {
                     self.screen_dimensions.x = x;
                     self.screen_dimensions.y = y;
                     c.glViewport(0, 0, self.screen_dimensions.x, self.screen_dimensions.y);
+                },
+                c.SDL_EVENT_USER => {
+                    if (self.user_event_cb) |cb|
+                        cb(event.user);
                 },
                 else => continue,
             }
