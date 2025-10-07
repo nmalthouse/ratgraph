@@ -1,6 +1,5 @@
 const std = @import("std");
-const graph = @import("graphics.zig");
-const Vec2f = graph.Vec2f;
+const Vec2f = @import("graphics/types.zig").Vec2f;
 //const Vec2f = struct { x: f32, y: f32 };
 
 pub const Argument = enum {
@@ -113,12 +112,17 @@ pub fn parseArgs(comptime arg_list: []const ArgItem, arg_it: anytype) !generateA
             }
         }
         if (!matched_arg) {
+            const fmt_len = comptime maxLen(arg_list);
+            const fmt_width = comptime std.fmt.digits2(fmt_len);
+
+            const fmt = "--{s: <" ++ fmt_width ++ "} : {s: <8}\t{s}\n";
             if (!std.mem.eql(u8, arg, "--help")) {
                 std.debug.print("Error: \'{s}\' is not a valid arg\n", .{arg});
-                std.debug.print("--help:print this help\n", .{});
+                std.debug.print(fmt, .{ "help", "flag", "Print this help" });
             }
+
             inline for (arg_list) |field| {
-                std.debug.print("{s}:{s}\t{s}\n", .{ field.name, @tagName(field.arg_type), field.doc });
+                std.debug.print(fmt, .{ field.name, @tagName(field.arg_type), field.doc });
                 if (field.type_override) |to| {
                     switch (@typeInfo(to)) {
                         .@"enum" => |e| {
@@ -134,6 +138,14 @@ pub fn parseArgs(comptime arg_list: []const ArgItem, arg_it: anytype) !generateA
     }
 
     return parsed;
+}
+
+fn maxLen(arg_list: []const ArgItem) u8 {
+    var max: u8 = "help".len;
+    inline for (arg_list) |field| {
+        max = @max(max, field.name.len);
+    }
+    return max;
 }
 
 const TestIterator = struct {
@@ -152,24 +164,24 @@ const TestIterator = struct {
 
 // In normal programs std.process.ArgIterator.initWithAllocator(alloc); can be used
 test "vector" {
-    var test_it = TestIterator{ .args = &.{ "--my_vec", "0", "12" } };
+    var test_it = TestIterator{ .args = &.{ "mybin", "--my_vec", "0", "12" } };
     const args = try parseArgs(&.{
         Arg("my_vec", .vec2, "Do the vector number"),
     }, &test_it);
-    if (args.parsed.my_vec) |v| {
+    if (args.my_vec) |v| {
         std.debug.print("{any}\n", .{v});
     }
 }
 
 test "basic" {
-    var test_it = TestIterator{ .args = &.{ "--my_num", "0", "--level", "shits" } };
+    var test_it = TestIterator{ .args = &.{ "mybin", "--my_num", "0", "--level", "shits" } };
     const args = try parseArgs(&.{
         Arg("my_num", .number, "A number used for something"),
         Arg("fast", .flag, "Move the game fast"),
         Arg("level", .string, "Overide the level to load."),
     }, &test_it);
 
-    if (args.parsed.my_num) |num| {
+    if (args.my_num) |num| {
         std.debug.print("my num {d}\n", .{num});
     }
 }
