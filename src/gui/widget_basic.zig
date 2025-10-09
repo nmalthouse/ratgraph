@@ -12,15 +12,16 @@ const Color = graph.Colori;
 const Rec = g.Rec;
 const graph = g.graph;
 const getVt = g.getVt;
+const CbHandle = g.CbHandle;
 
 // Write a widget that is a static text box.
 // Works like a tabs or whatever which holds all the alloc for string, so scrolling doesn't realloc
 
 pub const VScroll = struct {
-    pub const BuildCb = *const fn (*iArea, current_area: *iArea, index: usize, *Gui, *iWindow) void;
+    pub const BuildCb = *const fn (*CbHandle, current_area: *iArea, index: usize, *Gui, *iWindow) void;
     pub const Opts = struct {
         build_cb: BuildCb,
-        build_vt: *iArea,
+        build_vt: *CbHandle,
         win: *iWindow,
         count: usize,
         item_h: f32,

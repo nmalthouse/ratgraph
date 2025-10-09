@@ -10,6 +10,7 @@ const Color = graph.Colori;
 const VScroll = g.Widget.VScroll;
 const Widget = g.Widget;
 
+const CbHandle = g.CbHandle;
 pub const ComboOpts = struct {};
 
 pub const Combo = struct {
@@ -47,6 +48,7 @@ pub fn ComboUser(user_data: type) type {
         const ParentT = @This();
         pub const PoppedWindow = struct {
             vt: iWindow,
+            cbhandle: CbHandle = .{},
             area: iArea,
 
             parent_vt: *iArea,
@@ -80,7 +82,7 @@ pub fn ComboUser(user_data: type) type {
                 ly.pushRemaining();
                 const vscroll = VScroll.build(gui, ly.getArea(), .{
                     .build_cb = &build_scroll_cb,
-                    .build_vt = &self.area,
+                    .build_vt = &self.cbhandle,
                     .win = vt,
                     .item_h = gui.style.config.default_item_h,
                     .count = p.opts.count,
@@ -100,8 +102,8 @@ pub fn ComboUser(user_data: type) type {
                 }
             }
 
-            pub fn build_scroll_cb(vt: *iArea, area: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
+            pub fn build_scroll_cb(cb: *CbHandle, area: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
+                const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
                 var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area.area };
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 const total_count = p.opts.count;
@@ -237,6 +239,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
         pub const PoppedWindow = struct {
             vt: iWindow,
             area: iArea,
+            cbhandle: CbHandle = .{},
 
             parent_vt: *iArea,
             name: []const u8,
@@ -253,15 +256,15 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 vt.area.dirty(gui);
                 self.area.addChildOpt(gui, vt, VScroll.build(gui, area, .{
                     .build_cb = &build_cb,
-                    .build_vt = &self.area,
+                    .build_vt = &self.cbhandle,
                     .win = vt,
                     .count = info.@"enum".fields.len,
                     .item_h = gui.style.config.default_item_h,
                 }));
             }
 
-            pub fn build_cb(vt: *iArea, area: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
+            pub fn build_cb(cb: *CbHandle, area: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
+                const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
                 var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area.area };
                 const info = @typeInfo(enumT);
                 inline for (info.@"enum".fields, 0..) |field, i| {

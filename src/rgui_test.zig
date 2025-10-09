@@ -16,6 +16,7 @@ const DrawState = guis.DrawState;
 
 const Gui = guis.Gui;
 const Wg = guis.Widget;
+const CbHandle = guis.CbHandle;
 
 pub const MyInspector = struct {
     const MyEnum = enum {
@@ -31,6 +32,7 @@ pub const MyInspector = struct {
     };
 
     vt: iWindow,
+    cbhandle: CbHandle = .{},
     area: iArea,
 
     inspector_state: u32 = 0,
@@ -136,7 +138,7 @@ pub const MyInspector = struct {
             ly.pushRemaining();
             vt.addChildOpt(gui, win, Wg.VScroll.build(gui, ly.getArea(), .{
                 .build_cb = &buildScrollItems,
-                .build_vt = &self.area,
+                .build_vt = &self.cbhandle,
                 .win = win,
                 .count = 10,
                 .item_h = gui.style.config.default_item_h,
@@ -144,8 +146,8 @@ pub const MyInspector = struct {
         }
     }
 
-    pub fn buildScrollItems(window_area: *iArea, vt: *iArea, index: usize, gui: *Gui, window: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("area", window_area));
+    pub fn buildScrollItems(cb: *CbHandle, vt: *iArea, index: usize, gui: *Gui, window: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = vt.area };
         for (index..10) |i| {
             vt.addChildOpt(gui, window, Wg.Text.build(gui, ly.getArea(), "item {d}", .{i}));
@@ -178,12 +180,14 @@ pub fn main() !void {
 
     var draw = graph.ImmediateDrawingContext.init(alloc);
     defer draw.deinit();
+    std.debug.print("VT SIZE {d}\n", .{@sizeOf(iArea)});
 
-    const TEXT_H = @trunc(20 * 1.6);
+    const TEXT_H = @trunc(15 * 1.6);
+    const hh = @trunc(14 * 1.6);
     var font = try graph.Font.init(alloc, std.fs.cwd(), "asset/fonts/roboto.ttf", TEXT_H, .{});
     defer font.deinit();
 
-    const sc = 2;
+    const sc = 1;
     var gui = try Gui.init(alloc, &win, cache_dir, std.fs.cwd(), &font.font);
     gui.scale = sc;
     defer gui.deinit();
@@ -200,7 +204,7 @@ pub fn main() !void {
         if (!do_test_builder)
             demo.deinit();
     }
-    gui.style.config.default_item_h = @trunc(25 * 1.6);
+    gui.style.config.default_item_h = hh;
     gui.style.config.text_h = TEXT_H;
 
     const window_area = Rect{ .x = 0, .y = 0, .w = 1000, .h = 1000 };

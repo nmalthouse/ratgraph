@@ -9,6 +9,7 @@ const iWindow = g.iWindow;
 const Color = graph.Colori;
 const VScroll = g.Widget.VScroll;
 const Widget = g.Widget;
+const CbHandle = g.CbHandle;
 
 pub const TextView = struct {
     pub const INSET_AMOUNT = 5;
@@ -23,6 +24,7 @@ pub const TextView = struct {
         force_scroll: bool = false,
     };
     vt: iArea,
+    cbhandle: CbHandle = .{},
 
     cat_string: []const u8, //Alloced by gui
     lines: std.ArrayList([]const u8), //slices into cat_string
@@ -51,7 +53,7 @@ pub const TextView = struct {
             .simple => self.buildLines(gui.font, tw, gui.style.config.text_h, self.cat_string) catch return null,
         }
         const vscr = VScroll.build(gui, inset, .{
-            .build_vt = &self.vt,
+            .build_vt = &self.cbhandle,
             .build_cb = &buildScroll,
             .win = win,
             .item_h = gui.style.config.default_item_h,
@@ -89,8 +91,8 @@ pub const TextView = struct {
         vscr.gotoBottom();
     }
 
-    pub fn buildScroll(user: *iArea, layout: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", user));
+    pub fn buildScroll(cb: *CbHandle, layout: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = layout.area };
         if (index >= self.lines.items.len) return;
         for (self.lines.items[index..], index..) |line, i| {

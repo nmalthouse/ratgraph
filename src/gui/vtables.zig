@@ -8,10 +8,14 @@ pub const Rec = graph.Rec;
 pub const Uid = u64;
 const AL = std.mem.Allocator;
 
+pub const CbHandle = struct {};
+
 pub const Widget = struct {
     const tx = @import("widget_textbox.zig");
     //TOdo need a widget that is really cool. Like really cool.
     //"resizable tabs"
+    //
+    //TODO we need scissor
     pub const NumberDummy = tx.NumberDummy;
     pub const TextboxNumber = tx.TextboxNumber;
     pub const NumberDummyfn = tx.NumberDummyFn;
