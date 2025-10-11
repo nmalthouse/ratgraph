@@ -276,6 +276,10 @@ pub const iWindow = struct {
             for (win.click_listeners.items) |vt| {
                 if (vt.area.containsPoint(cb.pos)) {
                     if (vt.onclick) |oc| {
+                        if (win.getScissorRect(vt._scissor_id)) |sz| {
+                            if (!sz.containsPoint(cb.pos))
+                                continue; // Skip this cb and keep checking
+                        }
                         oc(vt, cb, win);
                         return true;
                     }
@@ -286,12 +290,19 @@ pub const iWindow = struct {
         return false;
     }
 
+    /// Returns true if this window contains the mouse
     pub fn dispatchScroll(win: *iWindow, coord: Vec2f, gui: *Gui, dist: f32) bool {
         if (win.area.area.containsPoint(coord)) {
             for (win.scroll_list.items) |vt| {
                 if (vt.area.containsPoint(coord)) {
-                    if (vt.onscroll) |oc|
+                    if (vt.onscroll) |oc| {
+                        if (win.getScissorRect(vt._scissor_id)) |sz| {
+                            if (!sz.containsPoint(coord))
+                                continue;
+                        }
                         oc(vt, gui, win, dist);
+                        return true;
+                    }
                 }
             }
             return true;
