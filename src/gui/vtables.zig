@@ -2,6 +2,7 @@ const std = @import("std");
 pub const graph = @import("../graphics.zig");
 const Os9Gui = @import("../gui_app.zig");
 pub const Dctx = graph.ImmediateDrawingContext;
+//TODO deprecate this style
 pub const GuiConfig = Os9Gui.GuiConfig;
 pub const Rect = graph.Rect;
 pub const Rec = graph.Rec;
@@ -57,9 +58,6 @@ pub const Widget = struct {
     pub const StaticSliderOpts = st.StaticSliderOpts;
 };
 
-pub fn getVt(comptime T: type, vt: anytype) *T {
-    return @alignCast(@fieldParentPtr("vt", vt));
-}
 pub const TextCbState = struct {
     gui: *Gui,
     text: []const u8,
@@ -283,6 +281,7 @@ pub const DrawState = struct {
     gui: *Gui,
     font: *graph.FontInterface,
     style: *GuiConfig,
+    nstyle: *const Style,
     scale: f32 = 2,
     tint: u32 = 0xffff_ffff, //Tint for textures
 
@@ -291,7 +290,7 @@ pub const DrawState = struct {
         return .{
             .do_newlines = false,
             .font = self.font,
-            .color = color orelse 0xff,
+            .color = color orelse self.nstyle.color.text_fg,
             .px_size = self.style.config.text_h,
         };
     }
@@ -590,6 +589,7 @@ pub const Gui = struct {
     sdl_win: *graph.SDL.Window,
 
     style: GuiConfig,
+    nstyle: Style,
     scale: f32 = 2,
 
     font: *graph.FontInterface,
@@ -607,6 +607,7 @@ pub const Gui = struct {
             .fbos = std.AutoHashMap(*iWindow, graph.RenderTexture).init(alloc),
             .sdl_win = win,
             .style = try GuiConfig.init(alloc, style_dir, "asset/os9gui", cache_dir),
+            .nstyle = .{},
         };
     }
 
@@ -1151,4 +1152,20 @@ pub const GuiHelp = struct {
         const border_area = area.inset((_br.h / 3) * gui.scale);
         return border_area;
     }
+};
+
+pub const Style = struct {
+    caret_width: f32 = 2,
+    color: struct {
+        bg: u32 = 0x4f4f4fff,
+        //text_fg: u32 = 0xdbe0e0_ff,
+        text_fg: u32 = 0xeeeeee_ff,
+        text_bg: u32 = 0x333333_ff,
+        textbox_bg: u32 = 0x333333_ff,
+        drop_down_arrow: u32 = 0xe0e0e0_ff,
+        caret: u32 = 0xaaaaaaff,
+
+        table_bg: u32 = 0x333333_ff,
+        static_slider_bg: u32 = 0x333333_ff,
+    } = .{},
 };

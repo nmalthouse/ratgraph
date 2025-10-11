@@ -79,7 +79,7 @@ pub const DynamicTable = struct {
 
     pub fn draw(vt: *iArea, d: g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        d.ctx.rect(vt.area, Color.White);
+        d.ctx.rect(vt.area, d.nstyle.color.table_bg);
         const y = vt.area.y;
         const y1 = vt.area.y + vt.area.h;
         for (self.opts.column_positions) |pos| {
@@ -143,7 +143,7 @@ const TableHeader = struct {
 
     pub fn draw(vt: *iArea, d: g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        d.ctx.rect(vt.area, d.style.config.colors.background);
+        d.ctx.rect(vt.area, d.nstyle.color.bg);
         const dat = self.parent.opts;
         if (dat.column_positions.len == 0 or dat.column_positions.len + 1 != dat.column_names.len)
             return;

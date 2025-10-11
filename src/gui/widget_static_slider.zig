@@ -106,8 +106,7 @@ pub const StaticSlider = struct {
 
     pub fn draw(vt: *iArea, d: g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        const GRAY = 0xddddddff;
-        d.ctx.rect(vt.area, GRAY);
+        d.ctx.rect(vt.area, d.nstyle.color.static_slider_bg);
         const ins = @ceil(d.scale);
         const inset = vt.area.inset(ins);
         const ta = inset.inset(@ceil(d.style.config.textbox_inset * d.scale));

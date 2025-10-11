@@ -209,7 +209,7 @@ pub fn main() !void {
 
     const window_area = Rect{ .x = 0, .y = 0, .w = 1000, .h = 1000 };
 
-    const dstate = guis.DrawState{ .ctx = &draw, .font = &font.font, .style = &gui.style, .gui = &gui, .scale = sc };
+    const dstate = guis.DrawState{ .ctx = &draw, .font = &font.font, .style = &gui.style, .gui = &gui, .scale = sc, .nstyle = &gui.nstyle };
     try gui.addWindow(MyInspector.create(&gui), window_area);
 
     while (!win.should_exit) {

@@ -137,7 +137,7 @@ pub const VScroll = struct {
 
     pub fn draw(vt: *iArea, d: DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        d.ctx.rect(vt.area, d.style.config.colors.background);
+        d.ctx.rect(vt.area, d.nstyle.color.bg);
         _ = self;
     }
 
@@ -258,7 +258,7 @@ pub const Checkbox = struct {
         const h = area.h;
         const pad = (area.h - h) / 2;
         const br = Rect.newV(.{ .x = area.x + bw, .y = area.y + pad }, .{ .x = h, .y = h }).inset(h / 4);
-        d.ctx.rect(vt.area, d.style.config.colors.background);
+        d.ctx.rect(vt.area, d.nstyle.color.bg);
 
         const ins = @ceil(d.scale);
         d.ctx.rectLine(br, ins, if (is_focused) d.style.config.colors.selected else 0xff);
@@ -288,7 +288,7 @@ pub const Checkbox = struct {
         const h = area.h;
         const pad = (area.h - h) / 2;
         const br = Rect.newV(.{ .x = area.x + bw, .y = area.y + pad }, .{ .x = h, .y = h }).inset(h / 4);
-        d.ctx.rect(vt.area, d.style.config.colors.background);
+        d.ctx.rect(vt.area, d.nstyle.color.bg);
 
         const dd = br;
         const center = dd.center();
@@ -559,7 +559,7 @@ pub const Text = struct {
         self.* = .{
             .vt = iArea.init(gui, area),
             .is_alloced = false,
-            .bg_col = bg_col orelse gui.style.config.colors.background,
+            .bg_col = bg_col orelse gui.nstyle.color.bg,
             .text = owned_string,
         };
         self.vt.draw_fn = &draw;
@@ -579,7 +579,7 @@ pub const Text = struct {
 
         self.* = .{
             .vt = iArea.init(gui, area),
-            .bg_col = gui.style.config.colors.background,
+            .bg_col = gui.nstyle.color.bg,
             .is_alloced = true,
             .text = vec.toOwnedSlice() catch return null,
         };

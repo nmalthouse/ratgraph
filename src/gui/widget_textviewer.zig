@@ -97,9 +97,8 @@ pub const TextView = struct {
         if (index >= self.lines.items.len) return;
         for (self.lines.items[index..], index..) |line, i| {
             _ = i;
-            const color = 0xffff_ffff;
             //const color: u32 = if (i % 2 == 0) 0xffff_ffff else 0xff_0000_ff;
-            layout.addChildOpt(gui, win, Widget.Text.buildStatic(gui, ly.getArea(), line, color));
+            layout.addChildOpt(gui, win, Widget.Text.buildStatic(gui, ly.getArea(), line, gui.nstyle.color.text_bg));
         }
     }
 
@@ -111,7 +110,8 @@ pub const TextView = struct {
     }
 
     pub fn draw(vt: *iArea, d: g.DrawState) void {
-        d.ctx.nineSlice(vt.area, d.style.getRect(.basic_inset), d.style.texture, d.scale, d.tint);
+        //d.ctx.nineSlice(vt.area, d.style.getRect(.basic_inset), d.style.texture, d.scale, d.tint);
+        d.ctx.rect(vt.area, d.nstyle.color.text_bg);
         //d.ctx.rect(vt.area, 0xff); //Black rect
     }
 
