@@ -71,7 +71,6 @@ pub const FloatScroll = struct {
         )) |sbar| {
             self.vt.addChildOpt(gui, opts.win, &sbar.vt);
             self.scroll_ptr = sbar;
-            std.debug.print("ADDED SCROLL\n", .{});
         } else {
             _ = self.vt.addEmpty(gui, opts.win, split[1]);
         }
@@ -95,7 +94,7 @@ pub const FloatScroll = struct {
     }
 
     pub fn draw(vt: *iArea, d: g.DrawState) void {
-        d.ctx.rect(vt.area, 0xff); //Black rect
+        d.ctx.rect(vt.area, d.nstyle.color.bg);
     }
 
     pub fn getAreaW(parent_w: f32, scale: f32) f32 {

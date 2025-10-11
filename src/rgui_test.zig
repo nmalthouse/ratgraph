@@ -196,7 +196,7 @@ pub const MyInspector = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = vt.area };
         _ = self;
-        for (0..25) |i| {
+        for (0..100) |i| {
             const ar = ly.getArea() orelse continue;
             vt.addChildOpt(gui, win, Wg.Text.build(gui, ar, "item {d}", .{i}));
         }
@@ -210,7 +210,7 @@ pub const MyInspector = struct {
 
 pub fn main() !void {
     std.debug.print("The size is :  {d}\n", .{@sizeOf(guis.iArea)});
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
     defer _ = gpa.detectLeaks();
     const alloc = gpa.allocator();
 
@@ -260,6 +260,8 @@ pub fn main() !void {
     const dstate = guis.DrawState{ .ctx = &draw, .font = &font.font, .style = &gui.style, .gui = &gui, .scale = sc, .nstyle = &gui.nstyle };
     try gui.addWindow(MyInspector.create(&gui), window_area);
 
+    var timer = try std.time.Timer.start();
+
     while (!win.should_exit) {
         try draw.begin(0xff, win.screen_dimensions.toF());
         win.pumpEvents(if (do_test_builder) .wait else .poll);
@@ -267,6 +269,7 @@ pub fn main() !void {
         if (win.keyRising(.ESCAPE))
             win.should_exit = true;
 
+        timer.reset();
         const wins = gui.windows.items;
         try gui.pre_update(wins);
         if (do_test_builder) {
@@ -282,6 +285,11 @@ pub fn main() !void {
         try draw.flush(null, null); //Flush any draw commands
 
         try draw.end(null);
+
+        const took = timer.read();
+        if (took > std.time.ns_per_ms * 16) {
+            std.debug.print("Overtime {d} \n", .{took / std.time.ns_per_ms});
+        }
         win.swap();
     }
 }

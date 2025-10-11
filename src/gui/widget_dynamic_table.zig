@@ -25,6 +25,11 @@ pub const DynamicTable = struct {
 
     pub fn build(gui: *Gui, area_o: ?Rect, win: *iWindow, opts: Opts) ?*iArea {
         const area = area_o orelse return null;
+        var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
+        const tab_area = ly.getArea() orelse return null;
+
+        const table_area = ly.getArea() orelse return null;
+
         const self = gui.create(@This());
 
         self.* = .{
@@ -34,12 +39,10 @@ pub const DynamicTable = struct {
         self.vt.draw_fn = &draw;
         self.vt.deinit_fn = &deinit;
 
-        var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
-        const tab_area = ly.getArea() orelse return null;
         self.vt.addChild(gui, win, TableHeader.build(gui, tab_area, self));
 
         ly.pushRemaining();
-        _ = self.vt.addEmpty(gui, win, ly.getArea() orelse return null);
+        _ = self.vt.addEmpty(gui, win, table_area);
         self.rebuild(gui, win);
 
         return &self.vt;

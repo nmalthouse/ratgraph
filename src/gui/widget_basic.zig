@@ -92,7 +92,7 @@ pub const VScroll = struct {
 
     pub fn getScrollableCount(self: *@This()) usize {
         const fitted = @trunc(self.vt.area.h / self.opts.item_h) - 2; // -1 so user can see scroll has ended
-        if (fitted > 1) {
+        if (fitted > 1 and fitted < std.math.maxInt(usize)) {
             const fw: usize = @intFromFloat(fitted);
             if (fw < self.opts.count)
                 return self.opts.count - fw;

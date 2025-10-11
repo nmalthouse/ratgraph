@@ -30,9 +30,14 @@ pub const Tabs = struct {
 
     pub fn build(gui: *Gui, area_o: ?Rect, tabs: []const Tab, win: *iWindow, opts: Opts) ?*iArea {
         const area = area_o orelse return null;
-        const self = gui.create(@This());
         if (tabs.len == 0)
             return null;
+        var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
+        const tab_area = ly.getArea() orelse return null;
+        ly.pushRemaining();
+        const child_area = ly.getArea() orelse return null;
+
+        const self = gui.create(@This());
 
         self.* = .{
             .vt = iArea.init(gui, area),
@@ -41,16 +46,17 @@ pub const Tabs = struct {
         };
         if (opts.index_ptr == null)
             self.opts.index_ptr = &self.__selected_tab_index;
-        self.tabs.appendSlice(tabs) catch return null; //free memory oops!
+        self.tabs.appendSlice(tabs) catch {
+            self.tabs.deinit();
+            gui.alloc.destroy(self);
+            return null;
+        };
         self.vt.draw_fn = &draw;
         self.vt.deinit_fn = &deinit;
-        var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
-        const tab_area = ly.getArea() orelse return null;
+
         self.vt.addChild(gui, win, TabHeader.build(gui, tab_area, self));
-        ly.pushRemaining();
-        _ = self.vt.addEmpty(gui, win, ly.getArea() orelse return null);
+        _ = self.vt.addEmpty(gui, win, child_area);
         self.rebuild(gui, win);
-        //build_cb(cb_vt, empty, tabs[0], gui, win);
 
         return &self.vt;
     }

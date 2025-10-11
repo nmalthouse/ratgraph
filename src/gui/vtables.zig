@@ -583,6 +583,13 @@ pub const VerticalLayout = struct {
         self.next_height = self.item_height * count;
     }
 
+    pub fn countLeft(self: *Self) usize {
+        if (self.item_height <= 0) return 0;
+
+        const count = (self.bounds.h - self.current_h) / (self.padding.vertical() + self.item_height);
+        return @intFromFloat(@trunc(count));
+    }
+
     /// The next requested area will be the rest of the available space
     pub fn pushRemaining(self: *Self) void {
         self.give_remaining = true;
