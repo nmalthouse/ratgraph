@@ -261,10 +261,10 @@ pub const Window = struct {
                 @tagName(@as(@TypeOf(options.frame_sync), @enumFromInt(set_swap))),
             });
         }
-        c.glEnable(c.GL_DEPTH_TEST);
+        GL.enable(.depth_test);
         if (options.enable_debug) {
-            c.glEnable(c.GL_DEBUG_OUTPUT);
-            c.glEnable(c.GL_DEBUG_OUTPUT_SYNCHRONOUS);
+            GL.enable(.debug_output);
+            GL.enable(.debug_output_synchronous);
             c.glDebugMessageControl(c.GL_DONT_CARE, c.GL_DONT_CARE, c.GL_DEBUG_SEVERITY_NOTIFICATION, 0, null, c.GL_FALSE);
             c.glDebugMessageCallback(GL.messageCallback, null);
         }

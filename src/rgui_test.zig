@@ -94,11 +94,14 @@ pub const MyInspector = struct {
         }, null));
         a.addChildOpt(gui, vt, Wg.Checkbox.build(gui, ly.getArea(), "secnd button", .{ .bool_ptr = &self.bool2 }, null));
         a.addChildOpt(gui, vt, Wg.StaticSlider.build(gui, ly.getArea(), null, .{
-            .default = 4,
-            .min = 0,
-            .max = 360,
+            .default = 0,
+            .min = -1000,
+            .max = 1000,
             .unit = "degrees",
-            .slide = .{ .snap = 15 },
+            .slide = .{ .snap = 1 },
+            .slide_cb = staticSliderCb,
+            .commit_cb = staticSliderSet,
+            .commit_vt = &self.area,
         }));
         a.addChildOpt(gui, vt, Wg.Combo.build(gui, ly.getArea() orelse return, &self.my_enum, .{}));
         a.addChildOpt(gui, vt, Wg.Combo.build(gui, ly.getArea() orelse return, &self.fenum, .{}));
@@ -119,6 +122,16 @@ pub const MyInspector = struct {
         a.addChildOpt(gui, vt, Wg.Tabs.build(gui, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.area }));
     }
 
+    fn staticSliderCb(user_vt: *iArea, gui: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("area", user_vt));
+        gui.setDirty(&self.area, &self.vt);
+    }
+
+    fn staticSliderSet(user_vt: *iArea, gui: *Gui, _: f32, _: usize) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("area", user_vt));
+        gui.setDirty(&self.area, &self.vt);
+    }
+
     pub fn buildTabs(user_vt: *iArea, vt: *iArea, tab_name: []const u8, gui: *Gui, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("area", user_vt));
         const eql = std.mem.eql;
@@ -127,6 +140,21 @@ pub const MyInspector = struct {
         if (eql(u8, tab_name, "main")) {
             vt.addChildOpt(gui, win, Wg.Textbox.build(gui, ly.getArea()));
             vt.addChildOpt(gui, win, Wg.Textbox.build(gui, ly.getArea()));
+
+            ly.pushRemaining();
+
+            if (ly.getArea()) |ar| {
+                const empty = vt.addEmpty(gui, win, ar.split(.horizontal, ar.h / 2)[0]);
+                win.registerScissor(empty) catch {};
+
+                const big_area = graph.Rec(ar.x, ar.y, 1000, 1000);
+                var ly2 = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = big_area };
+                for (0..10) |_| {
+                    //empty.addChildOpt(gui, win, Wg.Text.buildStatic(gui, big_area, "HELLO WIRLD", 0xff0000_ff));
+                    empty.addChildOpt(gui, win, Wg.Button.build(gui, ly2.getArea(), "My button 2", .{}));
+                }
+            }
+
             return;
         }
         if (eql(u8, tab_name, "next")) {
@@ -207,7 +235,7 @@ pub fn main() !void {
     gui.style.config.default_item_h = hh;
     gui.style.config.text_h = TEXT_H;
 
-    const window_area = Rect{ .x = 0, .y = 0, .w = 1000, .h = 1000 };
+    const window_area = Rect{ .x = 100, .y = 50, .w = 1000, .h = 1000 };
 
     const dstate = guis.DrawState{ .ctx = &draw, .font = &font.font, .style = &gui.style, .gui = &gui, .scale = sc, .nstyle = &gui.nstyle };
     try gui.addWindow(MyInspector.create(&gui), window_area);

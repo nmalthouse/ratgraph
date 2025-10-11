@@ -1211,7 +1211,7 @@ pub const Texture = struct {
 
         c.glTexParameterfv(o.target, c.GL_TEXTURE_BORDER_COLOR, &o.border_color);
 
-        c.glEnable(c.GL_BLEND);
+        GL.enable(.blend);
         c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
         c.glBlendEquation(c.GL_FUNC_ADD);
 

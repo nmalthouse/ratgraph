@@ -506,3 +506,31 @@ pub const Shader = struct {
         return simpleShader(@embedFile("shader/alpha_texturequad.vert"), @embedFile("shader/alpha_texturequad.frag"));
     }
 };
+
+pub const Capability = enum(c.GLenum) {
+    blend = c.GL_BLEND,
+    depth_test = c.GL_DEPTH_TEST,
+    scissor_test = c.GL_SCISSOR_TEST,
+    stencil_test = c.GL_STENCIL_TEST,
+    debug_output = c.GL_DEBUG_OUTPUT,
+    debug_output_synchronous = c.GL_DEBUG_OUTPUT_SYNCHRONOUS,
+    _,
+};
+
+const state_tracking = false;
+
+pub fn logState(comptime fmt: []const u8, args: anytype) void {
+    if (comptime state_tracking) {
+        log.info(fmt, args);
+    }
+}
+
+pub fn enable(cap: Capability) void {
+    logState("enable {s}", .{@tagName(cap)});
+    c.glEnable(@intFromEnum(cap));
+}
+
+pub fn disable(cap: Capability) void {
+    logState("disable {s}", .{@tagName(cap)});
+    c.glDisable(@intFromEnum(cap));
+}

@@ -1,6 +1,7 @@
 const std = @import("std");
 const Cache = @import("gui_cache.zig");
 const graph = @import("graphics.zig");
+const gl = graph.GL;
 //TODO write a backend using wasi
 //TODO write a backend using glfw
 //TODO gui should not depend on SDL. keys can be passed in an generic array. User must initialize keybindings with key ids
@@ -2190,12 +2191,11 @@ pub const GuiDrawContext = struct {
 
     pub fn drawGui(self: *Self, draw: *graph.ImmediateDrawingContext, gui: *Context) !void {
         try draw.flush(null, null);
-        graph.c.glEnable(graph.c.GL_DEPTH_TEST);
-        graph.c.glEnable(graph.c.GL_BLEND);
+        gl.enable(.depth_test);
+        gl.enable(.blend);
         graph.c.glBlendFunc(graph.c.GL_SRC_ALPHA, graph.c.GL_ONE_MINUS_SRC_ALPHA);
         graph.c.glBlendEquation(graph.c.GL_FUNC_ADD);
-        defer graph.c.glDisable(graph.c.GL_BLEND);
-        //defer graph.c.glDisable(graph.c.GL_DEPTH_TEST);
+        defer gl.disable(.blend);
         const scr_dim = draw.screen_dimensions;
         const ignore_cache = true;
         for (gui.windows.items[0..gui.this_frame_num_windows], 0..) |w, i| {
@@ -2269,7 +2269,7 @@ pub const GuiDrawContext = struct {
         //draw.screen_dimensions = .{ .x = parea.w, .y = parea.h };
         //{
         //    const c = graph.c;
-        //    c.glEnable(c.GL_STENCIL_TEST);
+        //    gl.enable(.stencil_test);
         //    c.glColorMask(c.GL_FALSE, c.GL_FALSE, c.GL_FALSE, c.GL_FALSE);
         //    c.glDepthMask(c.GL_FALSE);
         //    c.glClearStencil(0xff);
@@ -2326,7 +2326,7 @@ pub const GuiDrawContext = struct {
         //        n.data.draw_backup = false;
         //    }
         //}
-        //graph.c.glDisable(graph.c.GL_STENCIL_TEST);
+        //gl.disable(.stencil_test);
 
         //try ctx.drawRectTex(parea, parea, Color.White, self.main_rtexture.texture);
 
@@ -2385,7 +2385,7 @@ pub const GuiDrawContext = struct {
                 const c = graph.c;
                 try draw.flush(self.camera_bounds, null);
                 if (s.area) |ar| {
-                    c.glEnable(c.GL_SCISSOR_TEST);
+                    gl.enable(.scissor_test);
                     c.glScissor(
                         @as(i32, @intFromFloat(ar.x - self.camera_bounds.?.x)),
                         @as(i32, @intFromFloat(self.camera_bounds.?.h - (ar.y + ar.h) + self.camera_bounds.?.y)),
@@ -2393,7 +2393,7 @@ pub const GuiDrawContext = struct {
                         @as(i32, @intFromFloat(ar.h)),
                     );
                 } else {
-                    c.glDisable(c.GL_SCISSOR_TEST);
+                    gl.disable(.scissor_test);
                 }
             },
             .rect_filled_multi_color => |rf| {

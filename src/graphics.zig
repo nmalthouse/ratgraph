@@ -948,10 +948,10 @@ pub const ImmediateDrawingContext = struct {
     pub fn flushCustomMat(self: *Self, cam_2d: za.Mat4, cam_3d: za.Mat4) !void {
         if (self.preflush_cb) |cb|
             cb();
-        c.glEnable(c.GL_BLEND);
+        GL.enable(.blend);
         c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
         c.glBlendEquation(c.GL_FUNC_ADD);
-        defer c.glDisable(c.GL_BLEND);
+        defer GL.disable(.blend);
         //const view_3d = if (camera_3d) |c3| c3.getMatrix(
         //    self.screen_dimensions.x / self.screen_dimensions.y,
         //    1,
@@ -964,7 +964,6 @@ pub const ImmediateDrawingContext = struct {
         const sortctx = MapKeySortCtx{ .items = self.batches.keys() }; // Sort the batches by params.draw_priority
         self.batches.sort(sortctx);
         var b_it = self.batches.iterator();
-        //c.glEnable(c.GL_BLEND);
         while (b_it.next()) |b| {
             inline for (@typeInfo(Batches).@"union".fields, 0..) |ufield, i| {
                 if (i == @intFromEnum(b.value_ptr.*)) {

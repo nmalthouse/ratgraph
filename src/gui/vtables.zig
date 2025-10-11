@@ -7,16 +7,15 @@ pub const GuiConfig = Os9Gui.GuiConfig;
 pub const Rect = graph.Rect;
 pub const Rec = graph.Rec;
 pub const Uid = u64;
+const gl = graph.GL;
+const ArrayList = std.ArrayListUnmanaged;
 const AL = std.mem.Allocator;
 
 pub const CbHandle = struct {};
+const log = std.log.scoped(.rgui);
 
 pub const Widget = struct {
     const tx = @import("widget_textbox.zig");
-    //TOdo need a widget that is really cool. Like really cool.
-    //"resizable tabs"
-    //
-    //TODO we need scissor
     pub const NumberDummy = tx.NumberDummy;
     pub const TextboxNumber = tx.TextboxNumber;
     pub const NumberDummyfn = tx.NumberDummyFn;
@@ -67,6 +66,8 @@ pub const TextCbState = struct {
     mod_state: graph.SDL.keycodes.KeymodMask = 0,
 };
 
+//TODO since most functions are optional and registered to some event, omit them from the vtable and
+//instead store an array of function pointers in the window
 pub const iArea = struct {
     draw_fn: ?*const fn (*iArea, DrawState) void = null,
     deinit_fn: ?*const fn (*iArea, *Gui, *iWindow) void = null,
@@ -80,15 +81,19 @@ pub const iArea = struct {
     parent: ?*iArea = null,
     /// If this area is set dirty, set parents dirty (dirty_parents) deep
     dirty_parents: u8 = 0,
+    /// index of self as child of parent
     index: usize = 0,
     area: Rect,
-    children: std.ArrayList(*iArea),
+    children: ArrayList(*iArea),
     is_dirty: bool = false,
 
+    _scissor_id: ScissorId = .none,
+
     pub fn init(gui: *Gui, area: Rect) iArea {
+        _ = gui;
         return .{
             .area = area,
-            .children = std.ArrayList(*iArea).init(gui.alloc),
+            .children = .{},
         };
     }
 
@@ -98,13 +103,14 @@ pub const iArea = struct {
 
     pub fn deinit(self: *@This(), gui: *Gui, win: *iWindow) void {
         self.clearChildren(gui, win);
-        self.children.deinit();
+        self.children.deinit(gui.alloc);
         if (self.deinit_fn) |dfn|
             dfn(self, gui, win);
     }
 
     pub fn draw(self: *@This(), dctx: DrawState, window: *iWindow) void {
         if (dctx.gui.needsDraw(self, window)) {
+            window.checkScissor(self, &dctx);
             if (self.draw_fn) |drawf|
                 drawf(self, dctx);
             for (self.children.items) |child|
@@ -127,6 +133,11 @@ pub const iArea = struct {
     }
 
     pub fn addChild(self: *@This(), gui: *Gui, win: *iWindow, vt: *iArea) void {
+        if (self._scissor_id != .none and vt._scissor_id != .none) {
+            log.err("Can't created nested scissors!", .{});
+            return;
+        }
+
         gui.register(vt, win);
         if (vt.onclick != null)
             gui.registerOnClick(vt, win) catch return;
@@ -134,9 +145,14 @@ pub const iArea = struct {
             gui.regOnScroll(vt, win) catch return;
         if (vt.onpoll != null)
             win.poll_listeners.append(vt) catch return;
+
+        // Propogate the scissor. Default is .none so no need to check
+        vt._scissor_id = self._scissor_id;
+
         vt.parent = self;
         vt.index = self.children.items.len;
-        self.children.append(vt) catch return;
+        self.children.append(gui.alloc, vt) catch return;
+
         gui.setDirty(vt, win);
     }
 
@@ -166,6 +182,8 @@ pub const iArea = struct {
     }
 };
 
+pub const ScissorId = enum(u8) { none = std.math.maxInt(u8), _ };
+
 pub fn label(lay: *iArea, gui: *Gui, win: *iWindow, area_o: ?Rect, comptime fmt: []const u8, args: anytype) ?Rect {
     const area = area_o orelse return null;
     const sp = area.split(.vertical, area.w / 2);
@@ -180,6 +198,7 @@ pub const iWindow = struct {
     deinit_fn: *const fn (*iWindow, *Gui) void,
 
     area: *iArea,
+    alloc: std.mem.Allocator,
 
     click_listeners: std.ArrayList(*iArea),
     scroll_list: std.ArrayList(*iArea),
@@ -190,13 +209,39 @@ pub const iWindow = struct {
     draws_since_cached: i32 = 0,
     needs_rebuild: bool = false,
 
+    /// ScissorId indexes into this
+    scissors: ArrayList(?*iArea) = .{},
+
+    draw_scissor_state: ScissorId = .none,
+
     pub fn draw(self: *iWindow, dctx: DrawState) void {
         self.area.draw(dctx, self);
-        //self.area.draw_fn(self.area, dctx);
+    }
+
+    pub fn checkScissor(self: *iWindow, vt: *iArea, dctx: *const DrawState) void {
+        if (vt._scissor_id != self.draw_scissor_state) {
+            dctx.ctx.flush(self.area.area, null) catch {}; //Flush existing
+            self.draw_scissor_state = vt._scissor_id;
+            if (self.getScissorRect(self.draw_scissor_state)) |sz| {
+                const wa = self.area.area;
+                const new_x = sz.x - wa.x;
+                const new_y = wa.h - (sz.y - wa.y + sz.h);
+                gl.enable(.scissor_test);
+                graph.c.glScissor(
+                    @as(i32, @intFromFloat(new_x)),
+                    @as(i32, @intFromFloat(new_y)),
+                    @as(i32, @intFromFloat(sz.w)),
+                    @as(i32, @intFromFloat(sz.h)),
+                );
+            } else {
+                gl.disable(.scissor_test);
+            }
+        }
     }
 
     pub fn init(build_fn: BuildfnT, gui: *Gui, deinit_fn: *const fn (*iWindow, *Gui) void, area: *iArea) iWindow {
         return .{
+            .alloc = gui.alloc,
             .deinit_fn = deinit_fn,
             .build_fn = build_fn,
             .click_listeners = std.ArrayList(*iArea).init(gui.alloc),
@@ -222,6 +267,7 @@ pub const iWindow = struct {
         self.scroll_list.deinit();
         self.to_draw.deinit();
         self.cache_map.deinit();
+        self.scissors.deinit(self.alloc);
     }
 
     /// Returns true if this window contains the mouse
@@ -273,6 +319,49 @@ pub const iWindow = struct {
                 return;
             }
         }
+    }
+
+    /// User must call this when creating a scissor
+    pub fn registerScissor(win: *iWindow, vt: *iArea) !void {
+        if (vt._scissor_id != .none) return error.nestedScissor;
+        for (win.scissors.items, 0..) |pot, i| {
+            if (pot == null) {
+                win.scissors.items[i] = vt;
+                vt._scissor_id = @enumFromInt(i);
+                return;
+            }
+        }
+        if (win.scissors.items.len >= @intFromEnum(ScissorId.none))
+            return error.tooManyScissor;
+
+        const new_id: ScissorId = @enumFromInt(win.scissors.items.len);
+        try win.scissors.append(win.alloc, vt);
+        vt._scissor_id = new_id;
+        return;
+    }
+
+    pub fn unregisterScissor(win: *iWindow, vt: *iArea) void {
+        if (vt._scissor_id != .none) {
+            const index: usize = @intFromEnum(vt._scissor_id);
+            if (index < win.scissors.items.len) {
+                if (win.scissors.items[index]) |owner_vt| {
+                    if (owner_vt == vt) {
+                        win.scissors.items[index] = null;
+                    }
+                }
+            }
+        }
+    }
+
+    fn getScissorRect(self: *iWindow, id: ScissorId) ?Rect {
+        if (id == .none) return null;
+        const index: usize = @intFromEnum(id);
+        if (index < self.scissors.items.len) {
+            if (self.scissors.items[index]) |owner_vt| {
+                return owner_vt.area;
+            }
+        }
+        return null;
     }
 };
 
@@ -829,6 +918,8 @@ pub const Gui = struct {
             }
         }
 
+        window.unregisterScissor(vt);
+
         if (self.mouse_grab) |g| {
             if (g.vt == vt) {
                 self.mouse_grab = null;
@@ -1007,9 +1098,10 @@ pub const Gui = struct {
         defer {
             graph.c.glBindFramebuffer(graph.c.GL_FRAMEBUFFER, 0);
             graph.c.glViewport(0, 0, @intFromFloat(dctx.ctx.screen_dimensions.x), @intFromFloat(dctx.ctx.screen_dimensions.y));
+            gl.disable(.scissor_test);
         }
-        graph.c.glEnable(graph.c.GL_DEPTH_TEST);
-        graph.c.glEnable(graph.c.GL_BLEND);
+        gl.enable(.depth_test);
+        gl.enable(.blend);
         graph.c.glBlendFunc(graph.c.GL_SRC_ALPHA, graph.c.GL_ONE_MINUS_SRC_ALPHA);
         graph.c.glBlendEquation(graph.c.GL_FUNC_ADD);
         for (windows) |win| {
@@ -1021,12 +1113,14 @@ pub const Gui = struct {
         }
     }
 
-    pub fn drawWindow(self: *Self, win: *iWindow, dctx: DrawState, force_redraw: bool, fbo: *graph.RenderTexture) !void {
+    fn drawWindow(self: *Self, win: *iWindow, dctx: DrawState, force_redraw: bool, fbo: *graph.RenderTexture) !void {
+        gl.disable(.scissor_test);
         if (self.cached_drawing and !force_redraw) {
             if (win.draws_since_cached < 1 or win.draws_since_cached > self.max_cached_before_full_flush)
                 return self.draw_all_window(dctx, win, fbo);
 
             fbo.bind(false);
+            win.draw_scissor_state = .none;
             for (win.to_draw.items) |draw_area| {
                 draw_area.draw(dctx, win);
             }
@@ -1036,10 +1130,11 @@ pub const Gui = struct {
         }
     }
 
-    pub fn draw_all_window(self: *Self, dctx: DrawState, window: *iWindow, fbo: *graph.RenderTexture) !void {
+    fn draw_all_window(self: *Self, dctx: DrawState, window: *iWindow, fbo: *graph.RenderTexture) !void {
         _ = self;
         window.draws_since_cached = 1;
         fbo.bind(true);
+        window.draw_scissor_state = .none;
         window.draw(dctx);
         try dctx.ctx.flush(window.area.area, null);
     }
@@ -1154,18 +1249,44 @@ pub const GuiHelp = struct {
     }
 };
 
+pub const Colorscheme = struct {
+    bg: u32 = 0x4f4f4fff,
+    //text_fg: u32 = 0xdbe0e0_ff,
+    text_fg: u32 = 0xeeeeee_ff,
+    text_bg: u32 = 0x333333_ff,
+    textbox_bg: u32 = 0x333333_ff,
+    drop_down_arrow: u32 = 0xe0e0e0_ff,
+    caret: u32 = 0xaaaaaaff,
+
+    table_bg: u32 = 0x333333_ff,
+    static_slider_bg: u32 = 0x333333_ff,
+};
+
+pub const DarkColorscheme = Colorscheme{
+    .bg = 0x4f4f4fff,
+    .text_fg = 0xeeeeee_ff,
+    .text_bg = 0x333333_ff,
+    .textbox_bg = 0x333333_ff,
+    .drop_down_arrow = 0xe0e0e0_ff,
+    .caret = 0xaaaaaaff,
+
+    .table_bg = 0x333333_ff,
+    .static_slider_bg = 0x333333_ff,
+};
+
+pub const LightColorscheme = Colorscheme{
+    .bg = 0xd8d8d8ff,
+    .text_fg = 0xff,
+    .text_bg = 0xd8d8d8ff,
+    .textbox_bg = 0xd8d8d8ff,
+    .drop_down_arrow = 0xff,
+    .caret = 0xff,
+
+    .table_bg = 0xd8d8d8ff,
+    .static_slider_bg = 0xd8d8d8ff,
+};
+
 pub const Style = struct {
     caret_width: f32 = 2,
-    color: struct {
-        bg: u32 = 0x4f4f4fff,
-        //text_fg: u32 = 0xdbe0e0_ff,
-        text_fg: u32 = 0xeeeeee_ff,
-        text_bg: u32 = 0x333333_ff,
-        textbox_bg: u32 = 0x333333_ff,
-        drop_down_arrow: u32 = 0xe0e0e0_ff,
-        caret: u32 = 0xaaaaaaff,
-
-        table_bg: u32 = 0x333333_ff,
-        static_slider_bg: u32 = 0x333333_ff,
-    } = .{},
+    color: Colorscheme = LightColorscheme,
 };
