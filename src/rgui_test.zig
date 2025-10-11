@@ -148,6 +148,8 @@ pub const MyInspector = struct {
                 .build_vt = &self.cbhandle,
                 .win = win,
                 .scroll_mul = gui.style.config.default_item_h * 4,
+                .scroll_y = true,
+                .scroll_x = false,
             }));
 
             //if (ly.getArea()) |ar| {
@@ -190,14 +192,15 @@ pub const MyInspector = struct {
         _ = self;
     }
 
-    pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, win: *iWindow) void {
+    pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, win: *iWindow, scr: *Wg.FloatScroll) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = vt.area };
         _ = self;
-        for (0..10) |i| {
+        for (0..25) |i| {
             const ar = ly.getArea() orelse continue;
             vt.addChildOpt(gui, win, Wg.Text.build(gui, ar, "item {d}", .{i}));
         }
+        scr.hintBounds(ly.getUsed());
     }
 
     pub fn btnCb(_: *iArea, id: usize, _: *Gui, _: *iWindow) void {

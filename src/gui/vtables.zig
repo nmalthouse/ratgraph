@@ -214,7 +214,7 @@ pub const iWindow = struct {
     needs_rebuild: bool = false,
 
     /// ScissorId indexes into this
-    scissors: ArrayList(?*iArea) = .{},
+    scissors: ArrayList(?struct { *iArea, Rect }) = .{},
 
     draw_scissor_state: ScissorId = .none,
 
@@ -276,42 +276,40 @@ pub const iWindow = struct {
 
     /// Returns true if this window contains the mouse
     pub fn dispatchClick(win: *iWindow, cb: MouseCbState) bool {
-        if (win.area.area.containsPoint(cb.pos)) {
-            for (win.click_listeners.items) |vt| {
-                if (vt.area.containsPoint(cb.pos)) {
-                    if (vt.onclick) |oc| {
-                        if (win.getScissorRect(vt._scissor_id)) |sz| {
-                            if (!sz.containsPoint(cb.pos))
-                                continue; // Skip this cb and keep checking
-                        }
-                        oc(vt, cb, win);
-                        return true;
+        if (!win.area.area.containsPoint(cb.pos)) return false;
+        for (win.click_listeners.items) |vt| {
+            if (vt.area.containsPoint(cb.pos)) {
+                if (vt.onclick) |oc| {
+                    if (win.getScissorRect(vt._scissor_id)) |sz| {
+                        if (!sz.containsPoint(cb.pos))
+                            continue; // Skip this cb and keep checking
                     }
+                    oc(vt, cb, win);
+                    return true;
                 }
             }
-            return true;
         }
-        return false;
+        return true;
     }
 
     /// Returns true if this window contains the mouse
     pub fn dispatchScroll(win: *iWindow, coord: Vec2f, gui: *Gui, dist: f32) bool {
-        if (win.area.area.containsPoint(coord)) {
-            for (win.scroll_list.items) |vt| {
-                if (vt.area.containsPoint(coord)) {
-                    if (vt.onscroll) |oc| {
-                        if (win.getScissorRect(vt._scissor_id)) |sz| {
-                            if (!sz.containsPoint(coord))
-                                continue;
-                        }
-                        oc(vt, gui, win, dist);
-                        return true;
+        if (!win.area.area.containsPoint(coord)) return false;
+        var i: usize = win.scroll_list.items.len;
+        while (i > 0) : (i -= 1) { //Iterate backwards so that deeper scroll's have priority
+            const vt = win.scroll_list.items[i - 1];
+            if (vt.area.containsPoint(coord)) {
+                if (vt.onscroll) |oc| {
+                    if (win.getScissorRect(vt._scissor_id)) |sz| {
+                        if (!sz.containsPoint(coord))
+                            continue;
                     }
+                    oc(vt, gui, win, dist);
+                    return true;
                 }
             }
-            return true;
         }
-        return false;
+        return true;
     }
 
     pub fn dispatchPoll(win: *iWindow, gui: *Gui) void {
@@ -337,11 +335,11 @@ pub const iWindow = struct {
     }
 
     /// User must call this when creating a scissor
-    pub fn registerScissor(win: *iWindow, vt: *iArea) !void {
+    pub fn registerScissor(win: *iWindow, vt: *iArea, region: Rect) !void {
         if (vt._scissor_id != .none) return error.nestedScissor;
         for (win.scissors.items, 0..) |pot, i| {
             if (pot == null) {
-                win.scissors.items[i] = vt;
+                win.scissors.items[i] = .{ vt, region };
                 vt._scissor_id = @enumFromInt(i);
                 return;
             }
@@ -350,7 +348,7 @@ pub const iWindow = struct {
             return error.tooManyScissor;
 
         const new_id: ScissorId = @enumFromInt(win.scissors.items.len);
-        try win.scissors.append(win.alloc, vt);
+        try win.scissors.append(win.alloc, .{ vt, region });
         vt._scissor_id = new_id;
         return;
     }
@@ -360,7 +358,7 @@ pub const iWindow = struct {
             const index: usize = @intFromEnum(vt._scissor_id);
             if (index < win.scissors.items.len) {
                 if (win.scissors.items[index]) |owner_vt| {
-                    if (owner_vt == vt) {
+                    if (owner_vt[0] == vt) {
                         win.scissors.items[index] = null;
                     }
                 }
@@ -373,7 +371,7 @@ pub const iWindow = struct {
         const index: usize = @intFromEnum(id);
         if (index < self.scissors.items.len) {
             if (self.scissors.items[index]) |owner_vt| {
-                return owner_vt.area;
+                return owner_vt[1];
             }
         }
         return null;
@@ -571,6 +569,10 @@ pub const VerticalLayout = struct {
             .w = bounds.w - self.padding.horizontal(),
             .h = h,
         };
+    }
+
+    pub fn getUsed(self: *Self) Rect {
+        return Rect{ .x = self.bounds.x, .y = self.bounds.y, .w = self.bounds.w, .h = self.current_h };
     }
 
     pub fn pushHeight(self: *Self, h: f32) void {

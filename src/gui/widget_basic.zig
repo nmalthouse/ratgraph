@@ -460,18 +460,14 @@ pub const ScrollBar = struct {
 
     fn calculateShuttleW(count: usize, item_h: f32, area_w: f32, min_w: f32) f32 {
         const area_used = @as(f32, @floatFromInt(count)) * item_h;
-        const overflow = area_used - area_w;
-        if (overflow <= 0)
-            return area_w;
+        const dist = area_used - area_w;
+        if (dist <= 0)
+            return area_w; //No scroll
 
-        //if (overflow < area_w - min_w)
-        //    return area_w - min_w;
-        //return min_w;
-
-        const useable = area_w - overflow;
-        if (overflow < useable) // We can have a 1:1 mapping of scrollbar movement
-            return overflow;
-
+        if (dist < area_w - min_w) { // do dynamic scroll size
+            const sw = area_w - dist;
+            return sw;
+        }
         return min_w;
     }
 
