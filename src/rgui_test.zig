@@ -143,17 +143,24 @@ pub const MyInspector = struct {
 
             ly.pushRemaining();
 
-            if (ly.getArea()) |ar| {
-                const empty = vt.addEmpty(gui, win, ar.split(.horizontal, ar.h / 2)[0]);
-                win.registerScissor(empty) catch {};
+            vt.addChildOpt(gui, win, Wg.FloatScroll.build(gui, ly.getArea(), .{
+                .build_cb = &buildFloatScroll,
+                .build_vt = &self.cbhandle,
+                .win = win,
+                .scroll_mul = gui.style.config.default_item_h * 4,
+            }));
 
-                const big_area = graph.Rec(ar.x, ar.y, 1000, 1000);
-                var ly2 = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = big_area };
-                for (0..10) |_| {
-                    //empty.addChildOpt(gui, win, Wg.Text.buildStatic(gui, big_area, "HELLO WIRLD", 0xff0000_ff));
-                    empty.addChildOpt(gui, win, Wg.Button.build(gui, ly2.getArea(), "My button 2", .{}));
-                }
-            }
+            //if (ly.getArea()) |ar| {
+            //    const empty = vt.addEmpty(gui, win, ar.split(.horizontal, ar.h / 2)[0]);
+            //    win.registerScissor(empty) catch {};
+
+            //    const big_area = graph.Rec(ar.x, ar.y, 1000, 1000);
+            //    var ly2 = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = big_area };
+            //    for (0..10) |_| {
+            //        //empty.addChildOpt(gui, win, Wg.Text.buildStatic(gui, big_area, "HELLO WIRLD", 0xff0000_ff));
+            //        empty.addChildOpt(gui, win, Wg.Button.build(gui, ly2.getArea(), "My button 2", .{}));
+            //    }
+            //}
 
             return;
         }
@@ -181,6 +188,16 @@ pub const MyInspector = struct {
             vt.addChildOpt(gui, window, Wg.Text.build(gui, ly.getArea(), "item {d}", .{i}));
         }
         _ = self;
+    }
+
+    pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        var ly = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = vt.area };
+        _ = self;
+        for (0..10) |i| {
+            const ar = ly.getArea() orelse continue;
+            vt.addChildOpt(gui, win, Wg.Text.build(gui, ar, "item {d}", .{i}));
+        }
     }
 
     pub fn btnCb(_: *iArea, id: usize, _: *Gui, _: *iWindow) void {

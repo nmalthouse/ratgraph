@@ -55,6 +55,10 @@ pub const Widget = struct {
     pub const Slide = st.Slide;
     pub const StaticSlider = st.StaticSlider;
     pub const StaticSliderOpts = st.StaticSliderOpts;
+
+    const Fscroll = @import("widget_floatscroll.zig");
+    pub const FloatScroll = Fscroll.FloatScroll;
+    pub const FloatScrollOpts = Fscroll.Opts;
 };
 
 pub const TextCbState = struct {
