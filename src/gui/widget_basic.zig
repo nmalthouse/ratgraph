@@ -115,6 +115,8 @@ pub const VScroll = struct {
         self.opts.count = new_count;
         self.sc_count = self.getScrollableCount();
         scr.updateCount(self.sc_count);
+        if (self.sc_count >= self.index_ptr.*)
+            self.index_ptr.* = self.sc_count;
     }
 
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {

@@ -1280,7 +1280,7 @@ pub const LightColorscheme = Colorscheme{
     .bg = 0xd8d8d8ff,
     .text_fg = 0xff,
     .text_bg = 0xd8d8d8ff,
-    .textbox_bg = 0xd8d8d8ff,
+    .textbox_bg = 0xa8a8a8ff,
     .drop_down_arrow = 0xff,
     .caret = 0xff,
 
