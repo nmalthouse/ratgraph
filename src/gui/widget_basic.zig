@@ -73,8 +73,8 @@ pub const VScroll = struct {
                 &notifyChange,
             ));
         } else {
-            //self.index_ptr.* = 0;
-            //_ = self.vt.addEmpty(gui, opts.win, split[1]);
+            self.index_ptr.* = 0;
+            _ = self.vt.addEmpty(gui, opts.win, split[1]);
         }
 
         self.rebuild(gui, opts.win);
@@ -110,13 +110,11 @@ pub const VScroll = struct {
     }
 
     pub fn updateCount(self: *@This(), new_count: usize) void {
-        if (self.vt.children.items.len != 2) return;
+        if (self.vt.children.items.len != 2 or !self.has_scroll) return;
         const scr: *ScrollBar = @alignCast(@fieldParentPtr("vt", self.vt.children.items[1]));
         self.opts.count = new_count;
         self.sc_count = self.getScrollableCount();
         scr.updateCount(self.sc_count);
-        if (self.sc_count >= self.index_ptr.*)
-            self.index_ptr.* = self.sc_count;
     }
 
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {
