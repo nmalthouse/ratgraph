@@ -28,7 +28,7 @@ pub const Tabs = struct {
     __selected_tab_index: usize = 0,
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, tabs: []const Tab, win: *iWindow, opts: Opts) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, tabs: []const Tab, win: *iWindow, opts: Opts) ?g.NewVt {
         const area = area_o orelse return null;
         if (tabs.len == 0)
             return null;
@@ -40,7 +40,7 @@ pub const Tabs = struct {
         const self = gui.create(@This());
 
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .tabs = std.ArrayList(Tab).init(gui.alloc),
             .opts = opts,
         };
@@ -51,14 +51,12 @@ pub const Tabs = struct {
             gui.alloc.destroy(self);
             return null;
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
 
         self.vt.addChild(gui, win, TabHeader.build(gui, tab_area, self));
         _ = self.vt.addEmpty(gui, win, child_area);
         self.rebuild(gui, win);
 
-        return &self.vt;
+        return .{ .vt = &self.vt };
     }
 
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {
@@ -89,17 +87,14 @@ const TabHeader = struct {
 
     parent: *Tabs,
 
-    pub fn build(gui: *Gui, area: Rect, parent: *Tabs) *iArea {
+    pub fn build(gui: *Gui, area: Rect, parent: *Tabs) g.NewVt {
         const self = gui.create(@This());
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .parent = parent,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
-        self.vt.onclick = &onclick;
 
-        return &self.vt;
+        return .{ .vt = &self.vt, .onclick = onclick };
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {

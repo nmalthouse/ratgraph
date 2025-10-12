@@ -33,7 +33,7 @@ fn numberTypeFromPtr(comptime T: type) type {
 }
 
 pub const Slider = struct {
-    pub fn build(gui: *Gui, area_o: ?Rect, ptr: anytype, min: anytype, max: anytype, opts: SliderOptions) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, ptr: anytype, min: anytype, max: anytype, opts: SliderOptions) ?g.NewVt {
         const Gen = SliderGeneric(numberTypeFromPtr(@TypeOf(ptr)));
         return Gen.build(gui, area_o, ptr, min, max, opts);
     }
@@ -56,13 +56,13 @@ pub fn SliderGeneric(comptime number_T: type) type {
         nudge_dist: f32,
         opts: SliderOptions,
 
-        pub fn build(gui: *Gui, area_o: ?Rect, ptr: *number_T, min: anytype, max: anytype, opts: SliderOptions) ?*iArea {
+        pub fn build(gui: *Gui, area_o: ?Rect, ptr: *number_T, min: anytype, max: anytype, opts: SliderOptions) ?g.NewVt {
             const area = area_o orelse return null;
             if (min >= max) return null;
             const self = gui.create(@This());
 
             self.* = .{
-                .vt = iArea.init(gui, area),
+                .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focusEvent = fevent },
                 .ptr = ptr,
                 .shuttle_rect = Rec(0, 0, 16 * gui.scale, area.h),
                 .min = std.math.lossyCast(number_T, min),
@@ -71,12 +71,8 @@ pub fn SliderGeneric(comptime number_T: type) type {
                 .opts = opts,
             };
             self.vt.can_tab_focus = true;
-            self.vt.focusEvent = &fevent;
             self.shuttle_rect.x = self.valueToShuttlePos();
-            self.vt.draw_fn = &draw;
-            self.vt.deinit_fn = &deinit; //we must free our memory !
-            self.vt.onclick = &onclick;
-            return &self.vt;
+            return .{ .vt = &self.vt, .onclick = onclick };
         }
 
         pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {

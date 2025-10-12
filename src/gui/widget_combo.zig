@@ -14,7 +14,7 @@ const CbHandle = g.CbHandle;
 pub const ComboOpts = struct {};
 
 pub const Combo = struct {
-    pub fn build(gui: *Gui, area_o: ?Rect, enum_ptr: anytype, opts: ComboOpts) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, enum_ptr: anytype, opts: ComboOpts) ?g.NewVt {
         const info = @typeInfo(@TypeOf(enum_ptr));
         if (info != .pointer) @compileError("expected a pointer to enum");
         if (info.pointer.is_const or info.pointer.size != .one) @compileError("invalid pointer");
@@ -72,7 +72,7 @@ pub fn ComboUser(user_data: type) type {
                     vt,
                     Widget.Textbox.buildOpts(gui, ly.getArea(), .{
                         .commit_cb = &textbox_cb,
-                        .commit_vt = vt.area,
+                        .commit_vt = &self.cbhandle,
                         .commit_when = .on_change,
                     }),
                 );
@@ -89,16 +89,16 @@ pub fn ComboUser(user_data: type) type {
                     .index_ptr = &p.index,
                 }) orelse return;
                 self.area.addChild(gui, vt, vscroll);
-                self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vscroll));
+                self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vscroll.vt));
             }
 
-            pub fn textbox_cb(pop_vt: *iArea, gui: *Gui, str: []const u8, _: usize) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("area", pop_vt));
+            pub fn textbox_cb(pop_vt: *CbHandle, gui: *Gui, str: []const u8, _: usize) void {
+                const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", pop_vt));
                 self.search_string = str;
                 if (self.vscroll_vt) |v| {
                     //This will call build_scroll_cb
                     v.index_ptr.* = 0;
-                    v.rebuild(gui, gui.getWindow(pop_vt) orelse return);
+                    v.rebuild(gui, gui.getWindow(&self.area) orelse return);
                 }
             }
 
@@ -133,7 +133,7 @@ pub fn ComboUser(user_data: type) type {
                         gui,
                         ly.getArea(),
                         name,
-                        .{ .cb_vt = self.parent_vt, .cb_fn = &ParentT.buttonCb, .id = i },
+                        .{ .cb_vt = &p.cbhandle, .cb_fn = &ParentT.buttonCb, .id = i },
                     ) orelse return);
                     area.children.items[area.children.items.len - 1].can_tab_focus = true;
                 }
@@ -159,22 +159,20 @@ pub fn ComboUser(user_data: type) type {
 
         vt: iArea,
 
+        cbhandle: CbHandle = .{},
         opts: ComboVt,
         index: usize = 0,
         current: usize = 0,
         user: user_data,
 
-        pub fn build(gui: *Gui, area: Rect, opts: ComboVt, user: user_data) *iArea {
+        pub fn build(gui: *Gui, area: Rect, opts: ComboVt, user: user_data) g.NewVt {
             const self = gui.create(@This());
             self.* = .{
-                .vt = iArea.init(gui, area),
+                .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
                 .opts = opts,
                 .user = user,
             };
-            self.vt.onclick = &onclick;
-            self.vt.draw_fn = &draw;
-            self.vt.deinit_fn = &deinit;
-            return &self.vt;
+            return .{ .vt = &self.vt, .onclick = onclick };
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -203,9 +201,9 @@ pub fn ComboUser(user_data: type) type {
             self.makeTransientWindow(cb.gui, Rec(vt.area.x, vt.area.y, vt.area.w, cb.gui.style.config.default_item_h * 10));
         }
 
-        pub fn buttonCb(vt: *iArea, id: usize, gui: *Gui, _: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-            vt.dirty(gui);
+        pub fn buttonCb(cb: *CbHandle, id: usize, gui: *Gui, _: *iWindow) void {
+            const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+            self.vt.dirty(gui);
             self.opts.current = id;
             self.opts.commit_cb(self.opts.user_vt, id, self.user);
             gui.deferTransientClose();
@@ -222,11 +220,9 @@ pub fn ComboUser(user_data: type) type {
                     &popped.area,
                 ),
                 .search_list = std.ArrayList(usize).init(gui.alloc),
-                .area = iArea.init(gui, area),
+                .area = .{ .area = area, .deinit_fn = PoppedWindow.deinit_area, .draw_fn = PoppedWindow.draw },
                 .name = "noname",
             };
-            popped.area.draw_fn = &PoppedWindow.draw;
-            popped.area.deinit_fn = &PoppedWindow.deinit_area;
             gui.setTransientWindow(&popped.vt);
             popped.vt.build_fn(&popped.vt, gui, area);
         }
@@ -265,6 +261,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
 
             pub fn build_cb(cb: *CbHandle, area: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+                const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area.area };
                 const info = @typeInfo(enumT);
                 inline for (info.@"enum".fields, 0..) |field, i| {
@@ -273,7 +270,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                             gui,
                             ly.getArea(),
                             field.name,
-                            .{ .cb_vt = self.parent_vt, .cb_fn = &ParentT.buttonCb, .id = field.value },
+                            .{ .cb_vt = &p.cbhandle, .cb_fn = &ParentT.buttonCb, .id = field.value },
                         ) orelse return);
                     }
                 }
@@ -297,21 +294,19 @@ pub fn ComboGeneric(comptime enumT: type) type {
         };
 
         vt: iArea,
+        cbhandle: CbHandle = .{},
 
         enum_ptr: *enumT,
         opts: ComboOpts,
 
-        pub fn build(gui: *Gui, area: Rect, enum_ptr: *enumT, opts: ComboOpts) *iArea {
+        pub fn build(gui: *Gui, area: Rect, enum_ptr: *enumT, opts: ComboOpts) g.NewVt {
             const self = gui.create(@This());
             self.* = .{
-                .vt = iArea.init(gui, area),
+                .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
                 .enum_ptr = enum_ptr,
                 .opts = opts,
             };
-            self.vt.onclick = &onclick;
-            self.vt.draw_fn = &draw;
-            self.vt.deinit_fn = &deinit;
-            return &self.vt;
+            return .{ .vt = &self.vt, .onclick = onclick };
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -342,9 +337,9 @@ pub fn ComboGeneric(comptime enumT: type) type {
             self.makeTransientWindow(cb.gui, Rec(btn_a.x, btn_a.y, btn_a.w, cb.gui.style.config.default_item_h * 4));
         }
 
-        pub fn buttonCb(vt: *iArea, id: usize, gui: *Gui, _: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-            vt.dirty(gui);
+        pub fn buttonCb(cb: *CbHandle, id: usize, gui: *Gui, _: *iWindow) void {
+            const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+            self.vt.dirty(gui);
             self.enum_ptr.* = @enumFromInt(id);
             gui.deferTransientClose();
         }
@@ -359,11 +354,9 @@ pub fn ComboGeneric(comptime enumT: type) type {
                     &PoppedWindow.deinit,
                     &popped.area,
                 ),
-                .area = iArea.init(gui, area),
+                .area = .{ .area = area, .deinit_fn = PoppedWindow.deinit_area, .draw_fn = PoppedWindow.draw },
                 .name = "noname",
             };
-            popped.area.draw_fn = &PoppedWindow.draw;
-            popped.area.deinit_fn = &PoppedWindow.deinit_area;
             gui.setTransientWindow(&popped.vt);
             popped.vt.build_fn(&popped.vt, gui, area);
         }

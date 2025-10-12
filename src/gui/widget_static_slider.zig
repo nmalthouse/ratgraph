@@ -9,6 +9,8 @@ const iWindow = g.iWindow;
 const Color = graph.Colori;
 const VScroll = g.Widget.VScroll;
 const Widget = g.Widget;
+const CbHandle = g.CbHandle;
+const NewVt = g.NewVt;
 pub const ALLOWED_CHAR = "0123456789abcdef.-inx";
 pub const StaticSliderOpts = struct {
     pub const State = graph.SDL.ButtonState;
@@ -23,9 +25,9 @@ pub const StaticSliderOpts = struct {
     clamp_edits: bool = false,
     slide: Slide = .{},
 
-    commit_cb: ?*const fn (*iArea, *Gui, f32, user_id: usize) void = null,
-    slide_cb: ?*const fn (*iArea, *Gui, f32, user_id: usize, State) void = null, // Called while holding the slider
-    commit_vt: ?*iArea = null,
+    commit_cb: ?*const fn (*CbHandle, *Gui, f32, user_id: usize) void = null,
+    slide_cb: ?*const fn (*CbHandle, *Gui, f32, user_id: usize, State) void = null, // Called while holding the slider
+    commit_vt: ?*CbHandle = null,
     user_id: usize = 0,
 };
 
@@ -74,23 +76,18 @@ pub const StaticSlider = struct {
     buf: [32]u8 = undefined,
     fbs: std.io.FixedBufferStream([]u8),
 
-    pub fn build(gui: *Gui, area_o: ?Rect, number: ?*f32, opts: StaticSliderOpts) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, number: ?*f32, opts: StaticSliderOpts) ?NewVt {
         const area = area_o orelse return null;
         const self = gui.create(@This());
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focusEvent = fevent },
             .opts = opts,
             ._num = opts.default,
             .num = number orelse &self._num,
             .state = .display,
             .fbs = .{ .buffer = &self.buf, .pos = 0 },
         };
-        self.vt.onclick = &onclick;
-        self.vt.draw_fn = &draw;
-        self.vt.onscroll = &scroll;
-        self.vt.deinit_fn = &deinit;
-        self.vt.focusEvent = &fevent;
-        return &self.vt;
+        return .{ .vt = &self.vt, .onclick = onclick, .onscroll = scroll };
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -189,7 +186,6 @@ pub const StaticSlider = struct {
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        vt.dirty(cb.gui);
         switch (cb.btn) {
             .left => {
                 self.cancelEdit(cb.gui);
@@ -209,6 +205,7 @@ pub const StaticSlider = struct {
                 }
             },
         }
+        vt.dirty(cb.gui);
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
@@ -218,11 +215,11 @@ pub const StaticSlider = struct {
     fn commitEdit(self: *@This(), gui: *Gui) void {
         self.state = .display;
         gui.stopTextInput();
-        self.vt.dirty(gui);
         self.num.* = std.fmt.parseFloat(f32, self.fbs.getWritten()) catch self.num.*;
         if (self.opts.clamp_edits)
             self.clamp();
         self.commitCb(gui);
+        self.vt.dirty(gui);
     }
 
     pub fn fevent_err(vt: *iArea, ev: g.FocusedEvent) !void {

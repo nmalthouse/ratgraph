@@ -44,19 +44,16 @@ pub const FloatScroll = struct {
 
     scroll_ptr: ?*FloatScrollBar = null,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, opts: Opts) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, opts: Opts) ?g.NewVt {
         const area = area_o orelse return null;
         const self = gui.create(@This());
 
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .opts = opts,
             .y = 0,
             .y_ptr = &self.y,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
-        self.vt.onscroll = onScroll;
 
         const split = self.vt.area.split(.vertical, getAreaW(self.vt.area.w, gui.scale));
         self.vt.area = split[0];
@@ -69,8 +66,8 @@ pub const FloatScroll = struct {
             &self.cb,
             &notifyChange,
         )) |sbar| {
-            self.vt.addChildOpt(gui, opts.win, &sbar.vt);
-            self.scroll_ptr = sbar;
+            self.vt.addChildOpt(gui, opts.win, sbar);
+            self.scroll_ptr = @alignCast(@fieldParentPtr("vt", sbar.vt));
         } else {
             _ = self.vt.addEmpty(gui, opts.win, split[1]);
         }
@@ -85,7 +82,7 @@ pub const FloatScroll = struct {
         opts.win.registerScissor(virt, split[0]) catch {};
 
         self.rebuild(gui, opts.win);
-        return &self.vt;
+        return .{ .vt = &self.vt, .onscroll = onScroll };
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -211,22 +208,19 @@ pub const FloatScrollBar = struct {
     shuttle_h: f32 = 0,
     shuttle_pos: f32 = 0,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, y_ptr: *f32, area_h: f32, parent_vt: *CbHandle, notify_fn: NotifyFn) ?*FloatScrollBar {
+    pub fn build(gui: *Gui, area_o: ?Rect, y_ptr: *f32, area_h: f32, parent_vt: *CbHandle, notify_fn: NotifyFn) ?g.NewVt {
         const area = area_o orelse return null;
         const self = gui.create(@This());
 
         self.* = .{
             .parent_vt = parent_vt,
             .notify_fn = notify_fn,
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .y_ptr = y_ptr,
 
             .area_h = area_h,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
-        self.vt.onclick = &onclick;
-        return self;
+        return .{ .vt = &self.vt, .onclick = onclick };
     }
 
     pub fn updateVirtH(self: *@This(), new_h: f32) void {

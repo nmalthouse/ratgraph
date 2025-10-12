@@ -14,7 +14,7 @@ pub const GLTexture = struct {
     pub const Opts = struct {
         tint: u32 = 0xffff_ffff,
 
-        cb_vt: ?*iArea = null,
+        cb_vt: ?*g.CbHandle = null,
         cb_fn: ?Widget.Button.ButtonCallbackT = null,
         id: usize = 0,
     };
@@ -24,20 +24,17 @@ pub const GLTexture = struct {
     tex: graph.Texture,
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, tex: graph.Texture, uv: Rect, opts: Opts) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, tex: graph.Texture, uv: Rect, opts: Opts) ?g.NewVt {
         const area = area_o orelse return null;
         const self = gui.create(@This());
 
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .uv = uv,
             .tex = tex,
             .opts = opts,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
-        self.vt.onclick = &onclick;
-        return &self.vt;
+        return .{ .vt = &self.vt, .onclick = onclick };
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {

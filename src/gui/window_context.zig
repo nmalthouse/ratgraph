@@ -13,7 +13,7 @@ pub const BtnContextWindow = struct {
     pub const Opts = struct {
         buttons: ButtonList,
         btn_cb: BtnCb,
-        btn_vt: *iArea,
+        btn_vt: *g.CbHandle,
         user_id: g.Uid = 0,
     };
     const BtnCb = Widget.Button.ButtonCallbackT;
@@ -23,6 +23,7 @@ pub const BtnContextWindow = struct {
     area: iArea,
 
     opts: Opts,
+    cbhandle: g.CbHandle = .{},
     //btn_cb: BtnCb,
     //btn_cb_vt: *iArea,
 
@@ -44,15 +45,13 @@ pub const BtnContextWindow = struct {
 
         const rec = graph.Rec(pos.x, pos.y, max_w + item_h, item_h * @as(f32, @floatFromInt(opts.buttons.len)));
         self.* = .{
-            .area = iArea.init(gui, gui.clampRectToWindow(rec)),
+            .area = .{ .area = gui.clampRectToWindow(rec), .draw_fn = draw, .deinit_fn = deinit_area },
             .vt = iWindow.init(build, gui, deinit, &self.area),
             .opts = opts,
         };
         try self.buttons.resize(gui.alloc, opts.buttons.len);
         for (opts.buttons, 0..) |btn, i|
             self.buttons.items[i] = .{ btn[0], try gui.alloc.dupe(u8, btn[1]) };
-        self.area.draw_fn = draw;
-        self.area.deinit_fn = deinit_area;
 
         build(&self.vt, gui, self.area.area);
 
@@ -67,7 +66,7 @@ pub const BtnContextWindow = struct {
         var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
         for (self.buttons.items) |btn| {
             self.area.addChildOpt(gui, vt, Widget.Button.build(gui, ly.getArea(), btn[1], .{
-                .cb_vt = &self.area,
+                .cb_vt = &self.cbhandle,
                 .cb_fn = btn_wrap_cb,
                 .id = btn[0],
             }));
@@ -91,8 +90,8 @@ pub const BtnContextWindow = struct {
         _ = d;
     }
 
-    fn btn_wrap_cb(vt: *iArea, id: g.Uid, gui: *Gui, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
+    fn btn_wrap_cb(cb: *g.CbHandle, id: g.Uid, gui: *Gui, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         self.opts.btn_cb(self.opts.btn_vt, id, gui, win);
         gui.deferTransientClose();
     }

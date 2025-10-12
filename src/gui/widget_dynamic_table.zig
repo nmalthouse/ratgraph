@@ -23,7 +23,7 @@ pub const DynamicTable = struct {
 
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, win: *iWindow, opts: Opts) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, win: *iWindow, opts: Opts) ?g.NewVt {
         const area = area_o orelse return null;
         var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
         const tab_area = ly.getArea() orelse return null;
@@ -33,11 +33,9 @@ pub const DynamicTable = struct {
         const self = gui.create(@This());
 
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .opts = opts,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
 
         self.vt.addChild(gui, win, TableHeader.build(gui, tab_area, self));
 
@@ -45,7 +43,7 @@ pub const DynamicTable = struct {
         _ = self.vt.addEmpty(gui, win, table_area);
         self.rebuild(gui, win);
 
-        return &self.vt;
+        return .{ .vt = &self.vt };
     }
 
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {
@@ -98,17 +96,14 @@ const TableHeader = struct {
     parent: *DynamicTable,
     grab_index: ?usize = null,
 
-    pub fn build(gui: *Gui, area: Rect, parent: *DynamicTable) *iArea {
+    pub fn build(gui: *Gui, area: Rect, parent: *DynamicTable) g.NewVt {
         const self = gui.create(@This());
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .parent = parent,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
-        self.vt.onclick = &onclick;
 
-        return &self.vt;
+        return .{ .vt = &self.vt, .onclick = onclick };
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {

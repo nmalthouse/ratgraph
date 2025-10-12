@@ -50,11 +50,9 @@ pub const MyInspector = struct {
     pub fn create(gui: *Gui) *iWindow {
         const self = gui.create(@This());
         self.* = .{
-            .area = iArea.init(gui, Rec(0, 0, 0, 0)),
+            .area = .{ .area = Rec(0, 0, 0, 0), .deinit_fn = area_deinit, .draw_fn = draw },
             .vt = iWindow.init(&@This().build, gui, &@This().deinit, &self.area),
         };
-        self.area.draw_fn = &draw;
-        self.area.deinit_fn = &area_deinit;
 
         return &self.vt;
     }
@@ -101,12 +99,12 @@ pub const MyInspector = struct {
             .slide = .{ .snap = 1 },
             .slide_cb = staticSliderCb,
             .commit_cb = staticSliderSet,
-            .commit_vt = &self.area,
+            .commit_vt = &self.cbhandle,
         }));
         a.addChildOpt(gui, vt, Wg.Combo.build(gui, ly.getArea() orelse return, &self.my_enum, .{}));
         a.addChildOpt(gui, vt, Wg.Combo.build(gui, ly.getArea() orelse return, &self.fenum, .{}));
 
-        a.addChildOpt(gui, vt, Wg.Button.build(gui, ly.getArea(), "My button", .{ .cb_vt = &self.area, .cb_fn = @This().btnCb, .id = 48 }));
+        a.addChildOpt(gui, vt, Wg.Button.build(gui, ly.getArea(), "My button", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = 48 }));
         a.addChildOpt(gui, vt, Wg.Button.build(gui, ly.getArea(), "My button 2", .{}));
         a.addChildOpt(gui, vt, Wg.Button.build(gui, ly.getArea(), "My button 3", .{}));
         a.addChild(gui, vt, Wg.Colorpicker.build(gui, ly.getArea() orelse return, self.color, .{}));
@@ -122,13 +120,13 @@ pub const MyInspector = struct {
         a.addChildOpt(gui, vt, Wg.Tabs.build(gui, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.area }));
     }
 
-    fn staticSliderCb(user_vt: *iArea, gui: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("area", user_vt));
+    fn staticSliderCb(cb: *CbHandle, gui: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         gui.setDirty(&self.area, &self.vt);
     }
 
-    fn staticSliderSet(user_vt: *iArea, gui: *Gui, _: f32, _: usize) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("area", user_vt));
+    fn staticSliderSet(cb: *CbHandle, gui: *Gui, _: f32, _: usize) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         gui.setDirty(&self.area, &self.vt);
     }
 
@@ -203,7 +201,7 @@ pub const MyInspector = struct {
         scr.hintBounds(ly.getUsed());
     }
 
-    pub fn btnCb(_: *iArea, id: usize, _: *Gui, _: *iWindow) void {
+    pub fn btnCb(_: *CbHandle, id: usize, _: *Gui, _: *iWindow) void {
         std.debug.print("BUTTON CLICKED {d}\n", .{id});
     }
 };
@@ -280,16 +278,16 @@ pub fn main() !void {
         }
         try gui.draw(dstate, false, wins);
 
+        const took = timer.read();
+        if (took > std.time.ns_per_ms * 16) {
+            std.debug.print("Overtime {d} \n", .{took / std.time.ns_per_ms});
+        }
         gui.drawFbos(&draw, wins);
 
         try draw.flush(null, null); //Flush any draw commands
 
         try draw.end(null);
 
-        const took = timer.read();
-        if (took > std.time.ns_per_ms * 16) {
-            std.debug.print("Overtime {d} \n", .{took / std.time.ns_per_ms});
-        }
         win.swap();
     }
 }

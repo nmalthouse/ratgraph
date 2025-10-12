@@ -70,36 +70,36 @@ pub const TextCbState = struct {
     mod_state: graph.SDL.keycodes.KeymodMask = 0,
 };
 
-//TODO since most functions are optional and registered to some event, omit them from the vtable and
-//instead store an array of function pointers in the window
+/// A helper to return function pointers not stored inside vtable
+pub const NewVt = struct {
+    pub const OnClick = *const fn (*iArea, MouseCbState, *iWindow) void;
+
+    pub const Onscroll = *const fn (*iArea, *Gui, *iWindow, distance: f32) void;
+    pub const FocusEvent = *const fn (*iArea, FocusedEvent) void;
+    pub const Onpoll = *const fn (*iArea, *Gui, *iWindow) void;
+    vt: *iArea,
+
+    onclick: ?OnClick = null,
+    onscroll: ?Onscroll = null,
+    onpoll: ?Onpoll = null,
+};
+
+//TODO store a depth and sort to_draw by depth
 pub const iArea = struct {
     draw_fn: ?*const fn (*iArea, DrawState) void = null,
-    deinit_fn: ?*const fn (*iArea, *Gui, *iWindow) void = null,
-    onclick: ?*const fn (*iArea, MouseCbState, *iWindow) void = null,
-    onscroll: ?*const fn (*iArea, *Gui, *iWindow, distance: f32) void = null,
-    focusEvent: ?*const fn (*iArea, FocusedEvent) void = null,
-    onpoll: ?*const fn (*iArea, *Gui, *iWindow) void = null,
+    deinit_fn: *const fn (*iArea, *Gui, *iWindow) void,
+    focusEvent: ?NewVt.FocusEvent = null,
 
     can_tab_focus: bool = false,
-
-    parent: ?*iArea = null,
-    /// If this area is set dirty, set parents dirty (dirty_parents) deep
-    dirty_parents: u8 = 0,
-    /// index of self as child of parent
-    index: usize = 0,
-    area: Rect,
-    children: ArrayList(*iArea),
     is_dirty: bool = false,
 
-    _scissor_id: ScissorId = .none,
+    parent: ?*iArea = null,
+    /// index of self as child of parent
+    index: u32 = 0,
+    area: Rect,
+    children: ArrayList(*iArea) = .{},
 
-    pub fn init(gui: *Gui, area: Rect) iArea {
-        _ = gui;
-        return .{
-            .area = area,
-            .children = .{},
-        };
-    }
+    _scissor_id: ScissorId = .none,
 
     pub fn getLastChild(self: *@This()) ?*iArea {
         return self.children.getLastOrNull();
@@ -108,8 +108,7 @@ pub const iArea = struct {
     pub fn deinit(self: *@This(), gui: *Gui, win: *iWindow) void {
         self.clearChildren(gui, win);
         self.children.deinit(gui.alloc);
-        if (self.deinit_fn) |dfn|
-            dfn(self, gui, win);
+        self.deinit_fn(self, gui, win);
     }
 
     pub fn draw(self: *@This(), dctx: DrawState, window: *iWindow) void {
@@ -131,33 +130,34 @@ pub const iArea = struct {
         self.is_dirty = true;
     }
 
-    pub fn addChildOpt(self: *@This(), gui: *Gui, win: *iWindow, vto: ?*iArea) void {
+    pub fn addChildOpt(self: *@This(), gui: *Gui, win: *iWindow, vto: ?NewVt) void {
         if (vto) |vt|
             self.addChild(gui, win, vt);
     }
 
-    pub fn addChild(self: *@This(), gui: *Gui, win: *iWindow, vt: *iArea) void {
-        if (self._scissor_id != .none and vt._scissor_id != .none) {
+    pub fn addChild(self: *@This(), gui: *Gui, win: *iWindow, new: NewVt) void {
+        if (self._scissor_id != .none and new.vt._scissor_id != .none) {
             log.err("Can't created nested scissors!", .{});
             return;
         }
+        if (self.children.items.len >= std.math.maxInt(u32)) return;
 
-        gui.register(vt, win);
-        if (vt.onclick != null)
-            gui.registerOnClick(vt, win) catch return;
-        if (vt.onscroll != null)
-            gui.regOnScroll(vt, win) catch return;
-        if (vt.onpoll != null)
-            win.poll_listeners.append(vt) catch return;
+        gui.register(new.vt, win);
+        if (new.onclick) |onclick|
+            gui.registerOnClick(new.vt, onclick, win) catch return;
+        if (new.onscroll) |onscroll|
+            gui.regOnScroll(new.vt, onscroll, win) catch return;
+        if (new.onpoll) |onpoll|
+            win.registerPoll(new.vt, onpoll) catch return;
 
         // Propogate the scissor. Default is .none so no need to check
-        vt._scissor_id = self._scissor_id;
+        new.vt._scissor_id = self._scissor_id;
 
-        vt.parent = self;
-        vt.index = self.children.items.len;
-        self.children.append(gui.alloc, vt) catch return;
+        new.vt.parent = self;
+        new.vt.index = @intCast(self.children.items.len);
+        self.children.append(gui.alloc, new.vt) catch return;
 
-        gui.setDirty(vt, win);
+        gui.setDirty(new.vt, win);
     }
 
     pub fn deinitEmpty(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -166,9 +166,8 @@ pub const iArea = struct {
 
     pub fn addEmpty(self: *@This(), gui: *Gui, win: *iWindow, area: Rect) *iArea {
         const vt = gui.alloc.create(iArea) catch unreachable; //I'll allow this because it only happens on oom and we don't support recovery from that
-        vt.* = init(gui, area);
-        vt.deinit_fn = &deinitEmpty;
-        self.addChild(gui, win, vt);
+        vt.* = .{ .area = area, .deinit_fn = deinitEmpty };
+        self.addChild(gui, win, .{ .vt = vt });
         return vt;
     }
 
@@ -204,11 +203,11 @@ pub const iWindow = struct {
     area: *iArea,
     alloc: std.mem.Allocator,
 
-    click_listeners: std.ArrayList(*iArea),
-    scroll_list: std.ArrayList(*iArea),
-    poll_listeners: std.ArrayList(?*iArea),
+    click_listeners: ArrayList(struct { *iArea, NewVt.OnClick }) = .{},
+    scroll_list: ArrayList(struct { *iArea, NewVt.Onscroll }) = .{},
+    poll_listeners: ArrayList(struct { ?*iArea, NewVt.Onpoll }) = .{},
 
-    cache_map: std.AutoHashMap(*iArea, void),
+    cache_map: std.AutoArrayHashMapUnmanaged(*iArea, void) = .{},
     to_draw: std.ArrayList(*iArea),
     draws_since_cached: i32 = 0,
     needs_rebuild: bool = false,
@@ -248,10 +247,6 @@ pub const iWindow = struct {
             .alloc = gui.alloc,
             .deinit_fn = deinit_fn,
             .build_fn = build_fn,
-            .click_listeners = std.ArrayList(*iArea).init(gui.alloc),
-            .poll_listeners = std.ArrayList(?*iArea).init(gui.alloc),
-            .scroll_list = std.ArrayList(*iArea).init(gui.alloc),
-            .cache_map = std.AutoHashMap(*iArea, void).init(gui.alloc),
             .to_draw = std.ArrayList(*iArea).init(gui.alloc),
             .area = area,
         };
@@ -266,27 +261,25 @@ pub const iWindow = struct {
             std.debug.print("BROKEN\n", .{});
         if (self.scroll_list.items.len != 0)
             std.debug.print("BROKEN\n", .{});
-        self.click_listeners.deinit();
-        self.poll_listeners.deinit();
-        self.scroll_list.deinit();
+        self.click_listeners.deinit(self.alloc);
+        self.poll_listeners.deinit(self.alloc);
+        self.scroll_list.deinit(self.alloc);
         self.to_draw.deinit();
-        self.cache_map.deinit();
+        self.cache_map.deinit(self.alloc);
         self.scissors.deinit(self.alloc);
     }
 
     /// Returns true if this window contains the mouse
     pub fn dispatchClick(win: *iWindow, cb: MouseCbState) bool {
         if (!win.area.area.containsPoint(cb.pos)) return false;
-        for (win.click_listeners.items) |vt| {
-            if (vt.area.containsPoint(cb.pos)) {
-                if (vt.onclick) |oc| {
-                    if (win.getScissorRect(vt._scissor_id)) |sz| {
-                        if (!sz.containsPoint(cb.pos))
-                            continue; // Skip this cb and keep checking
-                    }
-                    oc(vt, cb, win);
-                    return true;
+        for (win.click_listeners.items) |click| {
+            if (click[0].area.containsPoint(cb.pos)) {
+                if (win.getScissorRect(click[0]._scissor_id)) |sz| {
+                    if (!sz.containsPoint(cb.pos))
+                        continue; // Skip this cb and keep checking
                 }
+                click[1](click[0], cb, win);
+                return true;
             }
         }
         return true;
@@ -297,16 +290,15 @@ pub const iWindow = struct {
         if (!win.area.area.containsPoint(coord)) return false;
         var i: usize = win.scroll_list.items.len;
         while (i > 0) : (i -= 1) { //Iterate backwards so that deeper scroll's have priority
-            const vt = win.scroll_list.items[i - 1];
+            const listener = win.scroll_list.items[i - 1];
+            const vt = listener[0];
             if (vt.area.containsPoint(coord)) {
-                if (vt.onscroll) |oc| {
-                    if (win.getScissorRect(vt._scissor_id)) |sz| {
-                        if (!sz.containsPoint(coord))
-                            continue;
-                    }
-                    oc(vt, gui, win, dist);
-                    return true;
+                if (win.getScissorRect(vt._scissor_id)) |sz| {
+                    if (!sz.containsPoint(coord))
+                        continue;
                 }
+                listener[1](vt, gui, win, dist);
+                return true;
             }
         }
         return true;
@@ -314,21 +306,20 @@ pub const iWindow = struct {
 
     pub fn dispatchPoll(win: *iWindow, gui: *Gui) void {
         for (win.poll_listeners.items) |item_o| {
-            const item = item_o orelse continue;
-            if (item.onpoll) |poll_fn|
-                poll_fn(item, gui, win);
+            const item = item_o[0] orelse continue;
+            item_o[1](item, gui, win);
         }
     }
 
-    pub fn registerPoll(win: *iWindow, vt: *iArea) void {
-        win.poll_listeners.append(vt) catch return;
+    pub fn registerPoll(win: *iWindow, vt: *iArea, onpoll: NewVt.Onpoll) !void {
+        try win.poll_listeners.append(win.alloc, .{ vt, onpoll });
     }
 
     pub fn unregisterPoll(win: *iWindow, vt: *iArea) void {
         for (win.poll_listeners.items, 0..) |item_o, i| {
-            const item = item_o orelse continue;
+            const item = item_o[0] orelse continue;
             if (item == vt) {
-                win.poll_listeners.items[i] = null;
+                win.poll_listeners.items[i][0] = null;
                 return;
             }
         }
@@ -691,7 +682,7 @@ pub const Gui = struct {
     fbos: std.AutoHashMap(*iWindow, graph.RenderTexture),
     transient_fbo: graph.RenderTexture,
 
-    area_window_map: std.AutoHashMap(*iArea, *iWindow),
+    area_window_map: std.AutoArrayHashMapUnmanaged(*iArea, *iWindow) = .{},
 
     draws_since_cached: i32 = 0,
     max_cached_before_full_flush: i32 = 60 * 10, //Ten seconds
@@ -712,7 +703,6 @@ pub const Gui = struct {
         return Gui{
             .alloc = alloc,
             .font = font,
-            .area_window_map = std.AutoHashMap(*iArea, *iWindow).init(alloc),
             .clamp_window = graph.Rec(0, 0, win.screen_dimensions.x, win.screen_dimensions.y),
             .windows = std.ArrayList(*iWindow).init(alloc),
             .window_collector = std.ArrayList(*iWindow).init(alloc),
@@ -738,7 +728,7 @@ pub const Gui = struct {
         self.windows.deinit();
         self.window_collector.deinit();
         self.closeTransientWindow();
-        self.area_window_map.deinit();
+        self.area_window_map.deinit(self.alloc);
         self.style.deinit();
     }
 
@@ -773,7 +763,7 @@ pub const Gui = struct {
         if (!self.cached_drawing)
             return true;
         if (!window.cache_map.contains(vt)) {
-            window.cache_map.put(vt, {}) catch return true;
+            window.cache_map.put(window.alloc, vt, {}) catch return true;
             return true;
         }
         return false;
@@ -843,22 +833,13 @@ pub const Gui = struct {
         return null;
     }
 
-    pub fn registerOnClick(_: *Self, vt: *iArea, window: *iWindow) !void {
-        try window.click_listeners.append(vt);
+    pub fn registerOnClick(_: *Self, vt: *iArea, onclick: NewVt.OnClick, window: *iWindow) !void {
+        try window.click_listeners.append(window.alloc, .{ vt, onclick });
     }
 
     pub fn setDirty(self: *Self, vt: *iArea, win: *iWindow) void {
         if (self.cached_drawing) {
-            if (vt.dirty_parents > 0) {
-                var parent: *iArea = vt;
-                for (0..@intCast(vt.dirty_parents)) |_| {
-                    if (parent.parent) |p|
-                        parent = p;
-                }
-                win.to_draw.append(parent) catch return;
-            } else {
-                win.to_draw.append(vt) catch return;
-            }
+            win.to_draw.append(vt) catch return;
         }
     }
 
@@ -901,13 +882,13 @@ pub const Gui = struct {
         self.transient_should_close = true;
     }
 
-    pub fn regOnScroll(_: *Self, vt: *iArea, window: *iWindow) !void {
-        try window.scroll_list.append(vt);
+    pub fn regOnScroll(_: *Self, vt: *iArea, onscroll: NewVt.Onscroll, window: *iWindow) !void {
+        try window.scroll_list.append(window.alloc, .{ vt, onscroll });
     }
 
     pub fn register(self: *Self, vt: *iArea, window: *iWindow) void {
         self.tracker.register_count += 1;
-        self.area_window_map.put(vt, window) catch return;
+        self.area_window_map.put(self.alloc, vt, window) catch return;
     }
 
     pub fn getWindow(self: *Self, vt: *iArea) ?*iWindow {
@@ -916,15 +897,15 @@ pub const Gui = struct {
 
     pub fn deregister(self: *Self, vt: *iArea, window: *iWindow) void {
         self.tracker.deregister_count += 1;
-        _ = self.area_window_map.remove(vt);
+        _ = self.area_window_map.swapRemove(vt);
         for (window.scroll_list.items, 0..) |item, index| {
-            if (item == vt) {
+            if (item[0] == vt) {
                 _ = window.scroll_list.swapRemove(index);
                 break;
             }
         }
         for (window.click_listeners.items, 0..) |item, index| {
-            if (item == vt) {
+            if (item[0] == vt) {
                 _ = window.click_listeners.swapRemove(index);
                 break;
             }
@@ -936,8 +917,8 @@ pub const Gui = struct {
             }
         }
         for (window.poll_listeners.items, 0..) |item, index| {
-            if (item == vt) {
-                window.poll_listeners.items[index] = null;
+            if (item[0] == vt) {
+                window.poll_listeners.items[index][0] = null;
                 break;
             }
         }

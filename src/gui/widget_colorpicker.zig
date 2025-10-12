@@ -9,6 +9,7 @@ const iWindow = g.iWindow;
 const Color = graph.Colori;
 const VScroll = g.Widget.VScroll;
 const Widget = g.Widget;
+const CbHandle = g.CbHandle;
 
 pub const Colorpicker = struct {
     const CommitCb = *const fn (*iArea, *Gui, color: u32, user_id: usize) void;
@@ -24,18 +25,15 @@ pub const Colorpicker = struct {
 
     color_hsv: graph.Hsva,
 
-    pub fn build(gui: *Gui, area: Rect, color: u32, opts: Opts) *iArea {
+    pub fn build(gui: *Gui, area: Rect, color: u32, opts: Opts) g.NewVt {
         const self = gui.create(@This());
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .opts = opts,
             .color = color,
             .color_hsv = graph.ptypes.Hsva.fromInt(color),
         };
-        self.vt.draw_fn = &draw;
-        self.vt.onclick = &onclick;
-        self.vt.deinit_fn = &deinit;
-        return &self.vt;
+        return .{ .vt = &self.vt, .onclick = onclick };
     }
 
     pub fn draw(vt: *iArea, d: g.DrawState) void {
@@ -73,10 +71,8 @@ pub const Colorpicker = struct {
                 &tr.area,
             ),
             .parent_ptr = self,
-            .area = iArea.init(gui, area),
+            .area = .{ .area = area, .deinit_fn = ColorpickerTransient.deinit_area, .draw_fn = ColorpickerTransient.draw },
         };
-        tr.area.deinit_fn = &ColorpickerTransient.deinit_area;
-        tr.area.draw_fn = &ColorpickerTransient.draw;
         gui.setTransientWindow(&tr.vt);
         tr.vt.build_fn(&tr.vt, gui, area);
     }
@@ -85,6 +81,7 @@ pub const Colorpicker = struct {
 const ColorpickerTransient = struct {
     vt: iWindow,
     area: iArea,
+    cbhandle: CbHandle = .{},
 
     parent_ptr: *Colorpicker,
 
@@ -138,15 +135,14 @@ const ColorpickerTransient = struct {
             gui,
             vy.getArea(),
             "Done",
-            .{ .cb_vt = &self.area, .cb_fn = &closeBtnCb, .id = 0 },
+            .{ .cb_vt = &self.cbhandle, .cb_fn = &closeBtnCb, .id = 0 },
         ));
 
         const Help = struct {
-            fn valueGroup(a1: anytype, gui1: *Gui, win1: *iWindow, layout: anytype, ptr: *f32, name: []const u8, min: f32, max: f32, nudge: f32) void {
+            fn valueGroup(cb: *CbHandle, a1: anytype, gui1: *Gui, win1: *iWindow, layout: anytype, ptr: *f32, name: []const u8, min: f32, max: f32, nudge: f32) void {
                 const hue_s = layout.getArea() orelse return;
                 var vy2 = g.HorizLayout{ .count = 2, .bounds = hue_s };
                 a1.addChildOpt(gui1, win1, Widget.Text.build(gui1, vy2.getArea(), "{s}", .{name}));
-                (a1.getLastChild() orelse return).dirty_parents = 1;
 
                 a1.addChildOpt(gui1, win1, Widget.StaticSlider.build(gui1, vy2.getArea(), ptr, .{
                     .display_bounds_while_editing = false,
@@ -155,27 +151,26 @@ const ColorpickerTransient = struct {
                     .min = min,
                     .max = max,
                     .slide = .{ .snap = nudge },
+                    .commit_cb = ssliderCbCommit,
+                    .slide_cb = ssliderCb,
+                    .commit_vt = cb,
                 }));
-                //a1.addChildOpt(gui1, win1, Widget.Slider.build(gui1, vy2.getArea(), ptr, min, max, .{ .nudge = nudge }));
-                //(a1.getLastChild() orelse return).dirty_parents = 1;
-                //a1.addChildOpt(gui1, win1, Widget.TextboxNumber.build(gui1, vy2.getArea(), ptr, win1, .{}));
-                (a1.getLastChild() orelse return).dirty_parents = 1;
             }
         };
 
-        Help.valueGroup(a, gui, win, &vy, &self.parent_ptr.color_hsv.h, "Hue", 0, 360, 5);
-        Help.valueGroup(a, gui, win, &vy, &self.parent_ptr.color_hsv.s, "Saturation", 0, 1, 0.02);
-        Help.valueGroup(a, gui, win, &vy, &self.parent_ptr.color_hsv.v, "Value", 0, 1, 0.02);
-        Help.valueGroup(a, gui, win, &vy, &self.parent_ptr.color_hsv.a, "Alpha", 0, 1, 0.02);
+        Help.valueGroup(&self.cbhandle, a, gui, win, &vy, &self.parent_ptr.color_hsv.h, "Hue", 0, 360, 5);
+        Help.valueGroup(&self.cbhandle, a, gui, win, &vy, &self.parent_ptr.color_hsv.s, "Saturation", 0, 1, 0.02);
+        Help.valueGroup(&self.cbhandle, a, gui, win, &vy, &self.parent_ptr.color_hsv.v, "Value", 0, 1, 0.02);
+        Help.valueGroup(&self.cbhandle, a, gui, win, &vy, &self.parent_ptr.color_hsv.a, "Alpha", 0, 1, 0.02);
 
         a.addChildOpt(gui, win, Widget.Textbox.buildOpts(gui, vy.getArea(), .{
             .commit_cb = &pastedTextboxCb,
-            .commit_vt = &self.area,
+            .commit_vt = &self.cbhandle,
         }));
     }
 
-    pub fn pastedTextboxCb(vt: *iArea, gui: *Gui, slice: []const u8, _: usize) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
+    pub fn pastedTextboxCb(cb: *CbHandle, gui: *Gui, slice: []const u8, _: usize) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         if (slice.len > 0) {
             _ = blk: {
                 const newcolor = ((std.fmt.parseInt(u32, slice, 0) catch |err| switch (err) {
@@ -185,7 +180,7 @@ const ColorpickerTransient = struct {
                 self.parent_ptr.commitColor(gui, newcolor);
                 self.parent_ptr.color_hsv = graph.ptypes.Hsva.fromInt(newcolor);
                 self.parent_ptr.vt.dirty(gui);
-                vt.dirty(gui);
+                self.area.dirty(gui);
                 //std.debug.print("Setting color to {x}\n", .{newcolor});
             };
         }
@@ -213,8 +208,8 @@ const ColorpickerTransient = struct {
         color.h = (self.hue_handle) / h_area.h * 360.0;
     }
 
-    fn closeBtnCb(vt: *iArea, id: usize, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
+    fn closeBtnCb(cb: *CbHandle, id: usize, gui: *Gui, _: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
 
         self.parent_ptr.commitColor(gui, self.parent_ptr.color_hsv.toInt());
         self.parent_ptr.vt.dirty(gui);
@@ -260,6 +255,16 @@ const ColorpickerTransient = struct {
     }
 
     pub fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
+
+    fn ssliderCb(cb: *CbHandle, gui: *Gui, _: f32, _: usize, _: Widget.StaticSliderOpts.State) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        self.area.dirty(gui);
+    }
+
+    fn ssliderCbCommit(cb: *CbHandle, gui: *Gui, _: f32, _: usize) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        self.area.dirty(gui);
+    }
 };
 
 const WarpArea = struct {
@@ -273,20 +278,17 @@ const WarpArea = struct {
 
     handle_dim: graph.Vec2f,
 
-    pub fn build(gui: *Gui, area: Rect, x: ?*f32, y: ?*f32, warp_notify_vt: *iArea, warp_notify_fn: WarpNotifyFn, handle_dim: graph.Vec2f) *iArea {
+    pub fn build(gui: *Gui, area: Rect, x: ?*f32, y: ?*f32, warp_notify_vt: *iArea, warp_notify_fn: WarpNotifyFn, handle_dim: graph.Vec2f) g.NewVt {
         const self = gui.create(@This());
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .xptr = x,
             .yptr = y,
             .notify_vt = warp_notify_vt,
             .notify_fn = warp_notify_fn,
             .handle_dim = handle_dim,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
-        self.vt.onclick = &onclick;
-        return &self.vt;
+        return .{ .vt = &self.vt, .onclick = onclick };
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {

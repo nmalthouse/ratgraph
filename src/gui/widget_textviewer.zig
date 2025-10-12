@@ -30,18 +30,16 @@ pub const TextView = struct {
     lines: std.ArrayList([]const u8), //slices into cat_string
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, text: []const []const u8, win: *iWindow, opts: Opts) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, text: []const []const u8, win: *iWindow, opts: Opts) ?g.NewVt {
         const area = area_o orelse return null;
         const self = gui.create(@This());
 
         self.* = .{
             .cat_string = catStrings(gui.alloc, text) catch return null,
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .lines = std.ArrayList([]const u8).init(gui.alloc),
             .opts = opts,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit;
 
         const inset = area.inset(INSET_AMOUNT * gui.scale);
 
@@ -63,7 +61,7 @@ pub const TextView = struct {
         }) orelse return null;
         self.vt.addChild(gui, win, vscr);
 
-        return &self.vt;
+        return .{ .vt = &self.vt };
     }
 
     pub fn addOwnedText(self: *@This(), owned: []const u8, gui: *Gui) !void {

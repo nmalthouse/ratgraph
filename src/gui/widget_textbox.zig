@@ -6,6 +6,7 @@ const Gui = g.Gui;
 const Rect = g.Rect;
 const iWindow = g.iWindow;
 const Color = graph.Colori;
+const CbHandle = g.CbHandle;
 
 fn charsetForNum(comptime T: type) []const u8 {
     const info = @typeInfo(T);
@@ -38,15 +39,14 @@ pub fn NumberDummy(comptime T: type) type {
         __value: T,
         ptr: *T,
 
-        pub fn build(gui: *Gui, area: Rect, number: ?*T, default: T) *iArea {
+        pub fn build(gui: *Gui, area: Rect, number: ?*T, default: T) g.NewVt {
             const self = gui.create(@This());
             self.* = .{
                 .__value = default,
                 .ptr = number orelse &self.__value,
-                .vt = iArea.init(gui, area),
+                .vt = .{ .area = area, .deinit_fn = deinit },
             };
-            self.vt.deinit_fn = &deinit;
-            return &self.vt;
+            return .{ .vt = &self.vt };
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -70,7 +70,7 @@ pub fn NumberDummy(comptime T: type) type {
 }
 
 pub const TextboxNumber = struct {
-    pub fn build(gui: *Gui, area_o: ?Rect, number: anytype, win: *iWindow, opts: TextboxOptions) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect, number: anytype, win: *iWindow, opts: TextboxOptions) ?g.NewVt {
         const area = area_o orelse return null;
         //const invalid_type_error = "wrong type for textbox number!";
         const pinfo = @typeInfo(@TypeOf(number));
@@ -81,10 +81,10 @@ pub const TextboxNumber = struct {
         var opt = opts;
         opt.restricted_charset = charsetForNum(number_type);
         const dummy = ND.build(gui, area, if (is_pointer) number else null, if (is_pointer) 0 else number);
-        dummy.addChild(gui, win, Textbox.buildNumber(
+        dummy.vt.addChild(gui, win, Textbox.buildNumber(
             gui,
             area,
-            dummy,
+            dummy.vt,
             &ND.printTo,
             &ND.parseFrom,
 
@@ -99,8 +99,8 @@ pub const NumberPrintFn = *const fn (*iArea, *std.ArrayList(u8)) void;
 pub const NumberParseFn = *const fn (*iArea, []const u8) error{invalid}!void;
 
 pub const TextboxOptions = struct {
-    commit_cb: ?*const fn (*iArea, *Gui, []const u8, user_id: usize) void = null,
-    commit_vt: ?*iArea = null,
+    commit_cb: ?*const fn (*CbHandle, *Gui, []const u8, user_id: usize) void = null,
+    commit_vt: ?*CbHandle = null,
     user_id: usize = 0,
 
     init_string: []const u8 = "",
@@ -156,6 +156,7 @@ pub const Textbox = struct {
     };
 
     vt: iArea,
+    cbhandle: CbHandle = .{},
     codepoints: std.ArrayList(u8),
 
     options: struct {
@@ -229,15 +230,15 @@ pub const Textbox = struct {
     //    return Self{ .codepoints = std.ArrayList(u8).init(alloc), .head = 0, .tail = 0 };
     //}
 
-    pub fn build(gui: *Gui, area_o: ?Rect) ?*iArea {
+    pub fn build(gui: *Gui, area_o: ?Rect) ?g.NewVt {
         return buildOpts(gui, area_o, .{});
     }
 
-    pub fn buildOpts(gui: *Gui, area_o: ?Rect, opts: TextboxOptions) ?*iArea {
+    pub fn buildOpts(gui: *Gui, area_o: ?Rect, opts: TextboxOptions) ?g.NewVt {
         const area = area_o orelse return null;
         const self = gui.create(@This());
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focusEvent = fevent },
             .codepoints = std.ArrayList(u8).init(gui.alloc),
             .opts = opts,
             .head = 0,
@@ -245,25 +246,21 @@ pub const Textbox = struct {
         };
         self.codepoints.appendSlice(opts.init_string) catch return null;
         self.vt.can_tab_focus = true;
-        self.vt.deinit_fn = &deinit;
-        self.vt.draw_fn = &draw;
-        self.vt.focusEvent = &fevent;
-        self.vt.onclick = &onclick;
-        return &self.vt;
+        return .{ .vt = &self.vt, .onclick = onclick };
     }
 
-    pub fn buildNumber(gui: *Gui, area: Rect, num_vt: *iArea, num_print: NumberPrintFn, num_parse: NumberParseFn, opts: TextboxOptions) ?*iArea {
-        const vt = buildOpts(gui, area, opts) orelse return null;
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        vt.dirty(gui);
-        self.reset("") catch return vt;
+    pub fn buildNumber(gui: *Gui, area: Rect, num_vt: *iArea, num_print: NumberPrintFn, num_parse: NumberParseFn, opts: TextboxOptions) ?g.NewVt {
+        const newvt = buildOpts(gui, area, opts) orelse return null;
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", newvt.vt));
+        newvt.vt.dirty(gui);
+        self.reset("") catch return newvt;
         num_print(num_vt, &self.codepoints);
         self.number = .{
             .print_cb = num_print,
             .parse_cb = num_parse,
             .vt = num_vt,
         };
-        return vt;
+        return newvt;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -525,7 +522,7 @@ pub const Textbox = struct {
                     .{
                         .buttons = &.{ .{ bi("copy"), "Copy" }, .{ bi("paste"), "Paste" } },
                         .btn_cb = rightClickMenuBtn,
-                        .btn_vt = vt,
+                        .btn_vt = &self.cbhandle,
                     },
                 ) catch return;
                 cb.gui.setTransientWindow(r_win);
@@ -533,9 +530,9 @@ pub const Textbox = struct {
         }
     }
 
-    fn rightClickMenuBtn(vt: *iArea, id: g.Uid, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        vt.dirty(gui);
+    fn rightClickMenuBtn(cb: *CbHandle, id: g.Uid, gui: *Gui, _: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        self.vt.dirty(gui);
         const bi = g.Widget.BtnContextWindow.buttonId;
         switch (id) {
             bi("copy") => setClipboard(self.codepoints.allocator, self.getSelectionSlice()) catch return,
