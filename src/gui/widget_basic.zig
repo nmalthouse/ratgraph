@@ -73,8 +73,8 @@ pub const VScroll = struct {
                 &notifyChange,
             ));
         } else {
-            self.index_ptr.* = 0;
-            _ = self.vt.addEmpty(gui, opts.win, split[1]);
+            //self.index_ptr.* = 0;
+            //_ = self.vt.addEmpty(gui, opts.win, split[1]);
         }
 
         self.rebuild(gui, opts.win);
@@ -587,5 +587,46 @@ pub const Text = struct {
         d.ctx.rect(vt.area, self.bg_col);
         const texta = vt.area.inset(d.style.config.default_item_h / 10);
         d.ctx.textClipped(texta, "{s}", .{self.text}, d.textP(null), .left);
+    }
+};
+
+pub const NumberDisplay = struct {
+    vt: iArea,
+
+    num_ptr: *usize,
+    last_drawn: usize = 0,
+    bg_col: u32,
+
+    pub fn build(gui: *Gui, area_o: ?Rect, number_ptr: *usize) ?NewVt {
+        const area = area_o orelse return null;
+        const self = gui.create(@This());
+        self.* = .{
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .bg_col = gui.nstyle.color.bg,
+            .num_ptr = number_ptr,
+        };
+        return .{ .vt = &self.vt, .onpoll = pollNumber };
+    }
+
+    pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        gui.alloc.destroy(self);
+    }
+
+    pub fn draw(vt: *iArea, d: DrawState) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        //d.ctx.rect(vt.area, 0x5ffff0ff);
+        d.ctx.rect(vt.area, self.bg_col);
+        const texta = vt.area.inset(d.style.config.default_item_h / 10);
+        d.ctx.textClipped(texta, "{d}", .{self.num_ptr.*}, d.textP(null), .left);
+        self.last_drawn = self.num_ptr.*;
+    }
+
+    pub fn pollNumber(vt: *iArea, gui: *Gui, _: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+
+        if (self.last_drawn != self.num_ptr.*) {
+            vt.dirty(gui);
+        }
     }
 };

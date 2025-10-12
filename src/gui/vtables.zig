@@ -31,6 +31,7 @@ pub const Widget = struct {
     pub const Button = bs.Button;
     pub const ScrollBar = bs.ScrollBar;
     pub const Text = bs.Text;
+    pub const NumberDisplay = bs.NumberDisplay;
 
     const co = @import("widget_combo.zig");
     pub const ComboOpts = co.ComboOpts;
