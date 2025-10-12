@@ -222,8 +222,12 @@ pub const Textbox = struct {
     }
 
     fn delete_to(self: *Self, movement: SingleLineMovement) !void {
-        self.select_to(movement);
-        try self.deleteSelection();
+        if (self.tail != self.head) {
+            try self.deleteSelection();
+        } else {
+            self.select_to(movement);
+            try self.deleteSelection();
+        }
     }
 
     //pub fn init(alloc: std.mem.Allocator) Self {
@@ -376,13 +380,7 @@ pub const Textbox = struct {
                         .move_right => tb.move_to(.right),
                         .move_word_right => tb.move_to(.next_word_end),
                         .move_word_left => tb.move_to(.prev_word_end),
-                        .backspace => {
-                            if (tb.tail != tb.head) {
-                                try tb.deleteSelection();
-                            } else {
-                                try tb.delete_to(.left);
-                            }
-                        },
+                        .backspace => try tb.delete_to(.left),
                         .delete => try tb.delete_to(.right),
                         .delete_word_right => try tb.delete_to(.next_word_end),
                         .delete_word_left => try tb.delete_to(.prev_word_end),

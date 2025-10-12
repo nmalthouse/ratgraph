@@ -104,10 +104,33 @@ pub fn pushEvent(id: u32, user_code: i32, data1: ?*anyopaque, data2: ?*anyopaque
     }
 }
 
+/// Just the bounded array
+const KeyBuf = struct {
+    const Len = 32;
+    buffer: [Len]KeyState = undefined,
+
+    len: usize = 0,
+
+    pub fn clear(self: *@This()) void {
+        self.len = 0;
+    }
+
+    pub fn append(self: *@This(), k: KeyState) !void {
+        if (self.len >= Len) return error.NoSpaceLeft;
+
+        self.buffer[self.len] = k;
+        self.len += 1;
+    }
+
+    pub fn slice(self: *@This()) []const KeyState {
+        return self.buffer[0..self.len];
+    }
+};
+
 pub const Window = struct {
     const Self = @This();
     pub const KeyboardStateT = std.bit_set.IntegerBitSet(c.SDL_SCANCODE_COUNT);
-    pub const KeysT = std.BoundedArray(KeyState, 16);
+    pub const KeysT = KeyBuf;
     pub const KeyStateT = [c.SDL_SCANCODE_COUNT]ButtonState;
     pub const EmptyKeyState: KeyStateT = [_]ButtonState{.low} ** c.SDL_SCANCODE_COUNT;
 
@@ -139,7 +162,7 @@ pub const Window = struct {
 
     //key_state: [c.SDL_SCANCODE_COUNT]ButtonState = [_]ButtonState{.low} ** c.SDL_NUM_SCANCODES,
     key_state: KeyStateT = [_]ButtonState{.low} ** c.SDL_SCANCODE_COUNT,
-    keys: KeysT = KeysT.init(0) catch unreachable,
+    keys: KeysT = .{},
     keyboard_state: KeyboardStateT = KeyboardStateT.initEmpty(),
     last_frame_keyboard_state: KeyboardStateT = KeyboardStateT.initEmpty(),
 
@@ -427,7 +450,7 @@ pub const Window = struct {
             self.mod = self.mod & toggle_excluded;
         }
 
-        self.keys.resize(0) catch unreachable;
+        self.keys.clear();
         self.last_frame_keyboard_state = self.keyboard_state;
         self.keyboard_state.mask = 0;
         {

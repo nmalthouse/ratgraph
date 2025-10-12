@@ -208,7 +208,7 @@ pub const iWindow = struct {
     poll_listeners: ArrayList(struct { ?*iArea, NewVt.Onpoll }) = .{},
 
     cache_map: std.AutoArrayHashMapUnmanaged(*iArea, void) = .{},
-    to_draw: std.ArrayList(*iArea),
+    to_draw: ArrayList(*iArea) = .{},
     draws_since_cached: i32 = 0,
     needs_rebuild: bool = false,
 
@@ -247,7 +247,6 @@ pub const iWindow = struct {
             .alloc = gui.alloc,
             .deinit_fn = deinit_fn,
             .build_fn = build_fn,
-            .to_draw = std.ArrayList(*iArea).init(gui.alloc),
             .area = area,
         };
     }
@@ -264,7 +263,7 @@ pub const iWindow = struct {
         self.click_listeners.deinit(self.alloc);
         self.poll_listeners.deinit(self.alloc);
         self.scroll_list.deinit(self.alloc);
-        self.to_draw.deinit();
+        self.to_draw.deinit(self.alloc);
         self.cache_map.deinit(self.alloc);
         self.scissors.deinit(self.alloc);
     }
@@ -658,11 +657,11 @@ pub const Gui = struct {
 
     alloc: std.mem.Allocator,
     /// All the registered windows
-    windows: std.ArrayList(*iWindow),
+    windows: ArrayList(*iWindow) = .{},
 
     /// Windows that are active this frame put themselves in here
     /// Cleared on pre_update, nothing is done explicitly with this, just helper for user
-    window_collector: std.ArrayList(*iWindow),
+    window_collector: ArrayList(*iWindow) = .{},
 
     transient_should_close: bool = false,
     transient_window: ?*iWindow = null,
@@ -704,8 +703,6 @@ pub const Gui = struct {
             .alloc = alloc,
             .font = font,
             .clamp_window = graph.Rec(0, 0, win.screen_dimensions.x, win.screen_dimensions.y),
-            .windows = std.ArrayList(*iWindow).init(alloc),
-            .window_collector = std.ArrayList(*iWindow).init(alloc),
             .transient_fbo = try graph.RenderTexture.init(100, 100),
             .fbos = std.AutoHashMap(*iWindow, graph.RenderTexture).init(alloc),
             .sdl_win = win,
@@ -725,8 +722,8 @@ pub const Gui = struct {
         }
         self.transient_fbo.deinit();
         self.fbos.deinit();
-        self.windows.deinit();
-        self.window_collector.deinit();
+        self.windows.deinit(self.alloc);
+        self.window_collector.deinit(self.alloc);
         self.closeTransientWindow();
         self.area_window_map.deinit(self.alloc);
         self.style.deinit();
@@ -839,7 +836,7 @@ pub const Gui = struct {
 
     pub fn setDirty(self: *Self, vt: *iArea, win: *iWindow) void {
         if (self.cached_drawing) {
-            win.to_draw.append(vt) catch return;
+            win.to_draw.append(win.alloc, vt) catch return;
         }
     }
 
@@ -1074,7 +1071,7 @@ pub const Gui = struct {
         window.build_fn(window, self, area); //Rebuild it
         try self.fbos.put(window, try graph.RenderTexture.init(area.w, area.h));
         self.register(window.area, window);
-        try self.windows.append(window);
+        try self.windows.append(self.alloc, window);
     }
 
     pub fn updateWindowSize(self: *Self, window: *iWindow, area: Rect) !void {
