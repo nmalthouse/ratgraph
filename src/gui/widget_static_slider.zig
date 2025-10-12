@@ -87,6 +87,9 @@ pub const StaticSlider = struct {
             .state = .display,
             .fbs = .{ .buffer = &self.buf, .pos = 0 },
         };
+        if (opts.max == opts.min) {
+            std.debug.print("Static slider has invalid max min \n", .{});
+        }
         return .{ .vt = &self.vt, .onclick = onclick, .onscroll = scroll };
     }
 

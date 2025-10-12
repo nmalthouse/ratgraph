@@ -305,6 +305,11 @@ pub const iWindow = struct {
     }
 
     pub fn dispatchPoll(win: *iWindow, gui: *Gui) void {
+        var i: usize = win.poll_listeners.items.len;
+        while (i > 0) : (i -= 1) {
+            if (win.poll_listeners.items[i - 1][0] == null)
+                _ = win.poll_listeners.swapRemove(i - 1);
+        }
         for (win.poll_listeners.items) |item_o| {
             const item = item_o[0] orelse continue;
             item_o[1](item, gui, win);

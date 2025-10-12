@@ -249,6 +249,7 @@ pub const Textbox = struct {
             .tail = 0,
         };
         self.codepoints.appendSlice(opts.init_string) catch return null;
+        self.move_to(.end);
         self.vt.can_tab_focus = true;
         return .{ .vt = &self.vt, .onclick = onclick };
     }
