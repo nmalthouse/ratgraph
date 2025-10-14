@@ -61,7 +61,6 @@ pub fn GenRegistryStructs(comptime fields: FieldList) struct {
     var file_proto_types: [fields.len]TypeInfo.UnionField = undefined;
 
     inline for (fields, 0..) |f, lt_i| {
-        //const inner_struct = container_struct(f.ftype, ID_TYPE);
         const anynull: ?f.ftype = null;
         big_ent_type[lt_i] = .{
             .name = f.name,
@@ -244,10 +243,6 @@ pub fn Registry(comptime field_names_l: FieldList) type {
 
         pub fn Type(comptime component_type: Components) type {
             return Fields[@intFromEnum(component_type)].ftype;
-        }
-
-        pub fn ContainerType(comptime component_type: Components) type {
-            return sparseset.container_struct(Type(component_type), ID_TYPE);
         }
 
         pub fn Iterator(comptime component_type: Components) type {
@@ -550,12 +545,6 @@ pub fn Registry(comptime field_names_l: FieldList) type {
             return try @field(self.data, @tagName(component_type)).getPtr(index);
         }
 
-        pub fn getContainer(self: *Self, index: ID_TYPE, comptime component_type: Components) !ContainerType(component_type) {
-            const ent = try self.getEntity(index);
-            if (!ent.isSet(@intFromEnum(component_type))) return error.componentNotAttached;
-            return .{ .item = (try @field(self.data, @tagName(component_type)).getPtr(index)).*, .i = index };
-        }
-
         pub fn get(self: *Self, index: ID_TYPE, comptime component_type: Components) !Fields[@intFromEnum(component_type)].ftype {
             return (try self.getPtrAllow(index, component_type)).*;
         }
@@ -625,10 +614,6 @@ pub fn Registry(comptime field_names_l: FieldList) type {
         pub fn hasComponent(self: *Self, index: ID_TYPE, comptime component_type: Components) !bool {
             return (try self.getEntity(index)).isSet(@intFromEnum(component_type));
         }
-
-        //pub fn iterator(self: *Self, comptime component_type: Components) SparseSet(container_struct(Fields[@intFromEnum(component_type)].ftype, ID_TYPE), ID_TYPE).Iterator {
-        //    return @field(self.data, @tagName(component_type)).denseIterator();
-        //}
 
         pub fn printEntityInfo(self: *Self, index: ID_TYPE) void {
             std.debug.print("Entity Info: {d}\n", .{index});

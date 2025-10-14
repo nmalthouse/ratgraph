@@ -1272,27 +1272,6 @@ pub const RenderTexture = struct {
     }
 };
 
-const AvgBuf = struct {
-    const Self = @This();
-    const len = 100;
-
-    pos: u32 = 0,
-    buf: [len]f32 = .{0} ** len,
-
-    fn insert(self: *Self, val: f32) void {
-        self.buf[self.pos] = val;
-        self.pos = (self.pos + 1) % @as(u32, @intCast(self.buf.len));
-    }
-
-    fn avg(self: *Self) f32 {
-        var res: f32 = 0;
-        for (self.buf) |it| {
-            res += it;
-        }
-        return res / @as(f32, @floatFromInt(self.buf.len));
-    }
-};
-
 fn lerp(start: f32, end: f32, ratio: f32) f32 {
     return start + (end - start) * ratio;
 }

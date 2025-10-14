@@ -2,6 +2,8 @@ const std = @import("std");
 const Cache = @import("gui_cache.zig");
 const graph = @import("graphics.zig");
 const gl = graph.GL;
+//TODO I do not like this anymore and I want it destroyed
+
 //TODO write a backend using wasi
 //TODO write a backend using glfw
 //TODO gui should not depend on SDL. keys can be passed in an generic array. User must initialize keybindings with key ids
