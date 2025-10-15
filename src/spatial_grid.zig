@@ -49,7 +49,7 @@ pub fn Spatial(comptime value_T: type) type {
             }
 
             pub fn next(self: *RectIt) ?Key {
-                const res = .{ .x = self.p.x, .y = self.p.y };
+                const res = Key{ .x = self.p.x, .y = self.p.y };
                 if (self.p.x > self.pf.x) {
                     return null;
                 }
@@ -144,8 +144,7 @@ pub fn Spatial(comptime value_T: type) type {
             return a < b;
         }
 
-        fn cmpValue(ctx: void, key: value_T, mid: value_T) std.math.Order {
-            _ = ctx;
+        fn cmpValue(key: value_T, mid: value_T) std.math.Order {
             if (key < mid) return .lt;
             if (key > mid) return .gt;
             return .eq;
@@ -157,7 +156,7 @@ pub fn Spatial(comptime value_T: type) type {
             while (r_it.next()) |key| {
                 if (self.map.get(key)) |vals| {
                     for (vals.items) |item| {
-                        if (std.sort.binarySearch(value_T, item, list.items, {}, cmpValue)) |index| {
+                        if (std.sort.binarySearch(value_T, list.items, item, cmpValue)) |index| {
                             _ = index;
                             continue;
                         } else {

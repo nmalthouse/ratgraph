@@ -387,7 +387,7 @@ pub fn parseField(
     //}
     const cinfo = @typeInfo(field_type);
     switch (cinfo) {
-        .Struct => {
+        .@"struct" => {
             propertiesToStructErrorCtx.last_property_name = @typeName(field_type);
             propertiesToStructErrorCtx.last_property_field = field_name;
             for (properties, 0..) |p, i| {
@@ -416,12 +416,12 @@ pub fn parseField(
                 const pname = if (namespace_offset >= p.name.len) continue else p.name[namespace_offset..];
                 if (property_mask[i] and std.mem.eql(u8, field_name, pname)) {
                     return switch (cinfo) {
-                        .Bool => p.value.bool,
-                        .Optional => |o| try parseField(field_name, o.child, null, properties, property_mask, namespace_offset),
+                        .bool => p.value.bool,
+                        .optional => |o| try parseField(field_name, o.child, null, properties, property_mask, namespace_offset),
                         //.Int => if (p.value == .int) std.math.lossyCast(field_type, p.value.int) else std.math.lossyCast(field_type, p.value.object),
-                        .Int => try std.fmt.parseInt(field_type, p.value, 0),
-                        .Float => try std.fmt.parseFloat(field_type, p.value),
-                        .Enum => |e| blk: {
+                        .int => try std.fmt.parseInt(field_type, p.value, 0),
+                        .float => try std.fmt.parseFloat(field_type, p.value),
+                        .@"enum" => |e| blk: {
                             inline for (e.fields) |ef| {
                                 if (std.mem.eql(u8, ef.name, p.value.string))
                                     break :blk @enumFromInt(ef.value);
@@ -429,7 +429,7 @@ pub fn parseField(
                             std.debug.print("INVALID ENUM {s} for {s} {s}\n", .{ p.value.string, @typeName(field_type), field_name });
                             return error.invalidEnumValue;
                         },
-                        .Pointer => |po| blk: {
+                        .pointer => |po| blk: {
                             if (po.size == .Slice and po.child == u8)
                                 break :blk p.value.string;
                             @compileError("unable to parse type" ++ @typeName(field_type));
@@ -456,11 +456,11 @@ pub fn propertiesToStruct(struct_type: type, type_name: []const u8, properties: 
 fn propertiesToStructRecur(struct_type: type, properties: []const TileMap.Property, property_mask: []bool, namespace_offset: usize) !struct_type {
     var ret: struct_type = undefined;
     const info = @typeInfo(struct_type);
-    inline for (info.Struct.fields) |field| {
+    inline for (info.@"struct".fields) |field| {
         @field(ret, field.name) = try parseField(
             field.name,
             field.type,
-            if (field.default_value) |dv| @as(*const field.type, @ptrCast(@alignCast(dv))).* else null,
+            if (field.default_value_ptr) |dv| @as(*const field.type, @ptrCast(@alignCast(dv))).* else null,
             properties,
             property_mask,
             namespace_offset,
@@ -576,10 +576,10 @@ pub fn rebakeTileset(
 
 pub fn setStructFromProperty(comptime stype: type, field_name: []const u8, ptr: *stype, name: []const u8, value: []const u8) !void {
     const info = @typeInfo(stype);
-    if (!std.mem.eql(u8, name, field_name) and info != .Struct)
+    if (!std.mem.eql(u8, name, field_name) and info != .@"struct")
         return error.notGOOD;
     switch (info) {
-        .Int => {
+        .int => {
             ptr.* = switch (value) {
                 .int => std.math.lossyCast(stype, value.int),
                 .color => std.math.lossyCast(stype, value.color),
@@ -587,7 +587,7 @@ pub fn setStructFromProperty(comptime stype: type, field_name: []const u8, ptr: 
             };
             return;
         },
-        .Struct => |s| {
+        .@"struct" => |s| {
             //"myname" sub = myname, name = myname
             //"my.name" sub = my, name = name
             const fd = std.mem.indexOfScalar(u8, name, '.');
@@ -607,14 +607,14 @@ pub fn setStructFromProperty(comptime stype: type, field_name: []const u8, ptr: 
             std.debug.print("{s} {s}\n", .{ field_name, name });
             return error.notFoundStructField;
         },
-        .Optional => |o| {
+        .optional => |o| {
             if (@typeInfo(o.child) == .Struct)
                 return error.optNotAllowedOnStruct;
             var opt: o.child = undefined;
             defer ptr.* = opt;
             return setStructFromProperty(o.child, field_name, &opt, name, value);
         },
-        .Enum => |e| {
+        .@"enum" => |e| {
             inline for (e.fields) |ef| {
                 //TODO use that enumFromString from std
                 if (std.mem.eql(u8, ef.name, value.string)) {
@@ -625,16 +625,16 @@ pub fn setStructFromProperty(comptime stype: type, field_name: []const u8, ptr: 
             std.debug.print("INVALID ENUM {s} for {s} {s}\n", .{ value.string, @typeName(stype), name });
             return error.invalidEnumValue;
         },
-        .Float => {
+        .float => {
             ptr.* = value.float;
             return;
         },
-        .Bool => {
+        .bool => {
             ptr.* = value.bool;
             return;
         },
-        .Pointer => |po| {
-            if (po.size == .Slice and po.child == u8) {
+        .pointer => |po| {
+            if (po.size == .slice and po.child == u8) {
                 ptr.* = value;
                 return;
             }
