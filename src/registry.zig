@@ -62,20 +62,8 @@ pub fn GenRegistryStructs(comptime fields: FieldList) struct {
 
     inline for (fields, 0..) |f, lt_i| {
         const anynull: ?f.ftype = null;
-        big_ent_type[lt_i] = .{
-            .name = f.name,
-            .type = ?f.ftype,
-            .default_value_ptr = &anynull,
-            .is_comptime = false,
-            .alignment = 0,
-        };
-        reg_fields[lt_i] = .{
-            .name = f.name,
-            .type = SparseSet(f.ftype, ID_TYPE),
-            .default_value_ptr = null,
-            .is_comptime = false,
-            .alignment = 0,
-        };
+        big_ent_type[lt_i] = .{ .name = f.name, .type = ?f.ftype, .default_value_ptr = &anynull, .is_comptime = false, .alignment = 0 };
+        reg_fields[lt_i] = .{ .name = f.name, .type = SparseSet(f.ftype, ID_TYPE), .default_value_ptr = null, .is_comptime = false, .alignment = 0 };
         json_fields[lt_i] = .{
             .name = f.name,
             .type = struct {
@@ -89,11 +77,7 @@ pub fn GenRegistryStructs(comptime fields: FieldList) struct {
             .is_comptime = false,
             .alignment = 0,
         };
-        union_fields[lt_i] = .{
-            .name = f.name,
-            .type = f.ftype,
-            .alignment = @alignOf(f.ftype),
-        };
+        union_fields[lt_i] = .{ .name = f.name, .type = f.ftype, .alignment = @alignOf(f.ftype) };
 
         //Test if f.ftype has a field called prototype and use it instead
         if (@hasDecl(f.ftype, "Prototype")) {

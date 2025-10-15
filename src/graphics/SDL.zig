@@ -40,7 +40,6 @@ pub const ButtonState = enum {
 };
 
 threadlocal var scratch_buffer: [256]u8 = undefined;
-
 pub fn getScancodeFromName(name: []const u8) usize {
     if (name.len > scratch_buffer.len - 1)
         return 0;
@@ -133,6 +132,26 @@ pub const Window = struct {
     pub const KeysT = KeyBuf;
     pub const KeyStateT = [c.SDL_SCANCODE_COUNT]ButtonState;
     pub const EmptyKeyState: KeyStateT = [_]ButtonState{.low} ** c.SDL_SCANCODE_COUNT;
+    pub const CreateOptions = struct {
+        window_size: Vec2i = .{ .x = 1280, .y = 960 },
+        double_buffer: bool = true,
+        gl_profile: enum { core, compat, es } = .core,
+        stencil_buffer_depth: ?i32 = 8,
+        gl_major_version: i32 = 4,
+        gl_minor_version: i32 = 6,
+        ///If set, attempt to make all frames last this long in ns. This option should only be set when frame_sync = .immediate
+        target_frame_len_ns: ?u64 = null,
+        frame_sync: enum(i32) {
+            vsync = 1,
+            ///FreeSync, G-Sync
+            adaptive_vsync = -1,
+            immediate = 0,
+        } = .vsync,
+        extra_gl_attributes: []const struct { attr: c.SDL_GLAttr, val: i32 } = &.{},
+        gl_flags: []const u32 = &.{c.SDL_GL_CONTEXT_DEBUG_FLAG},
+        window_flags: []const u32 = &.{},
+        enable_debug: bool = true,
+    };
 
     pub const ChildWindow = struct {
         win: *c.SDL_Window,
@@ -199,26 +218,7 @@ pub const Window = struct {
 
     //}
 
-    pub fn createWindow(title: [*c]const u8, options: struct {
-        window_size: Vec2i = .{ .x = 1280, .y = 960 },
-        double_buffer: bool = true,
-        gl_profile: enum { core, compat, es } = .core,
-        stencil_buffer_depth: ?i32 = 8,
-        gl_major_version: i32 = 4,
-        gl_minor_version: i32 = 6,
-        ///If set, attempt to make all frames last this long in ns. This option should only be set when frame_sync = .immediate
-        target_frame_len_ns: ?u64 = null,
-        frame_sync: enum(i32) {
-            vsync = 1,
-            ///FreeSync, G-Sync
-            adaptive_vsync = -1,
-            immediate = 0,
-        } = .vsync,
-        extra_gl_attributes: []const struct { attr: c.SDL_GLAttr, val: i32 } = &.{},
-        gl_flags: []const u32 = &.{c.SDL_GL_CONTEXT_DEBUG_FLAG},
-        window_flags: []const u32 = &.{},
-        enable_debug: bool = true,
-    }) !Self {
+    pub fn createWindow(title: [*c]const u8, options: CreateOptions) !Self {
         log.info("Attempting to create window: {s}", .{title});
         if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
             sdlLogErr();
@@ -357,16 +357,6 @@ pub const Window = struct {
             if (frame_took < tft)
                 std.time.sleep(tft - frame_took);
         }
-    }
-
-    pub fn getDpi(_: *Self) f32 {
-        @compileError("broken don't use");
-        //var dpi: f32 = 0;
-
-        //var hdpi: f32 = 0;
-        //var vdpi: f32 = 0;
-        //_ = c.SDL_GetDisplayDPI(c.SDL_GetWindowDisplayIndex(self.win), &dpi, &hdpi, &vdpi);
-        //return dpi;
     }
 
     pub fn setClipboard(alloc: std.mem.Allocator, text: []const u8) !void {
