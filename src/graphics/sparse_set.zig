@@ -15,36 +15,6 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
         pub const sparse_null_marker: index_type = NullMarker(index_type);
         pub const dense_null_marker: index_type = NullMarker(index_type);
 
-        //TODO write tests that ensure addition and removal during iteration does not invalidate anything
-        pub const Iterator = struct {
-            dense: *std.ArrayList(child_type),
-            dense_index_lut: *ArrayList(index_type),
-            //This is an index into dense
-            index: usize,
-
-            //This is a sparse index
-            i: index_type,
-
-            pub fn next(self: *Iterator) ?*child_type {
-                defer self.index += 1;
-                if (self.index >= self.dense.items.len)
-                    return null;
-                while (self.dense_index_lut.items[self.index] == dense_null_marker) : (self.index += 1) {
-                    if (self.index == self.dense.items.len - 1) {
-                        return null;
-                    }
-                }
-                self.i = self.dense_index_lut.items[self.index];
-                return &self.dense.items[self.index];
-            }
-
-            pub fn getCurrent(self: *Iterator) ?*child_type {
-                if (self.index < self.dense.items.len)
-                    return &self.dense.items[self.index];
-                return null;
-            }
-        };
-
         /// Sparse maps a global index to a 'dense' index
         sparse: ArrayList(index_type) = .{},
 
@@ -78,7 +48,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             var ret: Self = .{
                 .alloc = alloc,
                 .dense = (std.ArrayList(child_type)).fromOwnedSlice(alloc, slice),
-                .dense_index_lut = (std.ArrayList(index_type).fromOwnedSlice(alloc, lut)),
+                .dense_index_lut = (ArrayList(index_type).fromOwnedSlice(lut)),
             };
 
             for (ret.dense_index_lut.items, 0..) |item, i| {
@@ -108,6 +78,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             try self._freelist.resize(self.alloc, 0);
         }
 
+        /// Iterators remain valid but not pointers
         pub fn insert(self: *Self, index: index_type, item: child_type) (error{IndexOccupied} || Allocator.Error)!void {
             if (index < self.sparse.items.len and self.sparse.items[index] != sparse_null_marker)
                 return error.IndexOccupied;
@@ -131,7 +102,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             self.dense_index_lut.items[dense_index] = index;
         }
 
-        /// iterators remain valid
+        /// Iterators remain valid but not pointers
         pub fn remove(self: *Self, index: index_type) (InvalidIndex || Allocator.Error)!child_type {
             const di = try self.getDenseIndex(index);
             try self._freelist.append(self.alloc, di);
@@ -172,6 +143,35 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             const di = try self.getDenseIndex(index);
             return &self.dense.items[di];
         }
+
+        pub const Iterator = struct {
+            dense: *std.ArrayList(child_type),
+            dense_index_lut: *ArrayList(index_type),
+            //This is an index into dense
+            index: usize,
+
+            //This is a sparse index
+            i: index_type,
+
+            pub fn next(self: *Iterator) ?*child_type {
+                defer self.index += 1;
+                if (self.index >= self.dense.items.len)
+                    return null;
+                while (self.dense_index_lut.items[self.index] == dense_null_marker) : (self.index += 1) {
+                    if (self.index == self.dense.items.len - 1) {
+                        return null;
+                    }
+                }
+                self.i = self.dense_index_lut.items[self.index];
+                return &self.dense.items[self.index];
+            }
+
+            pub fn getCurrent(self: *Iterator) ?*child_type {
+                if (self.index < self.dense.items.len)
+                    return &self.dense.items[self.index];
+                return null;
+            }
+        };
     };
 }
 
@@ -195,10 +195,10 @@ test "Sparse set basic usage" {
     _ = try sset.remove(0);
 }
 
+const SetType1 = SparseSet(u32, u32);
 test "random" {
     const a = testing.allocator;
 
-    const SetType1 = SparseSet(u32, u32);
     var sset = try SetType1.init(a);
     defer sset.deinit();
 
@@ -210,10 +210,10 @@ test "random" {
 
     const max_i = 1000;
     const max_v = 100000;
-    const count = 10000;
+    const count = 1000;
 
     for (0..count) |_| {
-        switch (r.enumValue(enum { insert, remove })) {
+        switch (r.enumValue(enum { insert, remove, iterate })) {
             .insert => {
                 const index = r.uintLessThan(u32, max_i);
                 const value = r.uintLessThan(u32, max_v);
@@ -235,19 +235,29 @@ test "random" {
                     try std.testing.expectError(error.InvalidIndex, rem);
                 }
             },
-        }
-    }
-    var it = map.iterator();
-    while (it.next()) |pot| {
-        try std.testing.expectEqual(pot.value_ptr.*, try sset.get(pot.key_ptr.*));
-    }
+            .iterate => {
+                var it = map.iterator();
+                while (it.next()) |pot| {
+                    try std.testing.expectEqual(pot.value_ptr.*, try sset.get(pot.key_ptr.*));
+                }
 
-    var sit = sset.denseIterator();
-    while (sit.next()) |po| {
-        try std.testing.expectEqual(po.*, map.get(sit.i) orelse error.broken);
+                var sit = sset.denseIterator();
+                while (sit.next()) |po| {
+                    try std.testing.expectEqual(po.*, map.get(sit.i) orelse error.broken);
+                }
+            },
+        }
     }
 }
 
-// pub fn fromOwnedDenseSlice(alloc: std.mem.Allocator, slice: []child_type, lut: []index_type) !Self {
-// pub fn insert(self: *Self, index: index_type, item: child_type) !void {
-// pub fn remove(self: *Self, index: index_type) !index_type {
+test "fromSlice" {
+    const alloc = std.testing.allocator;
+    const dense = try alloc.dupe(u32, &.{ 0, 44, 43, 83, 87 });
+    const lut__ = try alloc.dupe(u32, &.{ 4, 5, 8, 0, 2 });
+    var sset = try SetType1.fromOwnedDenseSlice(alloc, dense, lut__);
+    defer sset.deinit();
+
+    for (lut__, dense) |ll, d| {
+        try std.testing.expectEqual(sset.get(ll), d);
+    }
+}
