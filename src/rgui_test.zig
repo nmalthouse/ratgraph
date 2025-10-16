@@ -18,6 +18,63 @@ const Gui = guis.Gui;
 const Wg = guis.Widget;
 const CbHandle = guis.CbHandle;
 
+pub const MyGlView = struct {
+    vt: iWindow,
+    area: iArea,
+    cbhandle: CbHandle = .{},
+
+    draw_ctx: *graph.ImmediateDrawingContext,
+
+    pub fn create(gui: *Gui, draw_ctx: *graph.ImmediateDrawingContext) *iWindow {
+        const self = gui.create(@This());
+        self.* = .{
+            .draw_ctx = draw_ctx,
+            .area = .{ .area = Rec(0, 0, 0, 0), .deinit_fn = area_deinit, .draw_fn = draw },
+            .vt = iWindow.init(&@This().build, gui, &@This().deinit, &self.area),
+        };
+        self.vt.update_fn = update;
+
+        return &self.vt;
+    }
+
+    pub fn update(vt: *iWindow, gui: *Gui) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+
+        const can_grab = gui.canGrabMouseOverride(vt);
+
+        if (can_grab) {
+            self.draw_ctx.rect(self.area.area, 0x00ffff);
+            //const mstate = gui.sdl_win.mouse.left;
+            if (gui.sdl_win.keyRising(.LSHIFT)) {
+                const center = self.area.area.center();
+                graph.c.SDL_WarpMouseInWindow(gui.sdl_win.win, center.x, center.y);
+            }
+            gui.setGrabOverride(vt, gui.sdl_win.keystate(.LSHIFT) == .low, .{ .hide_pointer = true });
+        } else {
+            self.draw_ctx.rect(self.area.area, 0xff00ffff);
+        }
+    }
+
+    pub fn deinit(vt: *iWindow, gui: *Gui) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        //self.layout.deinit(gui, vt);
+        vt.deinit(gui);
+        gui.alloc.destroy(self); //second
+    }
+
+    pub fn area_deinit(_: *iArea, _: *Gui, _: *iWindow) void {}
+
+    pub fn draw(vt: *iArea, d: DrawState) void {
+        GuiHelp.drawWindowFrame(d, vt.area);
+    }
+
+    pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        _ = gui;
+        self.area.area = area;
+    }
+};
+
 pub const MyInspector = struct {
     const MyEnum = enum {
         hello,
@@ -233,7 +290,7 @@ pub fn main() !void {
     var font = try graph.Font.init(alloc, std.fs.cwd(), "asset/fonts/roboto.ttf", TEXT_H, .{});
     defer font.deinit();
 
-    const sc = 1;
+    const sc = 2;
     var gui = try Gui.init(alloc, &win, cache_dir, std.fs.cwd(), &font.font);
     gui.scale = sc;
     defer gui.deinit();
@@ -256,10 +313,15 @@ pub fn main() !void {
     const window_area = Rect{ .x = 100, .y = 50, .w = 1000, .h = 1000 };
 
     const dstate = guis.DrawState{ .ctx = &draw, .font = &font.font, .style = &gui.style, .gui = &gui, .scale = sc, .nstyle = &gui.nstyle };
-    try gui.addWindow(MyInspector.create(&gui), window_area);
+    const inspector = MyInspector.create(&gui);
+    const glview = MyGlView.create(&gui, &draw);
+    try gui.addWindow(inspector, window_area, .{});
+    try gui.addWindow(glview, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = false });
 
     var timer = try std.time.Timer.start();
 
+    try gui.active_windows.append(gui.alloc, inspector);
+    try gui.active_windows.append(gui.alloc, glview);
     while (!win.should_exit) {
         try draw.begin(0xff, win.screen_dimensions.toF());
         win.pumpEvents(if (do_test_builder) .wait else .poll);
@@ -268,21 +330,15 @@ pub fn main() !void {
             win.should_exit = true;
 
         timer.reset();
-        const wins = gui.windows.items;
-        try gui.pre_update(wins);
-        if (do_test_builder) {
-            try gui.handleSdlEvents(wins);
-        } else {
-            if (demo.next()) |up|
-                try gui.handleEvent(up, wins);
-        }
-        try gui.draw(dstate, false, wins);
+        try gui.pre_update();
+        try gui.update();
+        try gui.draw(dstate, false);
 
         const took = timer.read();
         if (took > std.time.ns_per_ms * 16) {
             std.debug.print("Overtime {d} \n", .{took / std.time.ns_per_ms});
         }
-        gui.drawFbos(&draw, wins);
+        gui.drawFbos(&draw);
 
         try draw.flush(null, null); //Flush any draw commands
 

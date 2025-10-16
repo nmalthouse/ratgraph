@@ -200,6 +200,7 @@ pub const iWindow = struct {
 
     build_fn: BuildfnT,
     deinit_fn: *const fn (*iWindow, *Gui) void,
+    update_fn: ?*const fn (*iWindow, *Gui) void = null,
 
     area: *iArea,
     alloc: std.mem.Allocator,
@@ -626,6 +627,11 @@ pub const Demo = struct {
 
 const Vec2f = graph.Vec2f;
 
+pub const WindowId = enum(u32) {
+    none = std.math.maxInt(u32),
+    _,
+};
+
 const ENABLE_TEST_BUILDER = true;
 pub const Gui = struct {
     const TestBuilder = struct {
@@ -642,7 +648,6 @@ pub const Gui = struct {
     const Self = @This();
     pub const MouseGrabFn = *const fn (*iArea, MouseCbState, *iWindow) void;
     pub const TextinputFn = *const fn (*iArea, TextCbState, *iWindow) void;
-    const MouseGrabState = enum { high, falling };
 
     tracker: struct {
         register_count: usize = 0,
@@ -666,17 +671,21 @@ pub const Gui = struct {
     windows: ArrayList(*iWindow) = .{},
 
     /// Windows that are active this frame put themselves in here
-    /// Cleared on pre_update, nothing is done explicitly with this, just helper for user
-    window_collector: ArrayList(*iWindow) = .{},
+    active_windows: ArrayList(*iWindow) = .{},
 
     transient_should_close: bool = false,
     transient_window: ?*iWindow = null,
 
     mouse_grab: ?struct {
-        cb: MouseGrabFn,
-        vt: *iArea,
         win: *iWindow,
-        btn: MouseCbState.Btn,
+        kind: union(enum) {
+            btn: struct {
+                cb: MouseGrabFn,
+                vt: *iArea,
+                btn: MouseCbState.Btn,
+            },
+            override: struct { hide_pointer: bool },
+        },
     } = null,
 
     focused: ?struct {
@@ -729,7 +738,7 @@ pub const Gui = struct {
         self.transient_fbo.deinit();
         self.fbos.deinit();
         self.windows.deinit(self.alloc);
-        self.window_collector.deinit(self.alloc);
+        self.active_windows.deinit(self.alloc);
         self.closeTransientWindow();
         self.area_window_map.deinit(self.alloc);
         self.style.deinit();
@@ -846,15 +855,21 @@ pub const Gui = struct {
         }
     }
 
-    pub fn pre_update(self: *Self, windows: []const *iWindow) !void {
+    pub fn pre_update(self: *Self) !void {
         if (false) {
             self.tracker.print();
             self.tracker.reset();
         }
 
-        self.window_collector.clearRetainingCapacity();
-
-        for (windows) |win| {
+        if (self.mouse_grab) |mg| {
+            if (!self.isWindowActive(mg.win))
+                self.clearGrab();
+        }
+        if (self.focused) |f| {
+            if (!self.isWindowActive(f.win))
+                self.focused = null;
+        }
+        for (self.active_windows.items) |win| {
             win.to_draw.clearRetainingCapacity();
             win.cache_map.clearRetainingCapacity();
             if (win.needs_rebuild) {
@@ -864,6 +879,9 @@ pub const Gui = struct {
                 win.build_fn(win, self, win.area.area);
                 //std.debug.print("Built win in: {d:.2} us\n", .{time.read() / std.time.ns_per_us});
             }
+
+            if (win.update_fn) |upfn|
+                upfn(win, self);
         }
         if (self.transient_window) |tw| {
             tw.to_draw.clearRetainingCapacity();
@@ -875,8 +893,8 @@ pub const Gui = struct {
         }
     }
 
-    pub fn update(self: *Self, windows: []const *iWindow) !void {
-        try self.handleSdlEvents(windows);
+    pub fn update(self: *Self) !void {
+        try self.handleSdlEvents(self.active_windows.items);
     }
 
     /// If transient windows destroy themselves, the program will crash as used memory is freed.
@@ -896,6 +914,64 @@ pub const Gui = struct {
 
     pub fn getWindow(self: *Self, vt: *iArea) ?*iWindow {
         return self.area_window_map.get(vt);
+    }
+
+    pub fn getWindowId(self: *Self, id: WindowId) ?*iWindow {
+        if (id == .none) return null;
+        const index: usize = @intFromEnum(id);
+        if (index >= self.windows.items.len) return null;
+        return self.windows.items[index];
+    }
+
+    fn isWindowActive(self: *Self, id: *iWindow) bool {
+        if (self.transient_window != null and self.transient_window.? == id) return true;
+        return std.mem.indexOfScalar(*iWindow, self.active_windows.items, id) != null;
+    }
+
+    pub fn canGrabMouseOverride(self: *Self, win: *iWindow) bool {
+        if (self.mouse_grab) |mg| {
+            switch (mg.kind) {
+                else => return false,
+                .override => return mg.win == win,
+            }
+            return;
+        }
+        if (win.area.area.containsPoint(self.sdl_win.mouse.pos)) {
+            if (self.transient_window) |tr| {
+                if (tr != win and tr.area.area.containsPoint(self.sdl_win.mouse.pos))
+                    return false;
+            }
+
+            return true;
+        }
+        return false;
+    }
+
+    pub fn setGrabOverride(self: *Self, win: *iWindow, grab: bool, opts: struct { hide_pointer: bool }) void {
+        if (self.canGrabMouseOverride(win)) {
+            if (grab) {
+                self.mouse_grab = .{
+                    .win = win,
+                    .kind = .{ .override = .{ .hide_pointer = opts.hide_pointer } },
+                };
+                self.sdl_win.grabMouse(opts.hide_pointer);
+            } else {
+                self.clearGrab();
+            }
+        }
+    }
+
+    fn clearGrab(self: *Self) void {
+        if (self.mouse_grab) |mg| {
+            switch (mg.kind) {
+                .btn => {},
+                .override => |ov| {
+                    if (ov.hide_pointer)
+                        self.sdl_win.grabMouse(false);
+                },
+            }
+        }
+        self.mouse_grab = null;
     }
 
     pub fn deregister(self: *Self, vt: *iArea, window: *iWindow) void {
@@ -929,8 +1005,12 @@ pub const Gui = struct {
         window.unregisterScissor(vt);
 
         if (self.mouse_grab) |g| {
-            if (g.vt == vt) {
-                self.mouse_grab = null;
+            switch (g.kind) {
+                else => {},
+                .btn => |b| {
+                    if (b.vt == vt)
+                        self.clearGrab();
+                },
             }
         }
         if (self.focused) |f| {
@@ -1065,19 +1145,21 @@ pub const Gui = struct {
     ///name vtables with ids
     ///on vt destroy, check and unset
     pub fn grabMouse(self: *Self, cb: MouseGrabFn, vt: *iArea, win: *iWindow, btn: MouseCbState.Btn) void {
-        self.mouse_grab = .{
+        self.mouse_grab = .{ .win = win, .kind = .{ .btn = .{
             .cb = cb,
             .vt = vt,
-            .win = win,
             .btn = btn,
-        };
+        } } };
     }
 
-    pub fn addWindow(self: *Self, window: *iWindow, area: Rect) !void {
+    pub fn addWindow(self: *Self, window: *iWindow, area: Rect, opts: struct { put_fbo: bool = true }) !WindowId {
         window.build_fn(window, self, area); //Rebuild it
-        try self.fbos.put(window, try graph.RenderTexture.init(area.w, area.h));
+        if (opts.put_fbo)
+            try self.fbos.put(window, try graph.RenderTexture.init(area.w, area.h));
         self.register(window.area, window);
         try self.windows.append(self.alloc, window);
+
+        return @enumFromInt(self.windows.items.len - 1);
     }
 
     pub fn updateWindowSize(self: *Self, window: *iWindow, area: Rect) !void {
@@ -1085,14 +1167,14 @@ pub const Gui = struct {
             return;
         if (self.fbos.getPtr(window)) |fbo| {
             _ = try fbo.setSize(area.w, area.h);
-            window.build_fn(window, self, area);
         }
+        window.build_fn(window, self, area);
     }
 
     //pub fn updateSpecific(self: *Self, windows: []const *iWindow)!void{ }
 
-    pub fn drawFbos(self: *Self, ctx: *Dctx, windows: []const *iWindow) void {
-        for (windows) |w| {
+    pub fn drawFbos(self: *Self, ctx: *Dctx) void {
+        for (self.active_windows.items) |w| {
             const fbo = self.fbos.getPtr(w) orelse continue;
             drawFbo(w.area.area, fbo, ctx, self.tint);
         }
@@ -1102,17 +1184,18 @@ pub const Gui = struct {
         }
     }
 
-    pub fn draw(self: *Self, dctx: DrawState, force_redraw: bool, windows: []const *iWindow) !void {
+    pub fn draw(self: *Self, dctx: DrawState, force_redraw: bool) !void {
         defer {
             graph.c.glBindFramebuffer(graph.c.GL_FRAMEBUFFER, 0);
             graph.c.glViewport(0, 0, @intFromFloat(dctx.ctx.screen_dimensions.x), @intFromFloat(dctx.ctx.screen_dimensions.y));
             gl.disable(.scissor_test);
         }
+        try dctx.ctx.flush(null, null);
         gl.enable(.depth_test);
         gl.enable(.blend);
         graph.c.glBlendFunc(graph.c.GL_SRC_ALPHA, graph.c.GL_ONE_MINUS_SRC_ALPHA);
         graph.c.glBlendEquation(graph.c.GL_FUNC_ADD);
-        for (windows) |win| {
+        for (self.active_windows.items) |win| {
             const fbo = self.fbos.getPtr(win) orelse continue;
             try self.drawWindow(win, dctx, force_redraw, fbo);
         }
@@ -1165,43 +1248,48 @@ pub const Gui = struct {
         const states = [_]ButtonState{ us.mouse.left, us.mouse.middle, us.mouse.right };
         const kinds = [states.len]MouseCbState.Btn{ .left, .middle, .right };
 
-        for (states, 0..) |state, si| {
-            if (self.mouse_grab) |g| {
-                if (g.btn != kinds[si]) //When a mouse is grabbed, only evaluate that state
-                    continue;
-            }
-
-            const mstate = MouseCbState{
-                .gui = self,
-                .pos = us.mouse.pos,
-                .delta = us.mouse.delta,
-                .state = state,
-                .btn = kinds[si],
-            };
-            switch (mstate.state) {
-                .rising => {
-                    self.dispatchClick(mstate, windows);
-                    break; //Only emit a single click event per update
-                },
-                .low => {
-                    self.mouse_grab = null;
-                },
-                .falling => {
-                    if (self.mouse_grab) |g|
-                        g.cb(
-                            g.vt,
-                            mstate,
-                            g.win,
-                        );
-                },
-                .high => {
-                    if (self.mouse_grab) |g| {
-                        g.cb(g.vt, mstate, g.win);
+        if (self.mouse_grab) |grab| {
+            if (grab.kind == .btn) {
+                const btn = grab.kind.btn.btn;
+                const gr = grab.kind.btn;
+                for (states, 0..) |state, si| {
+                    if (btn != kinds[si]) //When a mouse is grabbed, only eval that state
+                        continue;
+                    const mstate = MouseCbState{
+                        .gui = self,
+                        .pos = us.mouse.pos,
+                        .delta = us.mouse.delta,
+                        .state = state,
+                        .btn = kinds[si],
+                    };
+                    switch (mstate.state) {
+                        .rising => {
+                            self.dispatchClick(mstate, windows);
+                            break; //Only emit a single click event per update
+                        },
+                        .low => {
+                            self.clearGrab();
+                        },
+                        .falling => {
+                            gr.cb(gr.vt, mstate, grab.win);
+                        },
+                        .high => {
+                            gr.cb(gr.vt, mstate, grab.win);
+                            break;
+                        },
                     }
+                }
+            }
+        } else {
+            for (states, 0..) |state, si| {
+                if (state == .rising) {
+                    const mstate = MouseCbState{ .gui = self, .pos = us.mouse.pos, .delta = us.mouse.delta, .state = state, .btn = kinds[si] };
+                    self.dispatchClick(mstate, windows);
                     break;
-                },
+                }
             }
         }
+
         {
             const keys = us.keys;
             if (keys.len > 0) {

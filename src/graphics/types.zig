@@ -23,6 +23,7 @@ pub const Orientation = enum {
 
 pub const Rect = struct {
     const Self = @This();
+    pub const Empty = Rect{};
 
     x: f32 = 0,
     y: f32 = 0,
