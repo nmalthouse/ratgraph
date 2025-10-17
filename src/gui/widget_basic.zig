@@ -162,11 +162,11 @@ pub const VScroll = struct {
 };
 
 pub const Checkbox = struct {
-    pub const CommitCb = *const fn (*iArea, *Gui, bool, user_id: g.Uid) void;
+    pub const CommitCb = *const fn (*CbHandle, *Gui, bool, user_id: g.Uid) void;
     pub const Opts = struct {
         bool_ptr: ?*bool = null,
         cb_fn: ?CommitCb = null,
-        cb_vt: ?*iArea = null,
+        cb_vt: ?*CbHandle = null,
         user_id: g.Uid = 0,
         style: enum {
             ableton,
@@ -204,6 +204,13 @@ pub const Checkbox = struct {
             .vt = &self.vt,
             .onclick = onclick,
         };
+    }
+
+    pub fn getWidth(gui: *const Gui, name: []const u8, opts: Opts) f32 {
+        //TODO this is incorrect for styles
+        _ = opts;
+        const tbound = gui.font.textBounds(name, gui.style.config.text_h);
+        return tbound.x;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {

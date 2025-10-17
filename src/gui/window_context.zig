@@ -11,26 +11,38 @@ const ArrayList = std.ArrayListUnmanaged;
 const NewVt = g.NewVt;
 
 pub const BtnContextWindow = struct {
+    pub const ButtonList = []const ButtonMapping;
+    pub const ButtonMapping = struct {
+        u64, //Set this using buttonId() to give this button a name
+        []const u8, // the button text
+        union(enum) {
+            btn,
+            checkbox: bool, //default value of checkbox
+        },
+    };
+
     pub const Opts = struct {
         buttons: ButtonList,
         btn_cb: BtnCb,
         btn_vt: *g.CbHandle,
         user_id: g.Uid = 0,
+        checkbox_cb: ?Widget.Checkbox.CommitCb = null,
     };
     const BtnCb = Widget.Button.ButtonCallbackT;
-    pub const ButtonMapping = struct { u64, []const u8 };
-    pub const ButtonList = []const ButtonMapping;
     vt: iWindow,
     area: iArea,
 
     opts: Opts,
     cbhandle: g.CbHandle = .{},
-    //btn_cb: BtnCb,
-    //btn_cb_vt: *iArea,
 
     buttons: ArrayList(ButtonMapping) = .{},
 
     pub fn buttonId(comptime name: []const u8) u64 {
+        const h = std.hash.Wyhash.hash;
+        return h(0, name);
+    }
+
+    pub fn buttonIdRuntime(name: []const u8) u64 {
         const h = std.hash.Wyhash.hash;
         return h(0, name);
     }
@@ -52,7 +64,7 @@ pub const BtnContextWindow = struct {
         };
         try self.buttons.resize(gui.alloc, opts.buttons.len);
         for (opts.buttons, 0..) |btn, i|
-            self.buttons.items[i] = .{ btn[0], try gui.alloc.dupe(u8, btn[1]) };
+            self.buttons.items[i] = .{ btn[0], try gui.alloc.dupe(u8, btn[1]), btn[2] };
 
         build(&self.vt, gui, self.area.area);
 
@@ -66,11 +78,20 @@ pub const BtnContextWindow = struct {
 
         var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
         for (self.buttons.items) |btn| {
-            self.area.addChildOpt(gui, vt, Widget.Button.build(gui, ly.getArea(), btn[1], .{
-                .cb_vt = &self.cbhandle,
-                .cb_fn = btn_wrap_cb,
-                .id = btn[0],
-            }));
+            const ar = ly.getArea();
+            self.area.addChildOpt(gui, vt, switch (btn[2]) {
+                .btn => Widget.Button.build(gui, ar, btn[1], .{
+                    .cb_vt = &self.cbhandle,
+                    .cb_fn = btn_wrap_cb,
+                    .id = btn[0],
+                }),
+                .checkbox => |default| Widget.Checkbox.build(gui, ar, btn[1], .{
+                    .cb_vt = &self.cbhandle,
+                    .cb_fn = checkbox_wrap_cb,
+                    .user_id = btn[0],
+                    .style = .check,
+                }, default),
+            });
         }
     }
 
@@ -89,6 +110,14 @@ pub const BtnContextWindow = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
         _ = self;
         _ = d;
+    }
+
+    fn checkbox_wrap_cb(cb: *g.CbHandle, gui: *Gui, val: bool, id: g.Uid) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        if (self.opts.checkbox_cb) |ch_cb| {
+            ch_cb(self.opts.btn_vt, gui, val, id);
+        }
+        gui.deferTransientClose();
     }
 
     fn btn_wrap_cb(cb: *g.CbHandle, id: g.Uid, dat: g.MouseCbState, win: *iWindow) void {

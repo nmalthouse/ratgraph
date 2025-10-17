@@ -519,7 +519,7 @@ pub const Textbox = struct {
                     cb.gui,
                     cb.pos,
                     .{
-                        .buttons = &.{ .{ bi("copy"), "Copy" }, .{ bi("paste"), "Paste" } },
+                        .buttons = &.{ .{ bi("copy"), "Copy", .btn }, .{ bi("paste"), "Paste", .btn } },
                         .btn_cb = rightClickMenuBtn,
                         .btn_vt = &self.cbhandle,
                     },
