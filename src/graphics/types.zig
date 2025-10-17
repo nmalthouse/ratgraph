@@ -253,6 +253,7 @@ pub fn rectContainsPoint(r: anytype, p: anytype) bool {
 }
 
 pub const Vec2f = packed struct {
+    pub const zero = Vec2f{ .x = 0, .y = 0 };
     x: f32,
     y: f32,
 

@@ -120,9 +120,11 @@ pub fn build(b: *std.Build) void {
 
     const bake = b.addExecutable(.{
         .name = "assetbake",
-        .root_source_file = b.path("src/assetbake.zig"),
-        .target = target,
-        .optimize = mode,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/assetbake.zig"),
+            .target = target,
+            .optimize = mode,
+        }),
     });
     b.installArtifact(bake);
     const to_link = [_]ToLink{ .freetype, .openal, .lua };
@@ -130,9 +132,11 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "the_engine",
-        .root_source_file = if (build_gui) b.path("src/rgui_test.zig") else b.path("src/main.zig"),
-        .target = target,
-        .optimize = mode,
+        .root_module = b.createModule(.{
+            .root_source_file = if (build_gui) b.path("src/rgui_test.zig") else b.path("src/main.zig"),
+            .target = target,
+            .optimize = mode,
+        }),
     });
     b.installArtifact(exe);
 
@@ -150,9 +154,11 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/tests.zig"),
-        .target = target,
-        .optimize = mode,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tests.zig"),
+            .target = target,
+            .optimize = mode,
+        }),
         .link_libc = true,
     });
     unit_tests.setExecCmd(&[_]?[]const u8{ "kcov", "kcov-output", null });

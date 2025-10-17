@@ -392,7 +392,6 @@ pub const Button = struct {
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        _ = self;
         switch (ev.event) {
             .focusChanged => vt.dirty(ev.gui),
             .text_input => {},
@@ -400,7 +399,13 @@ pub const Button = struct {
                 for (kev.keys) |k| {
                     switch (@as(graph.SDL.keycodes.Scancode, @enumFromInt(k.key_id))) {
                         else => {},
-                        //.SPACE, .RETURN => self.sendClickCb(ev.gui, ev.window),
+                        .SPACE, .RETURN => self.sendClickCb(.{
+                            .pos = vt.area.pos(),
+                            .delta = .zero,
+                            .gui = ev.gui,
+                            .state = .rising,
+                            .btn = .left,
+                        }, ev.window),
                     }
                 }
             },
