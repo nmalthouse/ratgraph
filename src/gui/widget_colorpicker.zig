@@ -208,13 +208,13 @@ const ColorpickerTransient = struct {
         color.h = (self.hue_handle) / h_area.h * 360.0;
     }
 
-    fn closeBtnCb(cb: *CbHandle, id: usize, gui: *Gui, _: *iWindow) void {
+    fn closeBtnCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
 
-        self.parent_ptr.commitColor(gui, self.parent_ptr.color_hsv.toInt());
-        self.parent_ptr.vt.dirty(gui);
+        self.parent_ptr.commitColor(dat.gui, self.parent_ptr.color_hsv.toInt());
+        self.parent_ptr.vt.dirty(dat.gui);
         _ = id;
-        gui.deferTransientClose();
+        dat.gui.deferTransientClose();
     }
 
     pub fn draw(vt: *iArea, d: g.DrawState) void {

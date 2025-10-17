@@ -311,7 +311,7 @@ pub const Checkbox = struct {
 };
 
 pub const Button = struct {
-    pub const ButtonCallbackT = *const fn (*CbHandle, g.Uid, *Gui, *iWindow) void;
+    pub const ButtonCallbackT = *const fn (*CbHandle, g.Uid, MouseCbState, *iWindow) void;
     pub const Opts = struct {
         cb_vt: ?*CbHandle = null,
         cb_fn: ?ButtonCallbackT = null,
@@ -374,17 +374,18 @@ pub const Button = struct {
         vt.dirty(cb.gui);
         self.is_down = true;
         cb.gui.grabMouse(&@This().mouseGrabbed, vt, win, cb.btn);
-        self.sendClickCb(cb.gui, win);
+        self.sendClickCb(cb, win);
     }
 
-    fn sendClickCb(self: *@This(), gui: *Gui, win: *iWindow) void {
+    fn sendClickCb(self: *@This(), cb: MouseCbState, win: *iWindow) void {
         if (self.opts.cb_fn) |cbfn| {
-            cbfn(self.opts.cb_vt orelse return, self.opts.id, gui, win);
+            cbfn(self.opts.cb_vt orelse return, self.opts.id, cb, win);
         }
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        _ = self;
         switch (ev.event) {
             .focusChanged => vt.dirty(ev.gui),
             .text_input => {},
@@ -392,7 +393,7 @@ pub const Button = struct {
                 for (kev.keys) |k| {
                     switch (@as(graph.SDL.keycodes.Scancode, @enumFromInt(k.key_id))) {
                         else => {},
-                        .SPACE, .RETURN => self.sendClickCb(ev.gui, ev.window),
+                        //.SPACE, .RETURN => self.sendClickCb(ev.gui, ev.window),
                     }
                 }
             },

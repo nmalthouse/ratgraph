@@ -529,9 +529,9 @@ pub const Textbox = struct {
         }
     }
 
-    fn rightClickMenuBtn(cb: *CbHandle, id: g.Uid, gui: *Gui, _: *iWindow) void {
+    fn rightClickMenuBtn(cb: *CbHandle, id: g.Uid, dat: g.MouseCbState, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        self.vt.dirty(gui);
+        self.vt.dirty(dat.gui);
         const bi = g.Widget.BtnContextWindow.buttonId;
         switch (id) {
             bi("copy") => setClipboard(self.codepoints.allocator, self.getSelectionSlice()) catch return,

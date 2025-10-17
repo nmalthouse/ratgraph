@@ -938,7 +938,7 @@ pub const Gui = struct {
         }
         if (win.area.area.containsPoint(self.sdl_win.mouse.pos)) {
             if (self.transient_window) |tr| {
-                if (tr != win and tr.area.area.containsPoint(self.sdl_win.mouse.pos))
+                if (tr != win)
                     return false;
             }
 

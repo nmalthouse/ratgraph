@@ -8,6 +8,7 @@ const Rec = g.Rec;
 const iWindow = g.iWindow;
 const Widget = g.Widget;
 const ArrayList = std.ArrayListUnmanaged;
+const NewVt = g.NewVt;
 
 pub const BtnContextWindow = struct {
     pub const Opts = struct {
@@ -90,11 +91,39 @@ pub const BtnContextWindow = struct {
         _ = d;
     }
 
-    fn btn_wrap_cb(cb: *g.CbHandle, id: g.Uid, gui: *Gui, win: *iWindow) void {
+    fn btn_wrap_cb(cb: *g.CbHandle, id: g.Uid, dat: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        self.opts.btn_cb(self.opts.btn_vt, id, gui, win);
-        gui.deferTransientClose();
+        self.opts.btn_cb(self.opts.btn_vt, id, dat, win);
+        dat.gui.deferTransientClose();
     }
 
     pub fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
+};
+
+pub const SubMenuExpander = struct {
+    vt: iArea,
+    text: []const u8,
+
+    pub fn build(gui: *Gui, area_o: ?Rect, text: []const u8) ?NewVt {
+        const area = area_o orelse return null;
+        const self = gui.create(@This());
+        self.* = .{
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .text = gui.alloc.dupe(u8, text) catch return null,
+        };
+        return .{ .vt = &self.vt };
+    }
+
+    pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        gui.alloc.destroy(self);
+    }
+
+    pub fn draw(vt: *iArea, d: g.DrawState) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        //d.ctx.rect(vt.area, 0x5ffff0ff);
+        d.ctx.rect(vt.area, self.bg_col);
+        const texta = vt.area.inset(d.style.config.default_item_h / 10);
+        d.ctx.textClipped(texta, "{s}", .{self.text}, d.textP(null), .left);
+    }
 };

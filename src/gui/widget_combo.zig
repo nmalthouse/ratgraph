@@ -201,12 +201,12 @@ pub fn ComboUser(user_data: type) type {
             self.makeTransientWindow(cb.gui, Rec(vt.area.x, vt.area.y, vt.area.w, cb.gui.style.config.default_item_h * 10));
         }
 
-        pub fn buttonCb(cb: *CbHandle, id: usize, gui: *Gui, _: *iWindow) void {
+        pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-            self.vt.dirty(gui);
+            self.vt.dirty(dat.gui);
             self.opts.current = id;
             self.opts.commit_cb(self.opts.user_vt, id, self.user);
-            gui.deferTransientClose();
+            dat.gui.deferTransientClose();
         }
 
         pub fn makeTransientWindow(self: *@This(), gui: *Gui, area: Rect) void {
@@ -337,11 +337,11 @@ pub fn ComboGeneric(comptime enumT: type) type {
             self.makeTransientWindow(cb.gui, Rec(btn_a.x, btn_a.y, btn_a.w, cb.gui.style.config.default_item_h * 4));
         }
 
-        pub fn buttonCb(cb: *CbHandle, id: usize, gui: *Gui, _: *iWindow) void {
+        pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-            self.vt.dirty(gui);
+            self.vt.dirty(dat.gui);
             self.enum_ptr.* = @enumFromInt(id);
-            gui.deferTransientClose();
+            dat.gui.deferTransientClose();
         }
 
         pub fn makeTransientWindow(self: *@This(), gui: *Gui, area: Rect) void {
