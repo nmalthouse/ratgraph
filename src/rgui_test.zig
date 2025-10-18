@@ -258,7 +258,7 @@ pub const MyInspector = struct {
         scr.hintBounds(ly.getUsed());
     }
 
-    pub fn btnCb(_: *CbHandle, id: usize, _: *Gui, _: *iWindow) void {
+    pub fn btnCb(_: *CbHandle, id: usize, _: guis.MouseCbState, _: *iWindow) void {
         std.debug.print("BUTTON CLICKED {d}\n", .{id});
     }
 };
@@ -285,8 +285,8 @@ pub fn main() !void {
     defer draw.deinit();
     std.debug.print("VT SIZE {d}\n", .{@sizeOf(iArea)});
 
-    const TEXT_H = @trunc(15 * 1.6);
-    const hh = @trunc(14 * 1.6);
+    const TEXT_H = 18;
+    const hh = 28;
     var font = try graph.Font.init(alloc, std.fs.cwd(), "asset/fonts/roboto.ttf", TEXT_H, .{});
     defer font.deinit();
 
@@ -315,8 +315,8 @@ pub fn main() !void {
     const dstate = guis.DrawState{ .ctx = &draw, .font = &font.font, .style = &gui.style, .gui = &gui, .scale = sc, .nstyle = &gui.nstyle };
     const inspector = MyInspector.create(&gui);
     const glview = MyGlView.create(&gui, &draw);
-    try gui.addWindow(inspector, window_area, .{});
-    try gui.addWindow(glview, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = false });
+    _ = try gui.addWindow(inspector, window_area, .{});
+    _ = try gui.addWindow(glview, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = false });
 
     var timer = try std.time.Timer.start();
 

@@ -186,7 +186,7 @@ pub fn ComboUser(user_data: type) type {
 
             const cb = d.style.getRect(.combo_background);
             d.ctx.nineSlice(vt.area, cb, d.style.texture, d.scale, d.tint);
-            const texta = vt.area.inset(cb.w / 3 * d.scale);
+            const texta = d.textArea(vt.area);
             d.ctx.textClipped(texta, "{s}", .{self.opts.name_cb(self.opts.user_vt, self.opts.current, d.gui, self.user)}, d.textP(null), .center);
             //self.gui.drawTextFmt(fmt, args, texta, self.style.config.text_h, 0xff, .{ .justify = .center }, self.font);
             const cbb = d.style.getRect(.combo_button);
@@ -321,7 +321,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
             const cb = d.style.getRect(.combo_background);
             const btn_a = vt.area;
             d.ctx.nineSlice(btn_a, cb, d.style.texture, d.scale, d.tint);
-            const texta = btn_a.inset(cb.w / 3 * d.scale);
+            const texta = d.textArea(vt.area);
             d.ctx.textClipped(texta, "{s}", .{@tagName(self.enum_ptr.*)}, d.textP(null), .center);
             //self.gui.drawTextFmt(fmt, args, texta, self.style.config.text_h, 0xff, .{ .justify = .center }, self.font);
             const cbb = d.style.getRect(.combo_button);

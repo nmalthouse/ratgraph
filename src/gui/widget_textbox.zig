@@ -445,7 +445,8 @@ pub const Textbox = struct {
         const tr = textArea(vt.area, d.gui);
         //const tr = vt.area.inset(inset);
         //d.ctx.nineSlice(vt.area, d.style.getRect(.basic_inset), d.style.texture, d.scale, d.tint);
-        d.ctx.rect(vt.area, d.nstyle.color.textbox_bg);
+        d.ctx.rect(vt.area, d.nstyle.color.textbox_border);
+        d.ctx.rect(vt.area.inset(d.scale), d.nstyle.color.textbox_bg);
         //if (params.invalid)
         //    gui.drawRectFilled(tr, self.style.config.colors.textbox_invalid);
         var selection_pos_min: f32 = 0;
@@ -466,6 +467,10 @@ pub const Textbox = struct {
             selection_pos_max - selection_pos_min,
             tr.h,
         ), d.style.config.colors.text_highlight);
+        const THICK = 2 * d.scale;
+        if (s.changed) {
+            d.ctx.rect(Rect.new(tr.x, tr.y + tr.h - THICK, tr.w, THICK), d.style.config.colors.uncommited);
+        }
         d.ctx.textClipped(tr, "{s}", .{sl}, d.textP(null), .left);
         if (is_focused) {
             d.ctx.rect(
@@ -473,14 +478,12 @@ pub const Textbox = struct {
                 d.nstyle.color.caret,
             );
         }
-        const THICK = 2 * d.scale;
-        if (s.changed) {
-            d.ctx.rect(Rect.new(tr.x, tr.y + tr.h - THICK, tr.w, THICK), d.style.config.colors.uncommited);
-        }
     }
 
     fn textArea(widget_area: Rect, d: *const Gui) Rect {
-        const inset = d.style.config.textbox_inset * d.scale;
+        const inset = @max((widget_area.h - d.style.config.text_h) / 2, 0);
+
+        //const inset = d.style.config.textbox_inset * d.scale;
         return widget_area.inset(inset);
     }
 

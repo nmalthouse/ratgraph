@@ -393,6 +393,18 @@ pub const DrawState = struct {
             .px_size = self.style.config.text_h,
         };
     }
+
+    pub fn minWidgetWidth(self: *const @This(), string: []const u8) f32 {
+        const bound = self.font.textBounds(string, self.style.config.text_h);
+
+        const inset = @max((self.style.config.default_item_h - self.style.config.text_h), 0);
+        return bound.x + inset;
+    }
+
+    pub fn textArea(self: *const @This(), area: Rect) Rect {
+        const inset = @max((area.h - self.style.config.text_h) / 2, 0);
+        return area.inset(inset);
+    }
 };
 
 pub const MouseCbState = struct {
@@ -1351,6 +1363,7 @@ pub const Colorscheme = struct {
     text_fg: u32 = 0xeeeeee_ff,
     text_bg: u32 = 0x333333_ff,
     textbox_bg: u32 = 0x333333_ff,
+    textbox_border: u32 = 0xff,
     drop_down_arrow: u32 = 0xe0e0e0_ff,
     caret: u32 = 0xaaaaaaff,
 
@@ -1363,6 +1376,7 @@ pub const DarkColorscheme = Colorscheme{
     .text_fg = 0xeeeeee_ff,
     .text_bg = 0x333333_ff,
     .textbox_bg = 0x333333_ff,
+    .textbox_border = 0xff,
     .drop_down_arrow = 0xe0e0e0_ff,
     .caret = 0xaaaaaaff,
 

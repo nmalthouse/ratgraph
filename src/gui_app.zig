@@ -695,7 +695,7 @@ pub const GuiConfig = struct {
         return ret;
     }
 
-    pub fn getRect(self: *Self, v: Style9Slices) Rect {
+    pub fn getRect(self: *const Self, v: Style9Slices) Rect {
         return self.nineSliceLut.items[@intFromEnum(v)];
     }
 

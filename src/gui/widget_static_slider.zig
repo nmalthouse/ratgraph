@@ -109,7 +109,8 @@ pub const StaticSlider = struct {
         d.ctx.rect(vt.area, d.nstyle.color.static_slider_bg);
         const ins = @ceil(d.scale);
         const inset = vt.area.inset(ins);
-        const ta = inset.inset(@ceil(d.style.config.textbox_inset * d.scale));
+        //const ta = inset.inset(@ceil(d.style.config.textbox_inset * d.scale));
+        const ta = d.textArea(vt.area);
         if (self.opts.max == self.opts.min) return;
         const FILL_COLOR = 0xf7a41dff;
         switch (self.state) {

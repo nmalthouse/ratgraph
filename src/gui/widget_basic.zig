@@ -249,7 +249,7 @@ pub const Checkbox = struct {
         d.ctx.rect(vt.area, GRAY);
         const ins = @ceil(d.scale);
         const inset = vt.area.inset(ins);
-        const ta = inset.inset(@ceil(d.style.config.textbox_inset * d.scale));
+        const ta = d.textArea(vt.area);
         const FILL_COLOR = 0xADD8E6ff;
         if (self.bool_ptr.*)
             d.ctx.rect(inset, FILL_COLOR);
@@ -277,15 +277,8 @@ pub const Checkbox = struct {
             d.ctx.line(inn.topL(), inn.botR(), self.opts.cross_color, ins * 2);
             d.ctx.line(inn.topR(), inn.botL(), self.opts.cross_color, ins * 2);
         }
-        //d.ctx.rectTex(
-        //    br,
-        //    cr,
-        //    d.style.texture,
-        //);
-        const tarea = Rec(br.farX() + pad, area.y + pad, area.w - br.farX(), area.h);
+        const tarea = d.textArea(vt.area.replace(br.x + br.w, null, null, null));
         d.ctx.textClipped(tarea, "{s}{s}", .{ self.name, if (is_focused) " [space to toggle]" else "" }, d.textP(null), .left);
-
-        //std.debug.print("{s} says: {any}\n", .{ self.name, self.bool_ptr.* });
     }
 
     pub fn drawDropdown(vt: *iArea, d: DrawState) void {
@@ -304,7 +297,7 @@ pub const Checkbox = struct {
         const cmass = center.sub(v[0].add(v[1].add(v[2])).scale(1.0 / 3.0));
         d.ctx.triangle(v[0].add(cmass), v[1].add(cmass), v[2].add(cmass), self.opts.cross_color);
 
-        const tarea = Rec(br.farX() + pad, area.y + pad, area.w - br.farX(), area.h);
+        const tarea = d.textArea(vt.area.replace(br.farX(), null, null, null));
         d.ctx.textClipped(tarea, "{s}", .{self.name}, d.textP(null), .left);
 
         //std.debug.print("{s} says: {any}\n", .{ self.name, self.bool_ptr.* });
@@ -372,7 +365,7 @@ pub const Button = struct {
         //if (is_focused)
         //d.ctx.rectBorder(vt.area, bw, d.style.config.colors.selected);
 
-        const ta = vt.area.inset(3 * d.scale);
+        const ta = d.textArea(vt.area);
         d.ctx.textClipped(ta, "{s}", .{self.text}, d.textP(color), .center);
     }
 
@@ -419,7 +412,7 @@ pub const Button = struct {
             const SELECTED_FIELD_COLOR = 0x6097dbff;
             d.ctx.rect(vt.area, SELECTED_FIELD_COLOR);
         }
-        const ta = vt.area.inset(3 * d.scale);
+        const ta = d.textArea(vt.area);
         d.ctx.textClipped(ta, "{s}", .{self.text}, d.textP(0xff), .center);
     }
 };
@@ -596,7 +589,7 @@ pub const Text = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         d.ctx.rect(vt.area, self.bg_col);
-        const texta = vt.area.inset(d.style.config.default_item_h / 10);
+        const texta = d.textArea(vt.area);
         d.ctx.textClipped(texta, "{s}", .{self.text}, d.textP(null), .left);
     }
 };
@@ -628,7 +621,7 @@ pub const NumberDisplay = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         d.ctx.rect(vt.area, self.bg_col);
-        const texta = vt.area.inset(d.style.config.default_item_h / 10);
+        const texta = d.textArea(vt.area);
         d.ctx.textClipped(texta, "{d}", .{self.num_ptr.*}, d.textP(null), .left);
         self.last_drawn = self.num_ptr.*;
     }
