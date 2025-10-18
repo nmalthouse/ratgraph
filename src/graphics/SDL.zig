@@ -627,7 +627,7 @@ pub const NewBind = struct {
 
         fbs.writer().print("{s}", .{self.name()}) catch {};
 
-        return fbs.getWritten();
+        return buf[0..fbs.pos];
     }
 
     pub fn Keycode(key: keycodes.Keycode, mod: keycodes.KeymodMask) @This() {

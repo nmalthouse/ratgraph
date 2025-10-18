@@ -29,6 +29,9 @@ pub const VScroll = struct {
 
         index_ptr: ?*usize = null,
         force_scroll: bool = false,
+
+        /// if set, index_ptr is recalculated to ensure this index is visible
+        current_index: ?usize = null,
     };
 
     vt: iArea,
@@ -61,6 +64,13 @@ pub const VScroll = struct {
         var onscroll: ?g.NewVt.Onscroll = null;
         _ = self.vt.addEmpty(gui, opts.win, split[0]);
         if (needs_scroll) {
+            if (opts.current_index) |ci| {
+                if (ci < self.index_ptr.*) {
+                    self.index_ptr.* = ci;
+                } else if (ci > self.index_ptr.* + self.sc_count + 1) {
+                    self.index_ptr.* = ci - @min(self.sc_count - 1, ci);
+                }
+            }
             self.has_scroll = true;
             onscroll = onScroll;
             self.vt.addChildOpt(gui, opts.win, ScrollBar.build(
