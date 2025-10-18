@@ -664,6 +664,10 @@ pub const Gui = struct {
     const Self = @This();
     pub const MouseGrabFn = *const fn (*iArea, MouseCbState, *iWindow) void;
     pub const TextinputFn = *const fn (*iArea, TextCbState, *iWindow) void;
+    const Focused = struct {
+        vt: *iArea,
+        win: *iWindow,
+    };
 
     tracker: struct {
         register_count: usize = 0,
@@ -704,10 +708,7 @@ pub const Gui = struct {
         },
     } = null,
 
-    focused: ?struct {
-        vt: *iArea,
-        win: *iWindow,
-    } = null,
+    focused: ?Focused = null,
 
     fbos: std.AutoHashMap(*iWindow, graph.RenderTexture),
     transient_fbo: graph.RenderTexture,
@@ -805,7 +806,7 @@ pub const Gui = struct {
     //sounds complicated?
 
     pub fn tabFocus(self: *Self, fwd: bool) void {
-        if (self.focused) |f| {
+        if (self.getFocused()) |f| {
             if (fwd) {
                 if (findNextFocusTarget(f.vt)) |next| {
                     self.grabFocus(next, f.win);
@@ -1073,8 +1074,17 @@ pub const Gui = struct {
         return graph.Rec(other.x, other.y, other.w - other.x, other.h - other.y);
     }
 
+    fn getFocused(self: *Self) ?Focused {
+        if (self.mouse_grab) |mg| {
+            if (mg.kind == .override)
+                return null;
+        }
+
+        return self.focused;
+    }
+
     pub fn isFocused(self: *Self, vt: *iArea) bool {
-        if (self.focused) |f| {
+        if (self.getFocused()) |f| {
             return f.vt == vt;
         }
         return false;
@@ -1095,7 +1105,7 @@ pub const Gui = struct {
     }
 
     pub fn dispatchTextinput(self: *Self, cb: TextCbState) void {
-        if (self.focused) |f| {
+        if (self.getFocused()) |f| {
             if (f.vt.focusEvent) |func| {
                 func(f.vt, .{ .gui = self, .window = f.win, .event = .{
                     .text_input = cb,
@@ -1109,7 +1119,7 @@ pub const Gui = struct {
     }
 
     pub fn dispatchFocusedEvent(self: *Self, event: FocusedEvent.Event) void {
-        if (self.focused) |f| {
+        if (self.getFocused()) |f| {
             if (f.vt.focusEvent) |func|
                 func(f.vt, .{ .gui = self, .window = f.win, .event = event });
         }
