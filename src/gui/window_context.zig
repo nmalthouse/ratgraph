@@ -51,10 +51,10 @@ pub const BtnContextWindow = struct {
         const self = gui.create(@This());
         var max_w: f32 = 0;
         for (opts.buttons) |btn| {
-            const dim = gui.font.textBounds(btn[1], gui.style.config.text_h);
+            const dim = gui.dstate.font.textBounds(btn[1], gui.dstate.style.config.text_h);
             max_w = @max(max_w, dim.x);
         }
-        const item_h = gui.style.config.default_item_h;
+        const item_h = gui.dstate.style.config.default_item_h;
 
         const rec = graph.Rec(pos.x, pos.y, max_w + item_h, item_h * @as(f32, @floatFromInt(opts.buttons.len)));
         self.* = .{
@@ -76,7 +76,7 @@ pub const BtnContextWindow = struct {
         self.area.area = area;
         self.area.clearChildren(gui, vt);
 
-        var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
+        var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
         for (self.buttons.items) |btn| {
             const ar = ly.getArea();
             self.area.addChildOpt(gui, vt, switch (btn[2]) {
@@ -106,7 +106,7 @@ pub const BtnContextWindow = struct {
         gui.alloc.destroy(self); //second
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
         _ = self;
         _ = d;
@@ -148,7 +148,7 @@ pub const SubMenuExpander = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         d.ctx.rect(vt.area, self.bg_col);

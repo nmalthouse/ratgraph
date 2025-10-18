@@ -34,7 +34,7 @@ pub const Template = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         d.ctx.rect(vt.area, 0xff); //Black rect
     }
 };

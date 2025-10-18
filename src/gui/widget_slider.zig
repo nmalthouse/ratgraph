@@ -64,7 +64,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
             self.* = .{
                 .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focusEvent = fevent },
                 .ptr = ptr,
-                .shuttle_rect = Rec(0, 0, 16 * gui.scale, area.h),
+                .shuttle_rect = Rec(0, 0, 16 * gui.dstate.scale, area.h),
                 .min = std.math.lossyCast(number_T, min),
                 .max = std.math.lossyCast(number_T, max),
                 .nudge_dist = opts.nudge,
@@ -181,7 +181,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
             }
         }
 
-        pub fn draw(vt: *iArea, d: g.DrawState) void {
+        pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
             const box = d.style.getRect(.slider_box);
             d.ctx.nineSlice(vt.area, box, d.style.texture, d.scale, d.tint);
@@ -204,7 +204,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
                     }
                 }
             }
-            const is_focused = d.gui.isFocused(vt);
+            const is_focused = gui.isFocused(vt);
 
             //const hr = Rec(vt.area.w / 3, 0, 16 * d.scale, vt.area.h);
             d.ctx.nineSlice(

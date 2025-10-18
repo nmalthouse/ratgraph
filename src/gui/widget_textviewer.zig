@@ -14,8 +14,8 @@ const CbHandle = g.CbHandle;
 pub const TextView = struct {
     pub const INSET_AMOUNT = 5;
     pub fn heightForN(gui: *const Gui, count: anytype) f32 {
-        const inset_amount = 2 * INSET_AMOUNT * gui.scale;
-        const item_h = gui.style.config.default_item_h;
+        const inset_amount = 2 * INSET_AMOUNT * gui.dstate.scale;
+        const item_h = gui.dstate.style.config.default_item_h;
         return item_h * std.math.lossyCast(f32, count) + inset_amount;
     }
 
@@ -41,20 +41,20 @@ pub const TextView = struct {
             .opts = opts,
         };
 
-        const inset = area.inset(INSET_AMOUNT * gui.scale);
+        const inset = area.inset(INSET_AMOUNT * gui.dstate.scale);
 
         //First, walk through string with xWalker and stick in a buffer of lines
-        const extra_margin = gui.style.config.text_h / 3;
-        const tw = VScroll.getAreaW(inset.w - extra_margin, gui.scale);
+        const extra_margin = gui.dstate.style.config.text_h / 3;
+        const tw = VScroll.getAreaW(inset.w - extra_margin, gui.dstate.scale);
         switch (opts.mode) {
-            .split_on_space => self.buildLinesSpaceSplit(gui.font, tw, gui.style.config.text_h, self.cat_string) catch return null,
-            .simple => self.buildLines(gui.font, tw, gui.style.config.text_h, self.cat_string) catch return null,
+            .split_on_space => self.buildLinesSpaceSplit(gui.dstate.font, tw, gui.dstate.style.config.text_h, self.cat_string) catch return null,
+            .simple => self.buildLines(gui.dstate.font, tw, gui.dstate.style.config.text_h, self.cat_string) catch return null,
         }
         const vscr = VScroll.build(gui, inset, .{
             .build_vt = &self.cbhandle,
             .build_cb = &buildScroll,
             .win = win,
-            .item_h = gui.style.config.default_item_h,
+            .item_h = gui.dstate.style.config.default_item_h,
             .count = self.lines.items.len,
             .index_ptr = null,
             .force_scroll = opts.force_scroll,
@@ -67,11 +67,11 @@ pub const TextView = struct {
     pub fn addOwnedText(self: *@This(), owned: []const u8, gui: *Gui) !void {
         if (self.vt.children.items.len != 1) return;
         const vscr: *VScroll = @alignCast(@fieldParentPtr("vt", self.vt.children.items[0]));
-        const extra_margin = gui.style.config.text_h / 3;
-        const tw = VScroll.getAreaW(vscr.vt.area.w - extra_margin, gui.scale);
+        const extra_margin = gui.dstate.style.config.text_h / 3;
+        const tw = VScroll.getAreaW(vscr.vt.area.w - extra_margin, gui.dstate.scale);
         switch (self.opts.mode) {
-            .split_on_space => self.buildLinesSpaceSplit(gui.font, tw, gui.style.config.text_h, owned) catch return,
-            .simple => self.buildLines(gui.font, tw, gui.style.config.text_h, owned) catch return,
+            .split_on_space => self.buildLinesSpaceSplit(gui.dstate.font, tw, gui.dstate.style.config.text_h, owned) catch return,
+            .simple => self.buildLines(gui.dstate.font, tw, gui.dstate.style.config.text_h, owned) catch return,
         }
         const new_count = self.lines.items.len;
         vscr.updateCount(new_count);
@@ -91,12 +91,12 @@ pub const TextView = struct {
 
     pub fn buildScroll(cb: *CbHandle, layout: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = layout.area };
+        var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = layout.area };
         if (index >= self.lines.items.len) return;
         for (self.lines.items[index..], index..) |line, i| {
             _ = i;
             //const color: u32 = if (i % 2 == 0) 0xffff_ffff else 0xff_0000_ff;
-            layout.addChildOpt(gui, win, Widget.Text.buildStatic(gui, ly.getArea(), line, gui.nstyle.color.text_bg));
+            layout.addChildOpt(gui, win, Widget.Text.buildStatic(gui, ly.getArea(), line, gui.dstate.nstyle.color.text_bg));
         }
     }
 
@@ -107,7 +107,7 @@ pub const TextView = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *g.DrawState) void {
         //d.ctx.nineSlice(vt.area, d.style.getRect(.basic_inset), d.style.texture, d.scale, d.tint);
         d.ctx.rect(vt.area, d.nstyle.color.text_bg);
         //d.ctx.rect(vt.area, 0xff); //Black rect

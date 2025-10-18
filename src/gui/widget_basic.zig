@@ -57,7 +57,7 @@ pub const VScroll = struct {
         self.sc_count = self.getScrollableCount();
         //self.sc_count = opts.count - self.getFitted();
 
-        const split = self.vt.area.split(.vertical, if (needs_scroll) getAreaW(self.vt.area.w, gui.scale) else self.vt.area.w);
+        const split = self.vt.area.split(.vertical, if (needs_scroll) getAreaW(self.vt.area.w, gui.dstate.scale) else self.vt.area.w);
         var onscroll: ?g.NewVt.Onscroll = null;
         _ = self.vt.addEmpty(gui, opts.win, split[0]);
         if (needs_scroll) {
@@ -135,7 +135,7 @@ pub const VScroll = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         d.ctx.rect(vt.area, d.nstyle.color.bg);
         _ = self;
@@ -209,7 +209,7 @@ pub const Checkbox = struct {
     pub fn getWidth(gui: *const Gui, name: []const u8, opts: Opts) f32 {
         //TODO this is incorrect for styles
         _ = opts;
-        const tbound = gui.font.textBounds(name, gui.style.config.text_h);
+        const tbound = gui.dstate.font.textBounds(name, gui.dstate.style.config.text_h);
         return tbound.x;
     }
 
@@ -242,7 +242,7 @@ pub const Checkbox = struct {
         }
     }
 
-    pub fn draw(vt: *iArea, d: DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
 
         const GRAY = 0xddddddff;
@@ -257,9 +257,9 @@ pub const Checkbox = struct {
         d.ctx.rectLine(inset, ins, 0xff);
     }
 
-    pub fn drawCheck(vt: *iArea, d: DrawState) void {
+    pub fn drawCheck(vt: *iArea, gui: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        const is_focused = d.gui.isFocused(vt);
+        const is_focused = gui.isFocused(vt);
 
         const bw = 1;
         const area = vt.area;
@@ -281,7 +281,7 @@ pub const Checkbox = struct {
         d.ctx.textClipped(tarea, "{s}{s}", .{ self.name, if (is_focused) " [space to toggle]" else "" }, d.textP(null), .left);
     }
 
-    pub fn drawDropdown(vt: *iArea, d: DrawState) void {
+    pub fn drawDropdown(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
 
         const bw = 1;
@@ -316,7 +316,7 @@ pub const Button = struct {
         cb_vt: ?*CbHandle = null,
         cb_fn: ?ButtonCallbackT = null,
         id: g.Uid = 0,
-        custom_draw: ?*const fn (*iArea, DrawState) void = null,
+        custom_draw: ?iArea.DrawFn = null,
         user_1: u32 = 0,
     };
     vt: iArea,
@@ -352,11 +352,11 @@ pub const Button = struct {
             vt.dirty(cb.gui);
     }
 
-    pub fn draw(vt: *iArea, d: DrawState) void {
+    pub fn draw(vt: *iArea, gui: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         const sl = if (self.is_down) d.style.getRect(.button_clicked) else d.style.getRect(.button);
-        const is_focused = d.gui.isFocused(vt);
+        const is_focused = gui.isFocused(vt);
         const color = d.style.config.colors.button_text;
 
         //const bw = 1;
@@ -405,7 +405,7 @@ pub const Button = struct {
         }
     }
 
-    pub fn customButtonDraw_listitem(vt: *iArea, d: DrawState) void {
+    pub fn customButtonDraw_listitem(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *Button = @alignCast(@fieldParentPtr("vt", vt));
         d.ctx.rect(vt.area, 0xffff_ffff);
         if (self.opts.user_1 == 1) {
@@ -526,7 +526,7 @@ pub const ScrollBar = struct {
         self.notify_fn(self.parent_vt, cb.gui, win);
     }
 
-    pub fn draw(vt: *iArea, d: DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         const sp = calculateShuttlePos(self.index_ptr.*, self.count, self.usable_h, self.shuttle_h);
         //d.ctx.rect(vt.area, 0x5ffff0ff);
@@ -553,7 +553,7 @@ pub const Text = struct {
         self.* = .{
             .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
             .is_alloced = false,
-            .bg_col = bg_col orelse gui.nstyle.color.bg,
+            .bg_col = bg_col orelse gui.dstate.nstyle.color.bg,
             .text = owned_string,
         };
         return .{ .vt = &self.vt };
@@ -571,7 +571,7 @@ pub const Text = struct {
 
         self.* = .{
             .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
-            .bg_col = gui.nstyle.color.bg,
+            .bg_col = gui.dstate.nstyle.color.bg,
             .is_alloced = true,
             .text = vec.toOwnedSlice() catch return null,
         };
@@ -585,7 +585,7 @@ pub const Text = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         d.ctx.rect(vt.area, self.bg_col);
@@ -606,7 +606,7 @@ pub const NumberDisplay = struct {
         const self = gui.create(@This());
         self.* = .{
             .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
-            .bg_col = gui.nstyle.color.bg,
+            .bg_col = gui.dstate.nstyle.color.bg,
             .num_ptr = number_ptr,
         };
         return .{ .vt = &self.vt, .onpoll = pollNumber };
@@ -617,7 +617,7 @@ pub const NumberDisplay = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         d.ctx.rect(vt.area, self.bg_col);

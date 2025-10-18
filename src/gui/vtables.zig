@@ -87,7 +87,8 @@ pub const NewVt = struct {
 
 //TODO store a depth and sort to_draw by depth
 pub const iArea = struct {
-    draw_fn: ?*const fn (*iArea, DrawState) void = null,
+    pub const DrawFn = *const fn (*iArea, *Gui, *DrawState) void;
+    draw_fn: ?DrawFn = null,
     deinit_fn: *const fn (*iArea, *Gui, *iWindow) void,
     focusEvent: ?NewVt.FocusEvent = null,
 
@@ -112,13 +113,13 @@ pub const iArea = struct {
         self.deinit_fn(self, gui, win);
     }
 
-    pub fn draw(self: *@This(), dctx: DrawState, window: *iWindow) void {
-        if (dctx.gui.needsDraw(self, window)) {
-            window.checkScissor(self, &dctx);
+    pub fn draw(self: *@This(), gui: *Gui, dctx: *DrawState, window: *iWindow) void {
+        if (gui.needsDraw(self, window)) {
+            window.checkScissor(self, dctx);
             if (self.draw_fn) |drawf|
-                drawf(self, dctx);
+                drawf(self, gui, dctx);
             for (self.children.items) |child|
-                child.draw(dctx, window);
+                child.draw(gui, dctx, window);
         }
         self.is_dirty = false;
     }
@@ -219,8 +220,8 @@ pub const iWindow = struct {
 
     draw_scissor_state: ScissorId = .none,
 
-    pub fn draw(self: *iWindow, dctx: DrawState) void {
-        self.area.draw(dctx, self);
+    pub fn draw(self: *iWindow, gui: *Gui, dctx: *DrawState) void {
+        self.area.draw(gui, dctx, self);
     }
 
     pub fn checkScissor(self: *iWindow, vt: *iArea, dctx: *const DrawState) void {
@@ -377,10 +378,9 @@ pub const iWindow = struct {
 
 pub const DrawState = struct {
     ctx: *Dctx,
-    gui: *Gui,
     font: *graph.FontInterface,
-    style: *GuiConfig,
-    nstyle: *const Style,
+    style: GuiConfig,
+    nstyle: Style,
     scale: f32 = 2,
     tint: u32 = 0xffff_ffff, //Tint for textures
 
@@ -404,6 +404,10 @@ pub const DrawState = struct {
     pub fn textArea(self: *const @This(), area: Rect) Rect {
         const inset = @max((area.h - self.style.config.text_h) / 2, 0);
         return area.inset(inset);
+    }
+
+    pub fn vLayout(self: *const @This(), area: Rect) VerticalLayout {
+        return .{ .item_height = self.style.config.default_item_h, .bounds = area };
     }
 };
 
@@ -718,23 +722,23 @@ pub const Gui = struct {
     text_input_enabled: bool = false,
     sdl_win: *graph.SDL.Window,
 
-    style: GuiConfig,
-    nstyle: Style,
-    scale: f32 = 2,
+    dstate: DrawState,
 
-    font: *graph.FontInterface,
-    tint: u32 = 0xffff_ffff,
-
-    pub fn init(alloc: AL, win: *graph.SDL.Window, cache_dir: std.fs.Dir, style_dir: std.fs.Dir, font: *graph.FontInterface) !Self {
+    pub fn init(alloc: AL, win: *graph.SDL.Window, cache_dir: std.fs.Dir, style_dir: std.fs.Dir, font: *graph.FontInterface, dctx: *graph.ImmediateDrawingContext) !Self {
         return Gui{
             .alloc = alloc,
-            .font = font,
             .clamp_window = graph.Rec(0, 0, win.screen_dimensions.x, win.screen_dimensions.y),
             .transient_fbo = try graph.RenderTexture.init(100, 100),
             .fbos = std.AutoHashMap(*iWindow, graph.RenderTexture).init(alloc),
             .sdl_win = win,
-            .style = try GuiConfig.init(alloc, style_dir, "asset/os9gui", cache_dir),
-            .nstyle = .{},
+            .dstate = .{
+                .ctx = dctx,
+                .font = font,
+                .style = try GuiConfig.init(alloc, style_dir, "asset/os9gui", cache_dir),
+                .nstyle = .{},
+                .scale = 1,
+                .tint = 0xffff_ffff,
+            },
         };
     }
 
@@ -753,7 +757,7 @@ pub const Gui = struct {
         self.active_windows.deinit(self.alloc);
         self.closeTransientWindow();
         self.area_window_map.deinit(self.alloc);
-        self.style.deinit();
+        self.dstate.style.deinit();
     }
 
     pub fn openTestBuilder(self: *Self, dir: std.fs.Dir, filename: []const u8) !void {
@@ -1185,18 +1189,19 @@ pub const Gui = struct {
 
     //pub fn updateSpecific(self: *Self, windows: []const *iWindow)!void{ }
 
-    pub fn drawFbos(self: *Self, ctx: *Dctx) void {
+    pub fn drawFbos(self: *Self) void {
         for (self.active_windows.items) |w| {
             const fbo = self.fbos.getPtr(w) orelse continue;
-            drawFbo(w.area.area, fbo, ctx, self.tint);
+            drawFbo(w.area.area, fbo, self.dstate.ctx, self.dstate.tint);
         }
 
         if (self.transient_window) |tw| {
-            drawFbo(tw.area.area, &self.transient_fbo, ctx, self.tint);
+            drawFbo(tw.area.area, &self.transient_fbo, self.dstate.ctx, self.dstate.tint);
         }
     }
 
-    pub fn draw(self: *Self, dctx: DrawState, force_redraw: bool) !void {
+    pub fn draw(self: *Self, force_redraw: bool) !void {
+        const dctx = &self.dstate;
         defer {
             graph.c.glBindFramebuffer(graph.c.GL_FRAMEBUFFER, 0);
             graph.c.glViewport(0, 0, @intFromFloat(dctx.ctx.screen_dimensions.x), @intFromFloat(dctx.ctx.screen_dimensions.y));
@@ -1216,7 +1221,7 @@ pub const Gui = struct {
         }
     }
 
-    fn drawWindow(self: *Self, win: *iWindow, dctx: DrawState, force_redraw: bool, fbo: *graph.RenderTexture) !void {
+    fn drawWindow(self: *Self, win: *iWindow, dctx: *DrawState, force_redraw: bool, fbo: *graph.RenderTexture) !void {
         gl.disable(.scissor_test);
         if (self.cached_drawing and !force_redraw) {
             if (win.draws_since_cached < 1 or win.draws_since_cached > self.max_cached_before_full_flush)
@@ -1225,7 +1230,7 @@ pub const Gui = struct {
             fbo.bind(false);
             win.draw_scissor_state = .none;
             for (win.to_draw.items) |draw_area| {
-                draw_area.draw(dctx, win);
+                draw_area.draw(self, dctx, win);
             }
             try dctx.ctx.flush(win.area.area, null);
         } else {
@@ -1233,12 +1238,11 @@ pub const Gui = struct {
         }
     }
 
-    fn draw_all_window(self: *Self, dctx: DrawState, window: *iWindow, fbo: *graph.RenderTexture) !void {
-        _ = self;
+    fn draw_all_window(self: *Self, dctx: *DrawState, window: *iWindow, fbo: *graph.RenderTexture) !void {
         window.draws_since_cached = 1;
         fbo.bind(true);
         window.draw_scissor_state = .none;
-        window.draw(dctx);
+        window.draw(self, dctx);
         try dctx.ctx.flush(window.area.area, null);
     }
 
@@ -1345,14 +1349,14 @@ pub const Gui = struct {
 };
 
 pub const GuiHelp = struct {
-    pub fn drawWindowFrame(d: DrawState, area: Rect) void {
+    pub fn drawWindowFrame(d: *DrawState, area: Rect) void {
         const _br = d.style.getRect(.window);
         d.ctx.nineSlice(area, _br, d.style.texture, d.scale, d.tint);
     }
 
     pub fn insetAreaForWindowFrame(gui: *Gui, area: Rect) Rect {
-        const _br = gui.style.getRect(.window);
-        const border_area = area.inset((_br.h / 3) * gui.scale);
+        const _br = gui.dstate.style.getRect(.window);
+        const border_area = area.inset((_br.h / 3) * gui.dstate.scale);
         return border_area;
     }
 };

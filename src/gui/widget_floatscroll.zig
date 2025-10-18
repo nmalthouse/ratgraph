@@ -55,7 +55,7 @@ pub const FloatScroll = struct {
             .y_ptr = &self.y,
         };
 
-        const split = self.vt.area.split(.vertical, getAreaW(self.vt.area.w, gui.scale));
+        const split = self.vt.area.split(.vertical, getAreaW(self.vt.area.w, gui.dstate.scale));
         self.vt.area = split[0];
 
         if (FloatScrollBar.build(
@@ -90,7 +90,7 @@ pub const FloatScroll = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         d.ctx.rect(vt.area, d.nstyle.color.bg);
     }
 
@@ -268,7 +268,7 @@ pub const FloatScrollBar = struct {
         self.notify_fn(self.parent_vt, cb.gui, win);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         const sp = calculateShuttlePos(self.area_h, self.y_ptr.*, self.vt.area.h, self.shuttle_h);
         d.ctx.rect(vt.area, 0x5ffff0ff);

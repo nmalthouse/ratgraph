@@ -104,7 +104,7 @@ pub const StaticSlider = struct {
         self.num.* = @max(min, @min(self.num.*, max));
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         d.ctx.rect(vt.area, d.nstyle.color.static_slider_bg);
         const ins = @ceil(d.scale);

@@ -64,7 +64,7 @@ pub const MyGlView = struct {
 
     pub fn area_deinit(_: *iArea, _: *Gui, _: *iWindow) void {}
 
-    pub fn draw(vt: *iArea, d: DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         GuiHelp.drawWindowFrame(d, vt.area);
     }
 
@@ -123,7 +123,7 @@ pub const MyInspector = struct {
 
     pub fn area_deinit(_: *iArea, _: *Gui, _: *iWindow) void {}
 
-    pub fn draw(vt: *iArea, d: DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         GuiHelp.drawWindowFrame(d, vt.area);
     }
 
@@ -134,11 +134,7 @@ pub const MyInspector = struct {
         //self.layout.reset(gui, vt);
         //start a vlayout
         //var ly = Vert{ .area = vt.area };
-        var ly = guis.VerticalLayout{
-            .padding = .{},
-            .item_height = gui.style.config.default_item_h,
-            .bounds = GuiHelp.insetAreaForWindowFrame(gui, vt.area.area),
-        };
+        var ly = gui.dstate.vLayout(GuiHelp.insetAreaForWindowFrame(gui, vt.area.area));
         ly.padding.left = 10;
         ly.padding.right = 10;
         ly.padding.top = 10;
@@ -190,7 +186,7 @@ pub const MyInspector = struct {
     pub fn buildTabs(user_vt: *iArea, vt: *iArea, tab_name: []const u8, gui: *Gui, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("area", user_vt));
         const eql = std.mem.eql;
-        var ly = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = vt.area };
+        var ly = gui.dstate.vLayout(vt.area);
         ly.padding.top = 10;
         if (eql(u8, tab_name, "main")) {
             vt.addChildOpt(gui, win, Wg.Textbox.build(gui, ly.getArea()));
@@ -202,7 +198,7 @@ pub const MyInspector = struct {
                 .build_cb = &buildFloatScroll,
                 .build_vt = &self.cbhandle,
                 .win = win,
-                .scroll_mul = gui.style.config.default_item_h * 4,
+                .scroll_mul = gui.dstate.style.config.default_item_h * 4,
                 .scroll_y = true,
                 .scroll_x = false,
             }));
@@ -233,14 +229,14 @@ pub const MyInspector = struct {
                 .build_vt = &self.cbhandle,
                 .win = win,
                 .count = 10,
-                .item_h = gui.style.config.default_item_h,
+                .item_h = gui.dstate.style.config.default_item_h,
             }));
         }
     }
 
     pub fn buildScrollItems(cb: *CbHandle, vt: *iArea, index: usize, gui: *Gui, window: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        var ly = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = vt.area };
+        var ly = gui.dstate.vLayout(vt.area);
         for (index..10) |i| {
             vt.addChildOpt(gui, window, Wg.Text.build(gui, ly.getArea(), "item {d}", .{i}));
         }
@@ -249,7 +245,7 @@ pub const MyInspector = struct {
 
     pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, win: *iWindow, scr: *Wg.FloatScroll) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        var ly = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = vt.area };
+        var ly = gui.dstate.vLayout(vt.area);
         _ = self;
         for (0..100) |i| {
             const ar = ly.getArea() orelse continue;
@@ -291,8 +287,7 @@ pub fn main() !void {
     defer font.deinit();
 
     const sc = 2;
-    var gui = try Gui.init(alloc, &win, cache_dir, std.fs.cwd(), &font.font);
-    gui.scale = sc;
+    var gui = try Gui.init(alloc, &win, cache_dir, std.fs.cwd(), &font.font, &draw);
     defer gui.deinit();
     const do_test_builder = true;
     if (do_test_builder)
@@ -307,12 +302,12 @@ pub fn main() !void {
         if (!do_test_builder)
             demo.deinit();
     }
-    gui.style.config.default_item_h = hh;
-    gui.style.config.text_h = TEXT_H;
+    gui.dstate.style.config.default_item_h = hh;
+    gui.dstate.style.config.text_h = TEXT_H;
 
     const window_area = Rect{ .x = 100, .y = 50, .w = 1000, .h = 1000 };
 
-    const dstate = guis.DrawState{ .ctx = &draw, .font = &font.font, .style = &gui.style, .gui = &gui, .scale = sc, .nstyle = &gui.nstyle };
+    gui.dstate.scale = sc;
     const inspector = MyInspector.create(&gui);
     const glview = MyGlView.create(&gui, &draw);
     _ = try gui.addWindow(inspector, window_area, .{});
@@ -332,13 +327,13 @@ pub fn main() !void {
         timer.reset();
         try gui.pre_update();
         try gui.update();
-        try gui.draw(dstate, false);
+        try gui.draw(false);
 
         const took = timer.read();
         if (took > std.time.ns_per_ms * 16) {
             std.debug.print("Overtime {d} \n", .{took / std.time.ns_per_ms});
         }
-        gui.drawFbos(&draw);
+        gui.drawFbos();
 
         try draw.flush(null, null); //Flush any draw commands
 

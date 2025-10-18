@@ -32,7 +32,7 @@ pub const Tabs = struct {
         const area = area_o orelse return null;
         if (tabs.len == 0)
             return null;
-        var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
+        var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
         const tab_area = ly.getArea() orelse return null;
         ly.pushRemaining();
         const child_area = ly.getArea() orelse return null;
@@ -77,7 +77,7 @@ pub const Tabs = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *g.DrawState) void {
         d.ctx.rect(vt.area, d.nstyle.color.bg);
     }
 };
@@ -113,7 +113,7 @@ const TabHeader = struct {
         }
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         d.ctx.rect(vt.area, d.nstyle.color.bg);
 

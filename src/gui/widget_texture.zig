@@ -42,7 +42,7 @@ pub const GLTexture = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         const r = vt.area;
         d.ctx.rectTexTint(r, self.uv, self.opts.tint, self.tex);

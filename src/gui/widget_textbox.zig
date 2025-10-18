@@ -292,7 +292,7 @@ pub const Textbox = struct {
             self.draw_start = self.head;
         } else {
             const ar = textArea(text_area, gui);
-            if (gui.font.nearestGlyphX(self.getVisibleSlice(), text_h, .{ .x = ar.w, .y = 0 }, false)) |u_i| {
+            if (gui.dstate.font.nearestGlyphX(self.getVisibleSlice(), text_h, .{ .x = ar.w, .y = 0 }, false)) |u_i| {
                 const final_glyph = u_i;
                 if (self.head > final_glyph) { // the head is occluded
 
@@ -408,7 +408,7 @@ pub const Textbox = struct {
                 }
             },
         }
-        self.calculateDrawStart(textArea(vt.area, ev.gui), ev.gui.style.config.text_h, ev.gui);
+        self.calculateDrawStart(textArea(vt.area, ev.gui), ev.gui.dstate.style.config.text_h, ev.gui);
     }
 
     fn paste(self: *Self) !void {
@@ -435,14 +435,14 @@ pub const Textbox = struct {
         }
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
         const s: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        const is_focused = d.gui.isFocused(vt);
+        const is_focused = gui.isFocused(vt);
         d.ctx.rect(vt.area, if (is_focused) 0xff00ffff else 0x222222ff);
 
         const text_h = d.style.config.text_h;
         //const inset = d.style.config.textbox_inset * d.scale;
-        const tr = textArea(vt.area, d.gui);
+        const tr = textArea(vt.area, gui);
         //const tr = vt.area.inset(inset);
         //d.ctx.nineSlice(vt.area, d.style.getRect(.basic_inset), d.style.texture, d.scale, d.tint);
         d.ctx.rect(vt.area, d.nstyle.color.textbox_border);
@@ -481,7 +481,7 @@ pub const Textbox = struct {
     }
 
     fn textArea(widget_area: Rect, d: *const Gui) Rect {
-        const inset = @max((widget_area.h - d.style.config.text_h) / 2, 0);
+        const inset = @max((widget_area.h - d.dstate.style.config.text_h) / 2, 0);
 
         //const inset = d.style.config.textbox_inset * d.scale;
         return widget_area.inset(inset);
@@ -498,17 +498,17 @@ pub const Textbox = struct {
         cb.gui.grabFocus(vt, win);
         vt.dirty(cb.gui);
 
-        const sz = cb.gui.style.config.text_h;
+        const sz = cb.gui.dstate.style.config.text_h;
         const ar = textArea(vt.area, cb.gui);
         const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
-        const nearest_glyph = (cb.gui.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false));
+        const nearest_glyph = (cb.gui.dstate.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false));
         switch (cb.btn) {
             .left => {
                 if (nearest_glyph) |u_i| {
                     self.setHead(u_i, 0, true);
                     cb.gui.grabMouse(&mouseGrabbed, vt, win, cb.btn);
                 }
-                self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.style.config.text_h, cb.gui);
+                self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.dstate.style.config.text_h, cb.gui);
             },
             .middle => {
                 if (nearest_glyph) |u_i| {
@@ -545,14 +545,14 @@ pub const Textbox = struct {
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        const sz = cb.gui.style.config.text_h;
+        const sz = cb.gui.dstate.style.config.text_h;
         const ar = textArea(vt.area, cb.gui);
         const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
-        if (cb.gui.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false)) |u_i| {
+        if (cb.gui.dstate.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false)) |u_i| {
             self.setHead(u_i, 0, false);
             vt.dirty(cb.gui);
         }
-        self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.style.config.text_h, cb.gui);
+        self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.dstate.style.config.text_h, cb.gui);
     }
 
     pub fn getSlice(self: *Self) []const u8 {

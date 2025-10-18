@@ -36,7 +36,7 @@ pub const Colorpicker = struct {
         return .{ .vt = &self.vt, .onclick = onclick };
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         d.ctx.rect(vt.area, self.color);
     }
@@ -55,8 +55,8 @@ pub const Colorpicker = struct {
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
 
-        const sz = cb.gui.style.config.color_picker_size;
-        const new_r = Rec(vt.area.x, vt.area.y, sz.x * cb.gui.scale, sz.y * cb.gui.scale);
+        const sz = cb.gui.dstate.style.config.color_picker_size;
+        const new_r = Rec(vt.area.x, vt.area.y, sz.x * cb.gui.dstate.scale, sz.y * cb.gui.dstate.scale);
         _ = win;
         self.makeTransientWin(cb.gui, cb.gui.clampRectToWindow(new_r));
     }
@@ -97,8 +97,8 @@ const ColorpickerTransient = struct {
 
         var ly = g.HorizLayout{ .count = 2, .bounds = g.GuiHelp.insetAreaForWindowFrame(gui, self.area.area) };
         const ar = ly.getArea() orelse return;
-        const pad = gui.scale * 5;
-        const slider_w = 40 * gui.scale;
+        const pad = gui.dstate.scale * 5;
+        const slider_w = 40 * gui.dstate.scale;
         const sv_area = Rec(ar.x, ar.y, ar.w - (slider_w + pad) * 1, ar.h);
         const sv = self.area.addEmpty(gui, win, sv_area);
         sv.addChild(gui, win, WarpArea.build(
@@ -129,7 +129,7 @@ const ColorpickerTransient = struct {
             .{ .x = h_area.w, .y = 10 },
         ));
 
-        var vy = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = ly.getArea() orelse return };
+        var vy = gui.dstate.vLayout(ly.getArea() orelse return);
 
         a.addChildOpt(gui, win, Widget.Button.build(
             gui,
@@ -217,7 +217,7 @@ const ColorpickerTransient = struct {
         dat.gui.deferTransientClose();
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
         const w = vt.children.items;
         if (w.len < 2)
@@ -225,7 +225,7 @@ const ColorpickerTransient = struct {
         const sv_area = w[0].area;
         g.GuiHelp.drawWindowFrame(d, vt.area);
         const col = self.parent_ptr.color_hsv.toInt();
-        const inset = g.GuiHelp.insetAreaForWindowFrame(d.gui, vt.area);
+        const inset = g.GuiHelp.insetAreaForWindowFrame(gui, vt.area);
         d.ctx.rect(inset, col);
         d.ctx.rectVertexColors(sv_area, &.{ Color.Black, Color.Black, Color.Black, Color.Black });
         const color = &self.parent_ptr.color_hsv;
@@ -333,7 +333,7 @@ const WarpArea = struct {
         vt.dirty(cb.gui);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         const x = if (self.xptr) |o| o.* else vt.area.w / 2;
         const y = if (self.yptr) |o| o.* else vt.area.h / 2;

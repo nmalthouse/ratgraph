@@ -25,7 +25,7 @@ pub const DynamicTable = struct {
 
     pub fn build(gui: *Gui, area_o: ?Rect, win: *iWindow, opts: Opts) ?g.NewVt {
         const area = area_o orelse return null;
-        var ly = g.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = area };
+        var ly = gui.dstate.vLayout(area);
         const tab_area = ly.getArea() orelse return null;
 
         const table_area = ly.getArea() orelse return null;
@@ -70,7 +70,7 @@ pub const DynamicTable = struct {
         }
         widths[widths.len - 1] = area.w - last_pos;
 
-        return g.TableLayoutCustom{ .bounds = area, .column_widths = widths, .item_height = gui.style.config.default_item_h };
+        return g.TableLayoutCustom{ .bounds = area, .column_widths = widths, .item_height = gui.dstate.style.config.default_item_h };
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -78,7 +78,7 @@ pub const DynamicTable = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         d.ctx.rect(vt.area, d.nstyle.color.table_bg);
         const y = vt.area.y;
@@ -109,7 +109,7 @@ const TableHeader = struct {
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
 
-        const click_pad = 2 * cb.gui.scale;
+        const click_pad = 2 * cb.gui.dstate.scale;
         for (self.parent.opts.column_positions, 0..) |pos, i| {
             const x = vt.area.x + vt.area.w * pos - click_pad;
             const click_area = graph.Rec(x, vt.area.y, click_pad * 2, vt.area.h);
@@ -122,7 +122,7 @@ const TableHeader = struct {
 
     pub fn grabbed(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        const pad = (4 * cb.gui.scale) / vt.area.w;
+        const pad = (4 * cb.gui.dstate.scale) / vt.area.w;
         const ind = self.grab_index orelse return;
         const cpos = self.parent.opts.column_positions;
         if (ind >= cpos.len) return;
@@ -139,7 +139,7 @@ const TableHeader = struct {
         vt.dirty(cb.gui); //TODO fix the dirty setting stuff
     }
 
-    pub fn draw(vt: *iArea, d: g.DrawState) void {
+    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         d.ctx.rect(vt.area, d.nstyle.color.bg);
         const dat = self.parent.opts;
