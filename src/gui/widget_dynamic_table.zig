@@ -26,7 +26,7 @@ pub const DynamicTable = struct {
     pub fn build(parent: *iArea, area_o: ?Rect, win: *iWindow, opts: Opts) g.WgStatus {
         const gui = parent.win_ptr.gui_ptr;
         const area = area_o orelse return .failed;
-        var ly = gui.dstate.vLayout(area);
+        var ly = gui.dstate.vlayout(area);
         const tab_area = ly.getArea() orelse return .failed;
 
         const table_area = ly.getArea() orelse return .failed;

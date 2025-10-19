@@ -147,14 +147,14 @@ pub const StaticSlider = struct {
     fn cancelEdit(self: *@This(), gui: *Gui) void {
         self.state = .display;
         gui.stopTextInput();
-        self.vt.dirty(gui);
+        self.vt.dirty();
     }
 
     fn startEdit(self: *@This(), gui: *Gui) void {
         self.state = .editing;
         self.fbs.reset();
         gui.startTextinput(self.vt.area);
-        self.vt.dirty(gui);
+        self.vt.dirty();
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
@@ -169,7 +169,7 @@ pub const StaticSlider = struct {
             self.slideCb(cb.gui, cb.state);
             if (cb.state == .falling)
                 self.commitCb(cb.gui);
-            vt.dirty(cb.gui);
+            vt.dirty();
         }
     }
 
@@ -182,7 +182,7 @@ pub const StaticSlider = struct {
         self.clamp();
         if (old_num != self.num.*) {
             self.commitCb(gui);
-            vt.dirty(gui);
+            vt.dirty();
         }
     }
 
@@ -219,7 +219,7 @@ pub const StaticSlider = struct {
                 }
             },
         }
-        vt.dirty(cb.gui);
+        vt.dirty();
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
@@ -233,7 +233,7 @@ pub const StaticSlider = struct {
         if (self.opts.clamp_edits)
             self.clamp();
         self.commitCb(gui);
-        self.vt.dirty(gui);
+        self.vt.dirty();
     }
 
     pub fn fevent_err(vt: *iArea, ev: g.FocusedEvent) !void {
@@ -245,12 +245,12 @@ pub const StaticSlider = struct {
                     self.state = .display;
                 }
                 //self.state = .editing;
-                vt.dirty(ev.gui);
+                vt.dirty();
             },
             .text_input => |st| {
                 const w = self.fbs.writer();
                 const view = std.unicode.Utf8View.init(st.text) catch return;
-                vt.dirty(ev.gui);
+                vt.dirty();
                 var it = view.iterator();
                 while (it.nextCodepointSlice()) |codepoint| {
                     const char = if (codepoint.len == 1) codepoint[0] else continue;
@@ -260,7 +260,7 @@ pub const StaticSlider = struct {
                 }
             },
             .keydown => |kev| {
-                vt.dirty(ev.gui);
+                vt.dirty();
                 for (kev.keys) |key| {
                     switch (@as(graph.SDL.keycodes.Scancode, @enumFromInt(key.key_id))) {
                         .BACKSPACE => {

@@ -63,9 +63,9 @@ pub fn ComboUser(user_data: type) type {
                 vt.area.area = area;
                 vt.area.clearChildren(gui, vt);
                 self.vscroll_vt = null;
-                vt.area.dirty(gui);
+                vt.area.dirty();
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
-                var ly = gui.dstate.vLayout(area.inset(gui.dstate.scale));
+                var ly = gui.dstate.vlayout(area.inset(gui.dstate.scale));
                 _ = Widget.Textbox.buildOpts(&vt.area, ly.getArea(), .{
                     .commit_cb = &textbox_cb,
                     .commit_vt = &self.cbhandle,
@@ -100,7 +100,7 @@ pub fn ComboUser(user_data: type) type {
                 const gui = area.win_ptr.gui_ptr;
 
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-                var ly = gui.dstate.vLayout(area.area);
+                var ly = gui.dstate.vlayout(area.area);
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 const total_count = p.opts.count;
 
@@ -200,7 +200,7 @@ pub fn ComboUser(user_data: type) type {
 
         pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-            self.vt.dirty(dat.gui);
+            self.vt.dirty();
             self.opts.current = id;
             self.opts.commit_cb(self.opts.user_vt, id, self.user);
             dat.gui.deferTransientClose();
@@ -245,7 +245,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 vt.area.area = area;
                 vt.area.clearChildren(gui, vt);
                 const info = @typeInfo(enumT);
-                vt.area.dirty(gui);
+                vt.area.dirty();
                 _ = VScroll.build(&vt.area, area, .{
                     .build_cb = &build_cb,
                     .build_vt = &self.cbhandle,
@@ -259,7 +259,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 const gui = area.win_ptr.gui_ptr;
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
-                var ly = gui.dstate.vLayout(area.area);
+                var ly = gui.dstate.vlayout(area.area);
                 const info = @typeInfo(enumT);
                 inline for (info.@"enum".fields, 0..) |field, i| {
                     if (i >= index) {
@@ -338,7 +338,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
 
         pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-            self.vt.dirty(dat.gui);
+            self.vt.dirty();
             self.enum_ptr.* = @enumFromInt(id);
             dat.gui.deferTransientClose();
         }

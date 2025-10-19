@@ -129,7 +129,7 @@ pub const MyInspector = struct {
         //self.layout.reset(gui, vt);
         //start a vlayout
         //var ly = Vert{ .area = vt.area };
-        var ly = gui.dstate.vLayout(GuiHelp.insetAreaForWindowFrame(gui, vt.area.area));
+        var ly = gui.dstate.vlayout(GuiHelp.insetAreaForWindowFrame(gui, vt.area.area));
         ly.padding.left = 10;
         ly.padding.right = 10;
         ly.padding.top = 10;
@@ -168,20 +168,20 @@ pub const MyInspector = struct {
         _ = Wg.Tabs.build(a, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle });
     }
 
-    fn staticSliderCb(cb: *CbHandle, gui: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
+    fn staticSliderCb(cb: *CbHandle, _: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        self.vt.area.dirty(gui);
+        self.vt.area.dirty();
     }
 
-    fn staticSliderSet(cb: *CbHandle, gui: *Gui, _: f32, _: usize) void {
+    fn staticSliderSet(cb: *CbHandle, _: *Gui, _: f32, _: usize) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        self.vt.area.dirty(gui);
+        self.vt.area.dirty();
     }
 
     pub fn buildTabs(cb: *CbHandle, vt: *iArea, tab_name: []const u8, gui: *Gui, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         const eql = std.mem.eql;
-        var ly = gui.dstate.vLayout(vt.area);
+        var ly = gui.dstate.vlayout(vt.area);
         ly.padding.top = 10;
         if (eql(u8, tab_name, "main")) {
             _ = Wg.Textbox.build(vt, ly.getArea());
@@ -233,7 +233,7 @@ pub const MyInspector = struct {
         const gui = vt.win_ptr.gui_ptr;
 
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        var ly = gui.dstate.vLayout(vt.area);
+        var ly = gui.dstate.vlayout(vt.area);
         for (index..10) |i| {
             _ = Wg.Text.build(vt, ly.getArea(), "item {d}", .{i});
         }
@@ -242,7 +242,7 @@ pub const MyInspector = struct {
 
     pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, _: *iWindow, scr: *Wg.FloatScroll) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        var ly = gui.dstate.vLayout(vt.area);
+        var ly = gui.dstate.vlayout(vt.area);
         _ = self;
         for (0..100) |i| {
             const ar = ly.getArea() orelse continue;

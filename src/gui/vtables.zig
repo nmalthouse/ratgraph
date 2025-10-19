@@ -115,15 +115,18 @@ pub const iArea = struct {
     parent: ?*iArea = null,
     /// index of self as child of parent
     index: u32 = 0,
+    depth: u16 = 0,
 
     _scissor_id: ScissorId = .none,
 
     win_ptr: *iWindow,
 
-    /// Returns `reserved_memory` which should be passed in unitilized
-    /// self.* = .{.vt = parent.init(&self.vt, .{})};
+    /// Use as follows:
+    /// self.* = .{.vt = .UNINITILIZED, .my_other = 0};
+    /// parent.addChild(&self.vt, .{.deinit_fn = deinit});
     pub fn addChild(parent: *iArea, reserved_memory: *iArea, args: Args) void {
         reserved_memory.* = .{
+            .depth = parent.depth + 1,
             .deinit_fn = args.deinit_fn,
             .area = args.area,
             .draw_fn = args.draw_fn,
@@ -173,10 +176,9 @@ pub const iArea = struct {
         self.is_dirty = false;
     }
 
-    pub fn dirty(self: *@This(), gui: *Gui) void {
+    pub fn dirty(self: *@This()) void {
         if (!self.is_dirty) {
-            if (gui.getWindow(self)) |win|
-                gui.setDirty(self, win);
+            self.win_ptr.gui_ptr.setDirty(self, self.win_ptr);
         }
         self.is_dirty = true;
     }
@@ -187,7 +189,7 @@ pub const iArea = struct {
 
     pub fn addEmpty(self: *@This(), area: Rect) *iArea {
         const gui = self.win_ptr.gui_ptr;
-        const vt = gui.alloc.create(iArea) catch unreachable; //I'll allow this because it only happens on oom and we don't support recovery from that
+        const vt = gui.alloc.create(iArea) catch unreachable;
         self.addChild(vt, .{
             .area = area,
             .deinit_fn = deinitEmpty,
@@ -206,6 +208,10 @@ pub const iArea = struct {
     pub fn genericSetDirtyOnFocusChange(self: *iArea, gui: *Gui, is_focused: bool) void {
         _ = is_focused;
         self.dirty(gui);
+    }
+
+    fn depthLessThan(_: void, lhs: *iArea, rhs: *iArea) bool {
+        return lhs.depth < rhs.depth;
     }
 };
 
@@ -460,8 +466,12 @@ pub const DrawState = struct {
         return area.inset(inset);
     }
 
-    pub fn vLayout(self: *const @This(), area: Rect) VerticalLayout {
+    pub fn vlayout(self: *const @This(), area: Rect) VerticalLayout {
         return .{ .item_height = self.style.config.default_item_h, .bounds = area };
+    }
+
+    pub fn hlayout(_: *const @This(), area: Rect, count: usize) HorizLayout {
+        return .{ .bounds = area, .count = count };
     }
 };
 
@@ -1094,7 +1104,6 @@ pub const Gui = struct {
     pub fn clampRectToWindow(self: *const Self, area: Rect) Rect {
         const wr = self.clamp_window.toAbsoluteRect();
         var other = area.toAbsoluteRect();
-        //TODO do y axis aswell
 
         if (other.w > wr.w) {
             const diff = other.w - wr.w;
@@ -1281,6 +1290,10 @@ pub const Gui = struct {
 
             fbo.bind(false);
             win.draw_scissor_state = .none;
+
+            // prevent out of order calls to .dirty from creating bad draws
+            std.sort.heap(*iArea, win.to_draw.items, {}, iArea.depthLessThan);
+
             for (win.to_draw.items) |draw_area| {
                 draw_area.draw(self, dctx, win);
             }

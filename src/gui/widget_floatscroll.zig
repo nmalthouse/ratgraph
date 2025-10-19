@@ -115,7 +115,7 @@ pub const FloatScroll = struct {
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {
         if (self.vt.children.items.len != num_widget) return;
 
-        self.vt.dirty(gui);
+        self.vt.dirty();
 
         const child = self.vt.children.items[virtual_area_index];
         child.clearChildren(gui, win);

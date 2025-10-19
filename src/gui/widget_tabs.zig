@@ -71,7 +71,7 @@ pub const Tabs = struct {
         const index = self.opts.index_ptr.?.*;
         if (index >= self.tabs.items.len)
             return;
-        self.vt.dirty(gui);
+        self.vt.dirty();
         const child = self.vt.children.items[1];
         child.clearChildren(gui, win);
         self.opts.build_cb(self.opts.cb_vt, child, self.tabs.items[index], gui, win);

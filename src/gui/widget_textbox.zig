@@ -257,11 +257,9 @@ pub const Textbox = struct {
     }
 
     pub fn buildNumber(parent: *iArea, area: Rect, num_vt: *iArea, num_print: NumberPrintFn, num_parse: NumberParseFn, opts: TextboxOptions) g.WgStatus {
-        const gui = parent.win_ptr.gui_ptr;
-
         if (buildOpts(parent, area, opts) != .good) return .failed;
         const self: *@This() = @alignCast(@fieldParentPtr("vt", parent.getLastChild() orelse return .failed));
-        self.vt.dirty(gui);
+        self.vt.dirty();
         self.reset("") catch return .good;
         num_print(num_vt, &self.codepoints);
         self.number = .{
@@ -278,8 +276,8 @@ pub const Textbox = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn focusChanged(vt: *iArea, gui: *Gui, _: bool) void {
-        vt.dirty(gui);
+    pub fn focusChanged(vt: *iArea, _: *Gui, _: bool) void {
+        vt.dirty();
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
@@ -290,7 +288,7 @@ pub const Textbox = struct {
         const old_draw_start = self.draw_start;
         defer {
             if (old_draw_start != self.draw_start)
-                self.vt.dirty(gui);
+                self.vt.dirty();
         }
         if (self.head < self.draw_start) {
             self.draw_start = self.head;
@@ -345,7 +343,7 @@ pub const Textbox = struct {
                 if (focused) ev.gui.startTextinput(vt.area) else ev.gui.stopTextInput();
                 if (focused) self.setNumber() else self.commitNumber();
 
-                vt.dirty(ev.gui);
+                vt.dirty();
             },
             .text_input => |st| {
                 textinput_cb(vt, st, ev.window);
@@ -353,7 +351,7 @@ pub const Textbox = struct {
                 self.commitChange(ev);
             },
             .keydown => |kev| {
-                vt.dirty(ev.gui);
+                vt.dirty();
                 const mod = kev.mod_state & ~M.mask(&.{ .SCROLL, .NUM, .CAPS });
                 const tb = self;
                 const StaticData = struct {
@@ -500,7 +498,7 @@ pub const Textbox = struct {
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         cb.gui.grabFocus(vt, win);
-        vt.dirty(cb.gui);
+        vt.dirty();
 
         const sz = cb.gui.dstate.style.config.text_h;
         const ar = textArea(vt.area, cb.gui);
@@ -537,8 +535,9 @@ pub const Textbox = struct {
     }
 
     fn rightClickMenuBtn(cb: *CbHandle, id: g.Uid, dat: g.MouseCbState, _: *iWindow) void {
+        _ = dat;
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        self.vt.dirty(dat.gui);
+        self.vt.dirty();
         const bi = g.Widget.BtnContextWindow.buttonId;
         switch (id) {
             bi("copy") => setClipboard(self.codepoints.allocator, self.getSelectionSlice()) catch return,
@@ -554,7 +553,7 @@ pub const Textbox = struct {
         const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
         if (cb.gui.dstate.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false)) |u_i| {
             self.setHead(u_i, 0, false);
-            vt.dirty(cb.gui);
+            vt.dirty();
         }
         self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.dstate.style.config.text_h, cb.gui);
     }
@@ -623,7 +622,7 @@ pub const Textbox = struct {
 
         const view = try std.unicode.Utf8View.init(d.text);
         var it = view.iterator();
-        vt.dirty(d.gui);
+        vt.dirty();
 
         outer: while (it.nextCodepointSlice()) |new_cp| {
             var new_len: usize = self.codepoints.items.len;

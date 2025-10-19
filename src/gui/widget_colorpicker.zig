@@ -95,7 +95,7 @@ const ColorpickerTransient = struct {
     pub fn build(win: *iWindow, gui: *Gui, area: Rect) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", win));
         self.vt.area.area = area;
-        win.area.dirty(gui);
+        win.area.dirty();
         self.vt.area.clearChildren(gui, win);
         const a = &win.area;
 
@@ -133,7 +133,7 @@ const ColorpickerTransient = struct {
             .{ .x = h_area.w, .y = 10 },
         );
 
-        var vy = gui.dstate.vLayout(ly.getArea() orelse return);
+        var vy = gui.dstate.vlayout(ly.getArea() orelse return);
 
         _ = Widget.Button.build(
             a,
@@ -183,8 +183,8 @@ const ColorpickerTransient = struct {
 
                 self.parent_ptr.commitColor(gui, newcolor);
                 self.parent_ptr.color_hsv = graph.ptypes.Hsva.fromInt(newcolor);
-                self.parent_ptr.vt.dirty(gui);
-                self.vt.area.dirty(gui);
+                self.parent_ptr.vt.dirty();
+                self.vt.area.dirty();
                 //std.debug.print("Setting color to {x}\n", .{newcolor});
             };
         }
@@ -196,14 +196,14 @@ const ColorpickerTransient = struct {
         gui.alloc.destroy(self);
     }
 
-    fn warpNotify(vt: *CbHandle, gui: *Gui) void {
+    fn warpNotify(vt: *CbHandle, _: *Gui) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", vt));
         const w = self.vt.area.children.items;
         if (w.len < 2)
             return;
         const sv_area = w[0].area;
         const h_area = w[1].area;
-        self.vt.area.dirty(gui);
+        self.vt.area.dirty();
         const color = &self.parent_ptr.color_hsv;
         color.s = self.sv_handle.x / sv_area.w;
         color.v = (1.0 - (self.sv_handle.y) / sv_area.h);
@@ -216,7 +216,7 @@ const ColorpickerTransient = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
 
         self.parent_ptr.commitColor(dat.gui, self.parent_ptr.color_hsv.toInt());
-        self.parent_ptr.vt.dirty(dat.gui);
+        self.parent_ptr.vt.dirty();
         _ = id;
         dat.gui.deferTransientClose();
     }
@@ -260,14 +260,14 @@ const ColorpickerTransient = struct {
 
     pub fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
 
-    fn ssliderCb(cb: *CbHandle, gui: *Gui, _: f32, _: usize, _: Widget.StaticSliderOpts.State) void {
+    fn ssliderCb(cb: *CbHandle, _: *Gui, _: f32, _: usize, _: Widget.StaticSliderOpts.State) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        self.vt.area.dirty(gui);
+        self.vt.area.dirty();
     }
 
-    fn ssliderCbCommit(cb: *CbHandle, gui: *Gui, _: f32, _: usize) void {
+    fn ssliderCbCommit(cb: *CbHandle, _: *Gui, _: f32, _: usize) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        self.vt.area.dirty(gui);
+        self.vt.area.dirty();
     }
 };
 
@@ -310,7 +310,7 @@ const WarpArea = struct {
         //IMPORTANT
         //with the current drawing algo, swapping the order will prevent warp from showing!
         self.notify_fn(self.notify_vt, cb.gui);
-        vt.dirty(cb.gui);
+        vt.dirty();
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
@@ -337,7 +337,7 @@ const WarpArea = struct {
                 x.* = 0;
         }
         self.notify_fn(self.notify_vt, cb.gui);
-        vt.dirty(cb.gui);
+        vt.dirty();
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {

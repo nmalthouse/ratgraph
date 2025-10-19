@@ -131,7 +131,7 @@ pub const VScroll = struct {
             return;
         //TODO check if it needs the vscroll and add it
 
-        self.vt.dirty(gui);
+        self.vt.dirty();
         const child = self.vt.children.items[0];
         child.clearChildren(gui, win);
 
@@ -234,7 +234,7 @@ pub const Checkbox = struct {
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         switch (ev.event) {
-            .focusChanged => vt.dirty(ev.gui),
+            .focusChanged => vt.dirty(),
             .text_input => {},
             .keydown => |kev| {
                 for (kev.keys) |k| {
@@ -249,7 +249,7 @@ pub const Checkbox = struct {
 
     fn toggle(self: *@This(), gui: *Gui, _: *iWindow) void {
         self.bool_ptr.* = !self.bool_ptr.*;
-        self.vt.dirty(gui);
+        self.vt.dirty();
         if (self.opts.cb_fn) |cbfn| {
             cbfn(self.opts.cb_vt orelse return, gui, self.bool_ptr.*, self.opts.user_id);
         }
@@ -374,7 +374,7 @@ pub const Button = struct {
             .falling, .low => false,
         };
         if (self.is_down != old)
-            vt.dirty(cb.gui);
+            vt.dirty();
     }
 
     pub fn draw(vt: *iArea, gui: *Gui, d: *DrawState) void {
@@ -396,7 +396,7 @@ pub const Button = struct {
 
     pub fn onclick(vt: *iArea, cb: MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        vt.dirty(cb.gui);
+        vt.dirty();
         self.is_down = true;
         cb.gui.grabMouse(&@This().mouseGrabbed, vt, win, cb.btn);
         self.sendClickCb(cb, win);
@@ -411,7 +411,7 @@ pub const Button = struct {
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         switch (ev.event) {
-            .focusChanged => vt.dirty(ev.gui),
+            .focusChanged => vt.dirty(),
             .text_input => {},
             .keydown => |kev| {
                 for (kev.keys) |k| {
@@ -664,11 +664,11 @@ pub const NumberDisplay = struct {
         self.last_drawn = self.num_ptr.*;
     }
 
-    pub fn pollNumber(vt: *iArea, gui: *Gui, _: *iWindow) void {
+    pub fn pollNumber(vt: *iArea, _: *Gui, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
 
         if (self.last_drawn != self.num_ptr.*) {
-            vt.dirty(gui);
+            vt.dirty();
         }
     }
 };

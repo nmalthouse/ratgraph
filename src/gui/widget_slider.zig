@@ -87,18 +87,18 @@ pub fn SliderGeneric(comptime number_T: type) type {
         pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
             switch (ev.event) {
-                .focusChanged => vt.dirty(ev.gui),
+                .focusChanged => vt.dirty(),
                 else => {},
                 .keydown => |kev| {
                     for (kev.keys) |k| {
                         switch (@as(graph.SDL.keycodes.Scancode, @enumFromInt(k.key_id))) {
                             else => {},
                             .LEFT => {
-                                vt.dirty(ev.gui);
+                                vt.dirty();
                                 self.nudge(-self.nudge_dist);
                             },
                             .RIGHT => {
-                                vt.dirty(ev.gui);
+                                vt.dirty();
                                 self.nudge(self.nudge_dist);
                             },
                         }
@@ -158,7 +158,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
             if (self.shuttleSS().containsPoint(cb.pos)) {
-                vt.dirty(cb.gui);
+                vt.dirty();
                 cb.gui.grabFocus(vt, win);
                 cb.gui.grabMouse(&mouseGrabbed, vt, win, cb.btn);
             }
@@ -176,7 +176,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
                 self.shuttle_rect.x = 0;
 
             if (old != self.shuttle_rect.x) {
-                vt.dirty(cb.gui);
+                vt.dirty();
                 self.ptr.* = self.shuttlePosToValue();
                 if (self.opts.snap_mod) |snap| {
                     if (info == .float) {
