@@ -20,7 +20,6 @@ const CbHandle = guis.CbHandle;
 
 pub const MyGlView = struct {
     vt: iWindow,
-    area: iArea,
     cbhandle: CbHandle = .{},
 
     draw_ctx: *graph.ImmediateDrawingContext,
@@ -29,8 +28,7 @@ pub const MyGlView = struct {
         const self = gui.create(@This());
         self.* = .{
             .draw_ctx = draw_ctx,
-            .area = .{ .area = Rec(0, 0, 0, 0), .deinit_fn = area_deinit, .draw_fn = draw },
-            .vt = iWindow.init(&@This().build, gui, &@This().deinit, &self.area),
+            .vt = iWindow.init(&@This().build, gui, &@This().deinit, .{}),
         };
         self.vt.update_fn = update;
 
@@ -43,15 +41,15 @@ pub const MyGlView = struct {
         const can_grab = gui.canGrabMouseOverride(vt);
 
         if (can_grab) {
-            self.draw_ctx.rect(self.area.area, 0x00ffff);
+            self.draw_ctx.rect(self.vt.area.area, 0x00ffff);
             //const mstate = gui.sdl_win.mouse.left;
             if (gui.sdl_win.keyRising(.LSHIFT)) {
-                const center = self.area.area.center();
+                const center = self.vt.area.area.center();
                 graph.c.SDL_WarpMouseInWindow(gui.sdl_win.win, center.x, center.y);
             }
             gui.setGrabOverride(vt, gui.sdl_win.keystate(.LSHIFT) == .low, .{ .hide_pointer = true });
         } else {
-            self.draw_ctx.rect(self.area.area, 0xff00ffff);
+            self.draw_ctx.rect(self.vt.area.area, 0xff00ffff);
         }
     }
 
@@ -62,8 +60,6 @@ pub const MyGlView = struct {
         gui.alloc.destroy(self); //second
     }
 
-    pub fn area_deinit(_: *iArea, _: *Gui, _: *iWindow) void {}
-
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         GuiHelp.drawWindowFrame(d, vt.area);
     }
@@ -71,7 +67,8 @@ pub const MyGlView = struct {
     pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         _ = gui;
-        self.area.area = area;
+        //TODO MOVE THIS OUT
+        self.vt.area.area = area;
     }
 };
 
@@ -90,7 +87,6 @@ pub const MyInspector = struct {
 
     vt: iWindow,
     cbhandle: CbHandle = .{},
-    area: iArea,
 
     inspector_state: u32 = 0,
     bool1: bool = false,
@@ -107,12 +103,13 @@ pub const MyInspector = struct {
     pub fn create(gui: *Gui) *iWindow {
         const self = gui.create(@This());
         self.* = .{
-            .area = .{ .area = Rec(0, 0, 0, 0), .deinit_fn = area_deinit, .draw_fn = draw },
-            .vt = iWindow.init(&@This().build, gui, &@This().deinit, &self.area),
+            .vt = iWindow.init(build, gui, deinit, .{}),
         };
 
         return &self.vt;
     }
+
+    fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
 
     pub fn deinit(vt: *iWindow, gui: *Gui) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
@@ -121,16 +118,14 @@ pub const MyInspector = struct {
         gui.alloc.destroy(self); //second
     }
 
-    pub fn area_deinit(_: *iArea, _: *Gui, _: *iWindow) void {}
-
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         GuiHelp.drawWindowFrame(d, vt.area);
     }
 
     pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        self.area.area = area;
-        self.area.clearChildren(gui, vt);
+        self.vt.area.area = area;
+        self.vt.area.clearChildren(gui, vt);
         //self.layout.reset(gui, vt);
         //start a vlayout
         //var ly = Vert{ .area = vt.area };
@@ -138,7 +133,7 @@ pub const MyInspector = struct {
         ly.padding.left = 10;
         ly.padding.right = 10;
         ly.padding.top = 10;
-        const a = &self.area;
+        const a = &self.vt.area;
 
         a.addChildOpt(gui, vt, Wg.Checkbox.build(gui, ly.getArea(), "first button", .{
             .bool_ptr = &self.bool1,
@@ -170,21 +165,21 @@ pub const MyInspector = struct {
         a.addChildOpt(gui, vt, Wg.Slider.build(gui, ly.getArea(), &self.i32_n, 0, 10, .{}));
 
         ly.pushRemaining();
-        a.addChildOpt(gui, vt, Wg.Tabs.build(gui, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.area }));
+        a.addChildOpt(gui, vt, Wg.Tabs.build(gui, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle }));
     }
 
     fn staticSliderCb(cb: *CbHandle, gui: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        gui.setDirty(&self.area, &self.vt);
+        self.vt.area.dirty(gui);
     }
 
     fn staticSliderSet(cb: *CbHandle, gui: *Gui, _: f32, _: usize) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        gui.setDirty(&self.area, &self.vt);
+        self.vt.area.dirty(gui);
     }
 
-    pub fn buildTabs(user_vt: *iArea, vt: *iArea, tab_name: []const u8, gui: *Gui, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("area", user_vt));
+    pub fn buildTabs(cb: *CbHandle, vt: *iArea, tab_name: []const u8, gui: *Gui, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         const eql = std.mem.eql;
         var ly = gui.dstate.vLayout(vt.area);
         ly.padding.top = 10;

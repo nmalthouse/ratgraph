@@ -11,7 +11,11 @@ const gl = graph.GL;
 const ArrayList = std.ArrayListUnmanaged;
 const AL = std.mem.Allocator;
 
-pub const CbHandle = struct {};
+pub const CbHandle = struct {
+    pub fn cast(self: *@This(), comptime T: type, comptime name: []const u8) *T {
+        return @alignCast(@fieldParentPtr(name, self));
+    }
+};
 const log = std.log.scoped(.rgui);
 
 pub const Widget = struct {
@@ -76,7 +80,7 @@ pub const NewVt = struct {
     pub const OnClick = *const fn (*iArea, MouseCbState, *iWindow) void;
 
     pub const Onscroll = *const fn (*iArea, *Gui, *iWindow, distance: f32) void;
-    pub const FocusEvent = *const fn (*iArea, FocusedEvent) void;
+    pub const FocusEventFn = *const fn (*iArea, FocusedEvent) void;
     pub const Onpoll = *const fn (*iArea, *Gui, *iWindow) void;
     vt: *iArea,
 
@@ -87,10 +91,20 @@ pub const NewVt = struct {
 
 //TODO store a depth and sort to_draw by depth
 pub const iArea = struct {
+    pub const Args = struct {
+        deinit_fn: DeinitFn,
+        area: Rect = .Empty,
+        draw_fn: ?DrawFn = null,
+    };
     pub const DrawFn = *const fn (*iArea, *Gui, *DrawState) void;
+    pub const DeinitFn = *const fn (*iArea, *Gui, *iWindow) void;
+
+    deinit_fn: DeinitFn,
+    area: Rect,
+    children: ArrayList(*iArea) = .{},
+
     draw_fn: ?DrawFn = null,
-    deinit_fn: *const fn (*iArea, *Gui, *iWindow) void,
-    focusEvent: ?NewVt.FocusEvent = null,
+    focus_ev_fn: ?NewVt.FocusEventFn = null,
 
     can_tab_focus: bool = false,
     is_dirty: bool = false,
@@ -98,8 +112,6 @@ pub const iArea = struct {
     parent: ?*iArea = null,
     /// index of self as child of parent
     index: u32 = 0,
-    area: Rect,
-    children: ArrayList(*iArea) = .{},
 
     _scissor_id: ScissorId = .none,
 
@@ -197,13 +209,16 @@ pub fn label(lay: *iArea, gui: *Gui, win: *iWindow, area_o: ?Rect, comptime fmt:
 }
 
 pub const iWindow = struct {
+    pub const InitArgs = struct {
+        area: Rect = .Empty,
+    };
     const BuildfnT = *const fn (*iWindow, *Gui, Rect) void;
 
     build_fn: BuildfnT,
     deinit_fn: *const fn (*iWindow, *Gui) void,
     update_fn: ?*const fn (*iWindow, *Gui) void = null,
 
-    area: *iArea,
+    area: iArea,
     alloc: std.mem.Allocator,
 
     click_listeners: ArrayList(struct { *iArea, NewVt.OnClick }) = .{},
@@ -245,19 +260,24 @@ pub const iWindow = struct {
         }
     }
 
-    pub fn init(build_fn: BuildfnT, gui: *Gui, deinit_fn: *const fn (*iWindow, *Gui) void, area: *iArea) iWindow {
+    pub fn init(build_fn: BuildfnT, gui: *Gui, deinit_fn: *const fn (*iWindow, *Gui) void, args: InitArgs) iWindow {
         return .{
             .alloc = gui.alloc,
             .deinit_fn = deinit_fn,
             .build_fn = build_fn,
-            .area = area,
+            .area = .{ .deinit_fn = deinit_area, .area = args.area, .draw_fn = draw_area },
         };
+    }
+
+    fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
+    fn draw_area(vt: *iArea, _: *Gui, d: *DrawState) void {
+        GuiHelp.drawWindowFrame(d, vt.area);
     }
 
     // the implementers deinit fn should call this first
     pub fn deinit(self: *iWindow, gui: *Gui) void {
         //self.layout.vt.deinit_fn(&self.layout.vt, gui, self);
-        gui.deregister(self.area, self);
+        gui.deregister(&self.area, self);
         self.area.deinit(gui, self);
         if (self.click_listeners.items.len != 0)
             std.debug.print("BROKEN\n", .{});
@@ -269,6 +289,21 @@ pub const iWindow = struct {
         self.to_draw.deinit(self.alloc);
         self.cache_map.deinit(self.alloc);
         self.scissors.deinit(self.alloc);
+    }
+
+    fn pre_update(win: *iWindow, gui: *Gui) void {
+        win.to_draw.clearRetainingCapacity();
+        win.cache_map.clearRetainingCapacity();
+        if (win.needs_rebuild) {
+            win.needs_rebuild = false;
+            win.draws_since_cached = 0;
+            //var time = try std.time.Timer.start();
+            win.build_fn(win, gui, win.area.area);
+            //std.debug.print("Built win in: {d:.2} us\n", .{time.read() / std.time.ns_per_us});
+        }
+
+        if (win.update_fn) |upfn|
+            upfn(win, gui);
     }
 
     /// Returns true if this window contains the mouse
@@ -810,7 +845,7 @@ pub const Gui = struct {
             if (fwd) {
                 if (findNextFocusTarget(f.vt)) |next| {
                     self.grabFocus(next, f.win);
-                } else if (findFocusTargetNoBacktrack(f.win.area)) |next| { //Start from the root of the window
+                } else if (findFocusTargetNoBacktrack(&f.win.area)) |next| { //Start from the root of the window
                     self.grabFocus(next, f.win);
                 }
             } else {
@@ -887,22 +922,10 @@ pub const Gui = struct {
                 self.focused = null;
         }
         for (self.active_windows.items) |win| {
-            win.to_draw.clearRetainingCapacity();
-            win.cache_map.clearRetainingCapacity();
-            if (win.needs_rebuild) {
-                win.needs_rebuild = false;
-                win.draws_since_cached = 0;
-                //var time = try std.time.Timer.start();
-                win.build_fn(win, self, win.area.area);
-                //std.debug.print("Built win in: {d:.2} us\n", .{time.read() / std.time.ns_per_us});
-            }
-
-            if (win.update_fn) |upfn|
-                upfn(win, self);
+            win.pre_update(self);
         }
         if (self.transient_window) |tw| {
-            tw.to_draw.clearRetainingCapacity();
-            tw.cache_map.clearRetainingCapacity();
+            tw.pre_update(self);
         }
         if (self.transient_should_close) {
             self.transient_should_close = false;
@@ -1038,14 +1061,14 @@ pub const Gui = struct {
 
     pub fn grabFocus(self: *Self, vt: *iArea, win: *iWindow) void {
         if (self.focused) |f| {
-            if (f.vt != vt and f.vt.focusEvent != null)
-                f.vt.focusEvent.?(f.vt, .{ .gui = self, .window = win, .event = .{ .focusChanged = false } });
+            if (f.vt != vt and f.vt.focus_ev_fn != null)
+                f.vt.focus_ev_fn.?(f.vt, .{ .gui = self, .window = win, .event = .{ .focusChanged = false } });
         }
         self.focused = .{
             .vt = vt,
             .win = win,
         };
-        if (vt.focusEvent) |fc|
+        if (vt.focus_ev_fn) |fc|
             fc(vt, .{ .gui = self, .window = win, .event = .{ .focusChanged = true } });
     }
 
@@ -1093,7 +1116,7 @@ pub const Gui = struct {
     pub fn setTransientWindow(self: *Self, win: *iWindow) void {
         self.closeTransientWindow();
         self.transient_window = win;
-        self.register(win.area, win);
+        self.register(&win.area, win);
         _ = self.transient_fbo.setSize(win.area.area.w, win.area.area.h) catch return;
     }
 
@@ -1106,7 +1129,7 @@ pub const Gui = struct {
 
     pub fn dispatchTextinput(self: *Self, cb: TextCbState) void {
         if (self.getFocused()) |f| {
-            if (f.vt.focusEvent) |func| {
+            if (f.vt.focus_ev_fn) |func| {
                 func(f.vt, .{ .gui = self, .window = f.win, .event = .{
                     .text_input = cb,
                 } });
@@ -1120,7 +1143,7 @@ pub const Gui = struct {
 
     pub fn dispatchFocusedEvent(self: *Self, event: FocusedEvent.Event) void {
         if (self.getFocused()) |f| {
-            if (f.vt.focusEvent) |func|
+            if (f.vt.focus_ev_fn) |func|
                 func(f.vt, .{ .gui = self, .window = f.win, .event = event });
         }
     }
@@ -1182,7 +1205,7 @@ pub const Gui = struct {
         window.build_fn(window, self, area); //Rebuild it
         if (opts.put_fbo)
             try self.fbos.put(window, try graph.RenderTexture.init(area.w, area.h));
-        self.register(window.area, window);
+        self.register(&window.area, window);
         try self.windows.append(self.alloc, window);
 
         return @enumFromInt(self.windows.items.len - 1);

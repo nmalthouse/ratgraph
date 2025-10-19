@@ -204,7 +204,7 @@ pub const Checkbox = struct {
         };
         self.__bool = set orelse self.__bool;
         self.vt.can_tab_focus = true;
-        self.vt.focusEvent = &fevent;
+        self.vt.focus_ev_fn = &fevent;
         self.vt.draw_fn = switch (opts.style) {
             .ableton => draw,
             .check => drawCheck,
@@ -339,7 +339,7 @@ pub const Button = struct {
         const area = area_o orelse return null;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = opts.custom_draw orelse draw, .focusEvent = fevent },
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = opts.custom_draw orelse draw, .focus_ev_fn = fevent },
             .text = gui.alloc.dupe(u8, name) catch return null,
             .opts = opts,
         };

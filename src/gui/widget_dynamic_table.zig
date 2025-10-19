@@ -16,8 +16,8 @@ pub const DynamicTable = struct {
         /// as a absolute percentage of the table width.
         column_positions: []f32,
         column_names: []const []const u8,
-        build_cb: *const fn (user_vt: *iArea, area_vt: *iArea, *Gui, *iWindow) void,
-        build_vt: *iArea,
+        build_cb: *const fn (*g.CbHandle, area_vt: *iArea, *Gui, *iWindow) void,
+        build_vt: *g.CbHandle,
     };
     vt: iArea,
 

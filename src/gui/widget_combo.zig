@@ -36,20 +36,19 @@ pub fn ComboUser(user_data: type) type {
     return struct {
         pub const ComboVt = struct {
             //build_cb: *const fn (user_vt: *iArea, widget_vt: *iArea, index: usize, *Gui, *iWindow) void,
-            name_cb: *const fn (user_vt: *iArea, index: usize, *Gui, ud: user_data) []const u8,
-            commit_cb: *const fn (user_vt: *iArea, index: usize, ud: user_data) void,
+            name_cb: *const fn (*CbHandle, index: usize, *Gui, ud: user_data) []const u8,
+            commit_cb: *const fn (*CbHandle, index: usize, ud: user_data) void,
             count: usize,
             current: usize,
 
             user_id: usize = 0,
 
-            user_vt: *iArea,
+            user_vt: *CbHandle,
         };
         const ParentT = @This();
         pub const PoppedWindow = struct {
             vt: iWindow,
             cbhandle: CbHandle = .{},
-            area: iArea,
 
             parent_vt: *iArea,
             name: []const u8,
@@ -61,13 +60,13 @@ pub fn ComboUser(user_data: type) type {
 
             pub fn buildWindow(vt: *iWindow, gui: *Gui, area: Rect) void {
                 const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-                self.area.area = area;
-                self.area.clearChildren(gui, vt);
+                vt.area.area = area;
+                vt.area.clearChildren(gui, vt);
                 self.vscroll_vt = null;
                 vt.area.dirty(gui);
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = gui.dstate.vLayout(area.inset(gui.dstate.scale));
-                self.area.addChildOpt(
+                vt.area.addChildOpt(
                     gui,
                     vt,
                     Widget.Textbox.buildOpts(gui, ly.getArea(), .{
@@ -76,8 +75,8 @@ pub fn ComboUser(user_data: type) type {
                         .commit_when = .on_change,
                     }),
                 );
-                if (self.area.children.items.len > 0) {
-                    gui.grabFocus(self.area.children.items[0], vt);
+                if (vt.area.children.items.len > 0) {
+                    gui.grabFocus(vt.area.children.items[0], vt);
                 }
                 ly.pushRemaining();
                 const vscroll = VScroll.build(gui, ly.getArea(), .{
@@ -88,7 +87,7 @@ pub fn ComboUser(user_data: type) type {
                     .count = p.opts.count,
                     .index_ptr = &p.index,
                 }) orelse return;
-                self.area.addChild(gui, vt, vscroll);
+                vt.area.addChild(gui, vt, vscroll);
                 self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vscroll.vt));
             }
 
@@ -98,7 +97,7 @@ pub fn ComboUser(user_data: type) type {
                 if (self.vscroll_vt) |v| {
                     //This will call build_scroll_cb
                     v.index_ptr.* = 0;
-                    v.rebuild(gui, gui.getWindow(&self.area) orelse return);
+                    v.rebuild(gui, &self.vt);
                 }
             }
 
@@ -217,10 +216,9 @@ pub fn ComboUser(user_data: type) type {
                     &PoppedWindow.buildWindow,
                     gui,
                     &PoppedWindow.deinit,
-                    &popped.area,
+                    .{ .area = area },
                 ),
                 .search_list = std.ArrayList(usize).init(gui.alloc),
-                .area = .{ .area = area, .deinit_fn = PoppedWindow.deinit_area, .draw_fn = PoppedWindow.draw },
                 .name = "noname",
             };
             gui.setTransientWindow(&popped.vt);
@@ -234,7 +232,6 @@ pub fn ComboGeneric(comptime enumT: type) type {
         const ParentT = @This();
         pub const PoppedWindow = struct {
             vt: iWindow,
-            area: iArea,
             cbhandle: CbHandle = .{},
 
             parent_vt: *iArea,
@@ -246,11 +243,11 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 area: Rect,
             ) void {
                 const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-                self.area.area = area;
-                self.area.clearChildren(gui, vt);
+                vt.area.area = area;
+                vt.area.clearChildren(gui, vt);
                 const info = @typeInfo(enumT);
                 vt.area.dirty(gui);
-                self.area.addChildOpt(gui, vt, VScroll.build(gui, area, .{
+                vt.area.addChildOpt(gui, vt, VScroll.build(gui, area, .{
                     .build_cb = &build_cb,
                     .build_vt = &self.cbhandle,
                     .win = vt,
@@ -352,9 +349,8 @@ pub fn ComboGeneric(comptime enumT: type) type {
                     &PoppedWindow.build,
                     gui,
                     &PoppedWindow.deinit,
-                    &popped.area,
+                    .{ .area = area },
                 ),
-                .area = .{ .area = area, .deinit_fn = PoppedWindow.deinit_area, .draw_fn = PoppedWindow.draw },
                 .name = "noname",
             };
             gui.setTransientWindow(&popped.vt);

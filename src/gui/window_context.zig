@@ -30,7 +30,6 @@ pub const BtnContextWindow = struct {
     };
     const BtnCb = Widget.Button.ButtonCallbackT;
     vt: iWindow,
-    area: iArea,
 
     opts: Opts,
     cbhandle: g.CbHandle = .{},
@@ -58,28 +57,27 @@ pub const BtnContextWindow = struct {
 
         const rec = graph.Rec(pos.x, pos.y, max_w + item_h, item_h * @as(f32, @floatFromInt(opts.buttons.len)));
         self.* = .{
-            .area = .{ .area = gui.clampRectToWindow(rec), .draw_fn = draw, .deinit_fn = deinit_area },
-            .vt = iWindow.init(build, gui, deinit, &self.area),
+            .vt = iWindow.init(build, gui, deinit, .{ .area = rec }),
             .opts = opts,
         };
         try self.buttons.resize(gui.alloc, opts.buttons.len);
         for (opts.buttons, 0..) |btn, i|
             self.buttons.items[i] = .{ btn[0], try gui.alloc.dupe(u8, btn[1]), btn[2] };
 
-        build(&self.vt, gui, self.area.area);
+        build(&self.vt, gui, self.vt.area.area);
 
         return &self.vt;
     }
 
     pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        self.area.area = area;
-        self.area.clearChildren(gui, vt);
+        vt.area.area = area;
+        vt.area.clearChildren(gui, vt);
 
         var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
         for (self.buttons.items) |btn| {
             const ar = ly.getArea();
-            self.area.addChildOpt(gui, vt, switch (btn[2]) {
+            vt.area.addChildOpt(gui, vt, switch (btn[2]) {
                 .btn => Widget.Button.build(gui, ar, btn[1], .{
                     .cb_vt = &self.cbhandle,
                     .cb_fn = btn_wrap_cb,

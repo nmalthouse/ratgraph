@@ -62,7 +62,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
             const self = gui.create(@This());
 
             self.* = .{
-                .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focusEvent = fevent },
+                .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focus_ev_fn = fevent },
                 .ptr = ptr,
                 .shuttle_rect = Rec(0, 0, 16 * gui.dstate.scale, area.h),
                 .min = std.math.lossyCast(number_T, min),

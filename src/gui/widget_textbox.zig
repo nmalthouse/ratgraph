@@ -242,7 +242,7 @@ pub const Textbox = struct {
         const area = area_o orelse return null;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focusEvent = fevent },
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focus_ev_fn = fevent },
             .codepoints = std.ArrayList(u8).init(gui.alloc),
             .opts = opts,
             .head = 0,

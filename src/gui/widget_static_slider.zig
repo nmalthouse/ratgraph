@@ -80,7 +80,7 @@ pub const StaticSlider = struct {
         const area = area_o orelse return null;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focusEvent = fevent },
+            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focus_ev_fn = fevent },
             .opts = opts,
             ._num = opts.default,
             .num = number orelse &self._num,

@@ -9,6 +9,7 @@ const iWindow = g.iWindow;
 const Color = graph.Colori;
 const VScroll = g.Widget.VScroll;
 const Widget = g.Widget;
+const CbHandle = g.CbHandle;
 
 const Tab = []const u8;
 
@@ -16,10 +17,10 @@ const Tab = []const u8;
 //on draw, draw those, then we have a buildCB(tab_name, area)
 //cool thats it.
 pub const Tabs = struct {
-    pub const BuildTabCb = *const fn (user_vt: *iArea, area_vt: *iArea, tab_name: []const u8, *Gui, *iWindow) void;
+    pub const BuildTabCb = *const fn (*CbHandle, area_vt: *iArea, tab_name: []const u8, *Gui, *iWindow) void;
     pub const Opts = struct {
         build_cb: BuildTabCb,
-        cb_vt: *iArea,
+        cb_vt: *CbHandle,
         index_ptr: ?*usize = null,
     };
     vt: iArea,
