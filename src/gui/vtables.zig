@@ -75,27 +75,30 @@ pub const TextCbState = struct {
     mod_state: graph.SDL.keycodes.KeymodMask = 0,
 };
 
-/// A helper to return function pointers not stored inside vtable
-pub const NewVt = struct {
-    pub const OnClick = *const fn (*iArea, MouseCbState, *iWindow) void;
-
-    pub const Onscroll = *const fn (*iArea, *Gui, *iWindow, distance: f32) void;
-    pub const FocusEventFn = *const fn (*iArea, FocusedEvent) void;
-    pub const Onpoll = *const fn (*iArea, *Gui, *iWindow) void;
-    vt: *iArea,
-
-    onclick: ?OnClick = null,
-    onscroll: ?Onscroll = null,
-    onpoll: ?Onpoll = null,
+pub const WgStatus = enum {
+    failed,
+    good,
 };
-
 //TODO store a depth and sort to_draw by depth
 pub const iArea = struct {
+    /// Decl'd so we can grep for undefined and not get confused
+    pub const UNINITILIZED: iArea = undefined;
     pub const Args = struct {
         deinit_fn: DeinitFn,
         area: Rect = .Empty,
         draw_fn: ?DrawFn = null,
+        focus_ev_fn: ?FocusEventFn = null,
+
+        onclick: ?OnClick = null,
+        onscroll: ?Onscroll = null,
+        onpoll: ?Onpoll = null,
+
+        can_tab_focus: bool = false,
     };
+    pub const OnClick = *const fn (*iArea, MouseCbState, *iWindow) void;
+    pub const Onscroll = *const fn (*iArea, *Gui, *iWindow, distance: f32) void;
+    pub const FocusEventFn = *const fn (*iArea, FocusedEvent) void;
+    pub const Onpoll = *const fn (*iArea, *Gui, *iWindow) void;
     pub const DrawFn = *const fn (*iArea, *Gui, *DrawState) void;
     pub const DeinitFn = *const fn (*iArea, *Gui, *iWindow) void;
 
@@ -104,7 +107,7 @@ pub const iArea = struct {
     children: ArrayList(*iArea) = .{},
 
     draw_fn: ?DrawFn = null,
-    focus_ev_fn: ?NewVt.FocusEventFn = null,
+    focus_ev_fn: ?FocusEventFn = null,
 
     can_tab_focus: bool = false,
     is_dirty: bool = false,
@@ -114,6 +117,40 @@ pub const iArea = struct {
     index: u32 = 0,
 
     _scissor_id: ScissorId = .none,
+
+    win_ptr: *iWindow,
+
+    /// Returns `reserved_memory` which should be passed in unitilized
+    /// self.* = .{.vt = parent.init(&self.vt, .{})};
+    pub fn addChild(parent: *iArea, reserved_memory: *iArea, args: Args) void {
+        reserved_memory.* = .{
+            .deinit_fn = args.deinit_fn,
+            .area = args.area,
+            .draw_fn = args.draw_fn,
+            .focus_ev_fn = args.focus_ev_fn,
+            .win_ptr = parent.win_ptr,
+            ._scissor_id = parent._scissor_id,
+            .index = @intCast(parent.children.items.len),
+            .parent = parent,
+            .can_tab_focus = args.can_tab_focus,
+        };
+        const gui = parent.win_ptr.gui_ptr;
+        const win = parent.win_ptr;
+        const new = reserved_memory;
+        // Propogate the scissor. Default is .none so no need to check
+        if (parent.children.items.len >= std.math.maxInt(u32)) @panic("too many widgets");
+
+        parent.children.append(gui.alloc, new) catch @panic("failed to attach child");
+        gui.register(new, win);
+        gui.setDirty(new, win);
+
+        if (args.onclick) |onclick|
+            gui.registerOnClick(new, onclick, win) catch return;
+        if (args.onscroll) |onscroll|
+            gui.regOnScroll(new, onscroll, win) catch return;
+        if (args.onpoll) |onpoll|
+            win.registerPoll(new, onpoll) catch return;
+    }
 
     pub fn getLastChild(self: *@This()) ?*iArea {
         return self.children.getLastOrNull();
@@ -144,44 +181,17 @@ pub const iArea = struct {
         self.is_dirty = true;
     }
 
-    pub fn addChildOpt(self: *@This(), gui: *Gui, win: *iWindow, vto: ?NewVt) void {
-        if (vto) |vt|
-            self.addChild(gui, win, vt);
-    }
-
-    pub fn addChild(self: *@This(), gui: *Gui, win: *iWindow, new: NewVt) void {
-        if (self._scissor_id != .none and new.vt._scissor_id != .none) {
-            log.err("Can't created nested scissors!", .{});
-            return;
-        }
-        if (self.children.items.len >= std.math.maxInt(u32)) return;
-
-        gui.register(new.vt, win);
-        if (new.onclick) |onclick|
-            gui.registerOnClick(new.vt, onclick, win) catch return;
-        if (new.onscroll) |onscroll|
-            gui.regOnScroll(new.vt, onscroll, win) catch return;
-        if (new.onpoll) |onpoll|
-            win.registerPoll(new.vt, onpoll) catch return;
-
-        // Propogate the scissor. Default is .none so no need to check
-        new.vt._scissor_id = self._scissor_id;
-
-        new.vt.parent = self;
-        new.vt.index = @intCast(self.children.items.len);
-        self.children.append(gui.alloc, new.vt) catch return;
-
-        gui.setDirty(new.vt, win);
-    }
-
     pub fn deinitEmpty(vt: *iArea, gui: *Gui, _: *iWindow) void {
         gui.alloc.destroy(vt);
     }
 
-    pub fn addEmpty(self: *@This(), gui: *Gui, win: *iWindow, area: Rect) *iArea {
+    pub fn addEmpty(self: *@This(), area: Rect) *iArea {
+        const gui = self.win_ptr.gui_ptr;
         const vt = gui.alloc.create(iArea) catch unreachable; //I'll allow this because it only happens on oom and we don't support recovery from that
-        vt.* = .{ .area = area, .deinit_fn = deinitEmpty };
-        self.addChild(gui, win, .{ .vt = vt });
+        self.addChild(vt, .{
+            .area = area,
+            .deinit_fn = deinitEmpty,
+        });
         return vt;
     }
 
@@ -220,10 +230,11 @@ pub const iWindow = struct {
 
     area: iArea,
     alloc: std.mem.Allocator,
+    gui_ptr: *Gui,
 
-    click_listeners: ArrayList(struct { *iArea, NewVt.OnClick }) = .{},
-    scroll_list: ArrayList(struct { *iArea, NewVt.Onscroll }) = .{},
-    poll_listeners: ArrayList(struct { ?*iArea, NewVt.Onpoll }) = .{},
+    click_listeners: ArrayList(struct { *iArea, iArea.OnClick }) = .{},
+    scroll_list: ArrayList(struct { *iArea, iArea.Onscroll }) = .{},
+    poll_listeners: ArrayList(struct { ?*iArea, iArea.Onpoll }) = .{},
 
     cache_map: std.AutoArrayHashMapUnmanaged(*iArea, void) = .{},
     to_draw: ArrayList(*iArea) = .{},
@@ -260,13 +271,21 @@ pub const iWindow = struct {
         }
     }
 
-    pub fn init(build_fn: BuildfnT, gui: *Gui, deinit_fn: *const fn (*iWindow, *Gui) void, args: InitArgs) iWindow {
-        return .{
+    /// Use as follows:
+    /// const mywin = alloc.create(MyWin);
+    /// mywin.* = .{.vt = .init(build, gui, deinit, .{}, &mywin.vt)};
+    ///
+    /// Returning the pointer.* is goofy, but it means we can avoid setting .vt = undefined
+    /// optimizer hopefully removes the copy
+    pub fn init(build_fn: BuildfnT, gui: *Gui, deinit_fn: *const fn (*iWindow, *Gui) void, args: InitArgs, reserved_memory: *iWindow) iWindow {
+        reserved_memory.* = .{
+            .gui_ptr = gui,
             .alloc = gui.alloc,
             .deinit_fn = deinit_fn,
             .build_fn = build_fn,
-            .area = .{ .deinit_fn = deinit_area, .area = args.area, .draw_fn = draw_area },
+            .area = .{ .deinit_fn = deinit_area, .area = args.area, .draw_fn = draw_area, .win_ptr = reserved_memory },
         };
+        return reserved_memory.*;
     }
 
     fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
@@ -353,7 +372,7 @@ pub const iWindow = struct {
         }
     }
 
-    pub fn registerPoll(win: *iWindow, vt: *iArea, onpoll: NewVt.Onpoll) !void {
+    pub fn registerPoll(win: *iWindow, vt: *iArea, onpoll: iArea.Onpoll) !void {
         try win.poll_listeners.append(win.alloc, .{ vt, onpoll });
     }
 
@@ -897,7 +916,7 @@ pub const Gui = struct {
         return null;
     }
 
-    pub fn registerOnClick(_: *Self, vt: *iArea, onclick: NewVt.OnClick, window: *iWindow) !void {
+    pub fn registerOnClick(_: *Self, vt: *iArea, onclick: iArea.OnClick, window: *iWindow) !void {
         try window.click_listeners.append(window.alloc, .{ vt, onclick });
     }
 
@@ -943,7 +962,7 @@ pub const Gui = struct {
         self.transient_should_close = true;
     }
 
-    pub fn regOnScroll(_: *Self, vt: *iArea, onscroll: NewVt.Onscroll, window: *iWindow) !void {
+    pub fn regOnScroll(_: *Self, vt: *iArea, onscroll: iArea.Onscroll, window: *iWindow) !void {
         try window.scroll_list.append(window.alloc, .{ vt, onscroll });
     }
 

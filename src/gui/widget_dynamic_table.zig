@@ -23,27 +23,29 @@ pub const DynamicTable = struct {
 
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, win: *iWindow, opts: Opts) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, win: *iWindow, opts: Opts) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         var ly = gui.dstate.vLayout(area);
-        const tab_area = ly.getArea() orelse return null;
+        const tab_area = ly.getArea() orelse return .failed;
 
-        const table_area = ly.getArea() orelse return null;
+        const table_area = ly.getArea() orelse return .failed;
 
         const self = gui.create(@This());
 
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .opts = opts,
         };
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw });
 
-        self.vt.addChild(gui, win, TableHeader.build(gui, tab_area, self));
+        _ = TableHeader.build(&self.vt, tab_area, self);
 
         ly.pushRemaining();
-        _ = self.vt.addEmpty(gui, win, table_area);
+        _ = self.vt.addEmpty(table_area);
         self.rebuild(gui, win);
 
-        return .{ .vt = &self.vt };
+        return .good;
     }
 
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {
@@ -96,14 +98,15 @@ const TableHeader = struct {
     parent: *DynamicTable,
     grab_index: ?usize = null,
 
-    pub fn build(gui: *Gui, area: Rect, parent: *DynamicTable) g.NewVt {
+    pub fn build(par: *iArea, area: Rect, parent: *DynamicTable) g.WgStatus {
+        const gui = par.win_ptr.gui_ptr;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .parent = parent,
         };
-
-        return .{ .vt = &self.vt, .onclick = onclick };
+        par.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
+        return .good;
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {

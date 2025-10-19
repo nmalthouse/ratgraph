@@ -44,35 +44,39 @@ pub const FloatScroll = struct {
 
     scroll_ptr: ?*FloatScrollBar = null,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, opts: Opts) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, opts: Opts) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
 
+        const split = area.split(.vertical, getAreaW(area.w, gui.dstate.scale));
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .opts = opts,
             .y = 0,
             .y_ptr = &self.y,
         };
 
-        const split = self.vt.area.split(.vertical, getAreaW(self.vt.area.w, gui.dstate.scale));
-        self.vt.area = split[0];
+        parent.addChild(
+            &self.vt,
+            .{ .area = split[0], .deinit_fn = deinit, .draw_fn = draw, .onscroll = onScroll },
+        );
 
-        if (FloatScrollBar.build(
-            gui,
+        switch (FloatScrollBar.build(
+            &self.vt,
             split[1],
             self.y_ptr,
-            area.h * 2, //Remeber to update this
+            area.h * 2,
             &self.cb,
             &notifyChange,
-        )) |sbar| {
-            self.vt.addChildOpt(gui, opts.win, sbar);
-            self.scroll_ptr = @alignCast(@fieldParentPtr("vt", sbar.vt));
-        } else {
-            _ = self.vt.addEmpty(gui, opts.win, split[1]);
+        )) {
+            .failed => {
+                _ = self.vt.addEmpty(split[1]);
+            },
+            .good => self.scroll_ptr = @alignCast(@fieldParentPtr("vt", self.vt.getLastChild() orelse return .failed)),
         }
 
-        const virt = self.vt.addEmpty(gui, opts.win, Rect{
+        const virt = self.vt.addEmpty(Rect{
             .x = self.vt.area.x,
             .y = self.vt.area.y,
             .w = if (opts.scroll_x) std.math.floatMax(f32) else self.vt.area.w,
@@ -82,7 +86,7 @@ pub const FloatScroll = struct {
         opts.win.registerScissor(virt, split[0]) catch {};
 
         self.rebuild(gui, opts.win);
-        return .{ .vt = &self.vt, .onscroll = onScroll };
+        return .good;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -208,19 +212,22 @@ pub const FloatScrollBar = struct {
     shuttle_h: f32 = 0,
     shuttle_pos: f32 = 0,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, y_ptr: *f32, area_h: f32, parent_vt: *CbHandle, notify_fn: NotifyFn) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, y_ptr: *f32, area_h: f32, parent_vt: *CbHandle, notify_fn: NotifyFn) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
 
         self.* = .{
             .parent_vt = parent_vt,
             .notify_fn = notify_fn,
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .y_ptr = y_ptr,
 
             .area_h = area_h,
         };
-        return .{ .vt = &self.vt, .onclick = onclick };
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
+        return .good;
     }
 
     pub fn updateVirtH(self: *@This(), new_h: f32) void {

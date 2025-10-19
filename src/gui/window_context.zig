@@ -57,7 +57,7 @@ pub const BtnContextWindow = struct {
 
         const rec = graph.Rec(pos.x, pos.y, max_w + item_h, item_h * @as(f32, @floatFromInt(opts.buttons.len)));
         self.* = .{
-            .vt = iWindow.init(build, gui, deinit, .{ .area = rec }),
+            .vt = iWindow.init(build, gui, deinit, .{ .area = rec }, &self.vt),
             .opts = opts,
         };
         try self.buttons.resize(gui.alloc, opts.buttons.len);
@@ -77,19 +77,19 @@ pub const BtnContextWindow = struct {
         var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
         for (self.buttons.items) |btn| {
             const ar = ly.getArea();
-            vt.area.addChildOpt(gui, vt, switch (btn[2]) {
-                .btn => Widget.Button.build(gui, ar, btn[1], .{
+            _ = switch (btn[2]) {
+                .btn => Widget.Button.build(&vt.area, ar, btn[1], .{
                     .cb_vt = &self.cbhandle,
                     .cb_fn = btn_wrap_cb,
                     .id = btn[0],
                 }),
-                .checkbox => |default| Widget.Checkbox.build(gui, ar, btn[1], .{
+                .checkbox => |default| Widget.Checkbox.build(&vt.area, ar, btn[1], .{
                     .cb_vt = &self.cbhandle,
                     .cb_fn = checkbox_wrap_cb,
                     .user_id = btn[0],
                     .style = .check,
                 }, default),
-            });
+            };
         }
     }
 
@@ -125,32 +125,4 @@ pub const BtnContextWindow = struct {
     }
 
     pub fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
-};
-
-pub const SubMenuExpander = struct {
-    vt: iArea,
-    text: []const u8,
-
-    pub fn build(gui: *Gui, area_o: ?Rect, text: []const u8) ?NewVt {
-        const area = area_o orelse return null;
-        const self = gui.create(@This());
-        self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
-            .text = gui.alloc.dupe(u8, text) catch return null,
-        };
-        return .{ .vt = &self.vt };
-    }
-
-    pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        gui.alloc.destroy(self);
-    }
-
-    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        //d.ctx.rect(vt.area, 0x5ffff0ff);
-        d.ctx.rect(vt.area, self.bg_col);
-        const texta = vt.area.inset(d.style.config.default_item_h / 10);
-        d.ctx.textClipped(texta, "{s}", .{self.text}, d.textP(null), .left);
-    }
 };

@@ -28,7 +28,7 @@ pub const MyGlView = struct {
         const self = gui.create(@This());
         self.* = .{
             .draw_ctx = draw_ctx,
-            .vt = iWindow.init(&@This().build, gui, &@This().deinit, .{}),
+            .vt = iWindow.init(&@This().build, gui, &@This().deinit, .{}, &self.vt),
         };
         self.vt.update_fn = update;
 
@@ -103,7 +103,7 @@ pub const MyInspector = struct {
     pub fn create(gui: *Gui) *iWindow {
         const self = gui.create(@This());
         self.* = .{
-            .vt = iWindow.init(build, gui, deinit, .{}),
+            .vt = iWindow.init(build, gui, deinit, .{}, &self.vt),
         };
 
         return &self.vt;
@@ -135,11 +135,11 @@ pub const MyInspector = struct {
         ly.padding.top = 10;
         const a = &self.vt.area;
 
-        a.addChildOpt(gui, vt, Wg.Checkbox.build(gui, ly.getArea(), "first button", .{
+        _ = Wg.Checkbox.build(a, ly.getArea(), "first button", .{
             .bool_ptr = &self.bool1,
-        }, null));
-        a.addChildOpt(gui, vt, Wg.Checkbox.build(gui, ly.getArea(), "secnd button", .{ .bool_ptr = &self.bool2 }, null));
-        a.addChildOpt(gui, vt, Wg.StaticSlider.build(gui, ly.getArea(), null, .{
+        }, null);
+        _ = Wg.Checkbox.build(a, ly.getArea(), "secnd button", .{ .bool_ptr = &self.bool2 }, null);
+        _ = Wg.StaticSlider.build(a, ly.getArea(), null, .{
             .default = 0,
             .min = -1000,
             .max = 1000,
@@ -148,24 +148,24 @@ pub const MyInspector = struct {
             .slide_cb = staticSliderCb,
             .commit_cb = staticSliderSet,
             .commit_vt = &self.cbhandle,
-        }));
-        a.addChildOpt(gui, vt, Wg.Combo.build(gui, ly.getArea() orelse return, &self.my_enum, .{}));
-        a.addChildOpt(gui, vt, Wg.Combo.build(gui, ly.getArea() orelse return, &self.fenum, .{}));
+        });
+        _ = Wg.Combo.build(a, ly.getArea() orelse return, &self.my_enum, .{});
+        _ = Wg.Combo.build(a, ly.getArea() orelse return, &self.fenum, .{});
 
-        a.addChildOpt(gui, vt, Wg.Button.build(gui, ly.getArea(), "My button", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = 48 }));
-        a.addChildOpt(gui, vt, Wg.Button.build(gui, ly.getArea(), "My button 2", .{}));
-        a.addChildOpt(gui, vt, Wg.Button.build(gui, ly.getArea(), "My button 3", .{}));
-        a.addChild(gui, vt, Wg.Colorpicker.build(gui, ly.getArea() orelse return, self.color, .{}));
+        _ = Wg.Button.build(a, ly.getArea(), "My button", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = 48 });
+        _ = Wg.Button.build(a, ly.getArea(), "My button 2", .{});
+        _ = Wg.Button.build(a, ly.getArea(), "My button 3", .{});
+        _ = Wg.Colorpicker.build(a, ly.getArea() orelse return, self.color, .{});
 
-        a.addChildOpt(gui, vt, Wg.Textbox.build(gui, ly.getArea()));
-        a.addChildOpt(gui, vt, Wg.Textbox.build(gui, ly.getArea()));
-        a.addChildOpt(gui, vt, Wg.TextboxNumber.build(gui, ly.getArea(), &self.number, vt, .{}));
-        a.addChildOpt(gui, vt, Wg.Slider.build(gui, ly.getArea(), &self.number, -10, 10, .{}));
-        a.addChildOpt(gui, vt, Wg.Slider.build(gui, ly.getArea(), &self.i32_n, -10, 10, .{}));
-        a.addChildOpt(gui, vt, Wg.Slider.build(gui, ly.getArea(), &self.i32_n, 0, 10, .{}));
+        _ = Wg.Textbox.build(a, ly.getArea());
+        _ = Wg.Textbox.build(a, ly.getArea());
+        _ = Wg.TextboxNumber.build(a, ly.getArea(), &self.number, .{});
+        _ = Wg.Slider.build(a, ly.getArea(), &self.number, -10, 10, .{});
+        _ = Wg.Slider.build(a, ly.getArea(), &self.i32_n, -10, 10, .{});
+        _ = Wg.Slider.build(a, ly.getArea(), &self.i32_n, 0, 10, .{});
 
         ly.pushRemaining();
-        a.addChildOpt(gui, vt, Wg.Tabs.build(gui, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle }));
+        _ = Wg.Tabs.build(a, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle });
     }
 
     fn staticSliderCb(cb: *CbHandle, gui: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
@@ -184,19 +184,19 @@ pub const MyInspector = struct {
         var ly = gui.dstate.vLayout(vt.area);
         ly.padding.top = 10;
         if (eql(u8, tab_name, "main")) {
-            vt.addChildOpt(gui, win, Wg.Textbox.build(gui, ly.getArea()));
-            vt.addChildOpt(gui, win, Wg.Textbox.build(gui, ly.getArea()));
+            _ = Wg.Textbox.build(vt, ly.getArea());
+            _ = Wg.Textbox.build(vt, ly.getArea());
 
             ly.pushRemaining();
 
-            vt.addChildOpt(gui, win, Wg.FloatScroll.build(gui, ly.getArea(), .{
+            _ = Wg.FloatScroll.build(vt, ly.getArea(), .{
                 .build_cb = &buildFloatScroll,
                 .build_vt = &self.cbhandle,
                 .win = win,
                 .scroll_mul = gui.dstate.style.config.default_item_h * 4,
                 .scroll_y = true,
                 .scroll_x = false,
-            }));
+            });
 
             //if (ly.getArea()) |ar| {
             //    const empty = vt.addEmpty(gui, win, ar.split(.horizontal, ar.h / 2)[0]);
@@ -213,38 +213,38 @@ pub const MyInspector = struct {
             return;
         }
         if (eql(u8, tab_name, "next")) {
-            vt.addChildOpt(gui, win, Wg.Slider.build(gui, ly.getArea(), &self.number, -10, 10, .{}));
-            vt.addChildOpt(gui, win, Wg.Slider.build(gui, ly.getArea(), &self.i32_n, -10, 10, .{}));
-            vt.addChildOpt(gui, win, Wg.Slider.build(gui, ly.getArea(), &self.i32_n, 0, 10, .{}));
+            _ = Wg.Slider.build(vt, ly.getArea(), &self.number, -10, 10, .{});
+            _ = Wg.Slider.build(vt, ly.getArea(), &self.i32_n, -10, 10, .{});
+            _ = Wg.Slider.build(vt, ly.getArea(), &self.i32_n, 0, 10, .{});
         }
         if (eql(u8, tab_name, "third")) {
             ly.pushRemaining();
-            vt.addChildOpt(gui, win, Wg.VScroll.build(gui, ly.getArea(), .{
+            _ = Wg.VScroll.build(vt, ly.getArea(), .{
                 .build_cb = &buildScrollItems,
                 .build_vt = &self.cbhandle,
                 .win = win,
                 .count = 10,
                 .item_h = gui.dstate.style.config.default_item_h,
-            }));
+            });
         }
     }
 
-    pub fn buildScrollItems(cb: *CbHandle, vt: *iArea, index: usize, gui: *Gui, window: *iWindow) void {
+    pub fn buildScrollItems(cb: *CbHandle, vt: *iArea, index: usize, gui: *Gui, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = gui.dstate.vLayout(vt.area);
         for (index..10) |i| {
-            vt.addChildOpt(gui, window, Wg.Text.build(gui, ly.getArea(), "item {d}", .{i}));
+            _ = Wg.Text.build(vt, ly.getArea(), "item {d}", .{i});
         }
         _ = self;
     }
 
-    pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, win: *iWindow, scr: *Wg.FloatScroll) void {
+    pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, _: *iWindow, scr: *Wg.FloatScroll) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = gui.dstate.vLayout(vt.area);
         _ = self;
         for (0..100) |i| {
             const ar = ly.getArea() orelse continue;
-            vt.addChildOpt(gui, win, Wg.Text.build(gui, ar, "item {d}", .{i}));
+            _ = Wg.Text.build(vt, ar, "item {d}", .{i});
         }
         scr.hintBounds(ly.getUsed());
     }

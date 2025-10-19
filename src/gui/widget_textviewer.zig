@@ -30,16 +30,18 @@ pub const TextView = struct {
     lines: std.ArrayList([]const u8), //slices into cat_string
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, text: []const []const u8, win: *iWindow, opts: Opts) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, text: []const []const u8, win: *iWindow, opts: Opts) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
 
         self.* = .{
-            .cat_string = catStrings(gui.alloc, text) catch return null,
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .cat_string = catStrings(gui.alloc, text) catch return .failed,
+            .vt = .UNINITILIZED,
             .lines = std.ArrayList([]const u8).init(gui.alloc),
             .opts = opts,
         };
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw });
 
         const inset = area.inset(INSET_AMOUNT * gui.dstate.scale);
 
@@ -47,10 +49,10 @@ pub const TextView = struct {
         const extra_margin = gui.dstate.style.config.text_h / 3;
         const tw = VScroll.getAreaW(inset.w - extra_margin, gui.dstate.scale);
         switch (opts.mode) {
-            .split_on_space => self.buildLinesSpaceSplit(gui.dstate.font, tw, gui.dstate.style.config.text_h, self.cat_string) catch return null,
-            .simple => self.buildLines(gui.dstate.font, tw, gui.dstate.style.config.text_h, self.cat_string) catch return null,
+            .split_on_space => self.buildLinesSpaceSplit(gui.dstate.font, tw, gui.dstate.style.config.text_h, self.cat_string) catch return .failed,
+            .simple => self.buildLines(gui.dstate.font, tw, gui.dstate.style.config.text_h, self.cat_string) catch return .failed,
         }
-        const vscr = VScroll.build(gui, inset, .{
+        return VScroll.build(&self.vt, inset, .{
             .build_vt = &self.cbhandle,
             .build_cb = &buildScroll,
             .win = win,
@@ -58,10 +60,7 @@ pub const TextView = struct {
             .count = self.lines.items.len,
             .index_ptr = null,
             .force_scroll = opts.force_scroll,
-        }) orelse return null;
-        self.vt.addChild(gui, win, vscr);
-
-        return .{ .vt = &self.vt };
+        });
     }
 
     pub fn addOwnedText(self: *@This(), owned: []const u8, gui: *Gui) !void {

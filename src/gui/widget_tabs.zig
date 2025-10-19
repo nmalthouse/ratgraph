@@ -29,35 +29,40 @@ pub const Tabs = struct {
     __selected_tab_index: usize = 0,
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, tabs: []const Tab, win: *iWindow, opts: Opts) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, tabs: []const Tab, win: *iWindow, opts: Opts) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         if (tabs.len == 0)
-            return null;
+            return .failed;
         var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
-        const tab_area = ly.getArea() orelse return null;
+        const tab_area = ly.getArea() orelse return .failed;
         ly.pushRemaining();
-        const child_area = ly.getArea() orelse return null;
+        const child_area = ly.getArea() orelse return .failed;
 
         const self = gui.create(@This());
 
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .tabs = std.ArrayList(Tab).init(gui.alloc),
             .opts = opts,
         };
+        parent.addChild(
+            &self.vt,
+            .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+        );
         if (opts.index_ptr == null)
             self.opts.index_ptr = &self.__selected_tab_index;
         self.tabs.appendSlice(tabs) catch {
             self.tabs.deinit();
             gui.alloc.destroy(self);
-            return null;
+            return .failed;
         };
 
-        self.vt.addChild(gui, win, TabHeader.build(gui, tab_area, self));
-        _ = self.vt.addEmpty(gui, win, child_area);
+        _ = TabHeader.build(&self.vt, tab_area, self);
+        _ = self.vt.addEmpty(child_area);
         self.rebuild(gui, win);
 
-        return .{ .vt = &self.vt };
+        return .good;
     }
 
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {
@@ -88,14 +93,16 @@ const TabHeader = struct {
 
     parent: *Tabs,
 
-    pub fn build(gui: *Gui, area: Rect, parent: *Tabs) g.NewVt {
+    pub fn build(pa: *iArea, area: Rect, parent: *Tabs) g.WgStatus {
+        const gui = pa.win_ptr.gui_ptr;
+
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .parent = parent,
         };
-
-        return .{ .vt = &self.vt, .onclick = onclick };
+        pa.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
+        return .good;
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {

@@ -14,7 +14,7 @@ const CbHandle = g.CbHandle;
 pub const ComboOpts = struct {};
 
 pub const Combo = struct {
-    pub fn build(gui: *Gui, area_o: ?Rect, enum_ptr: anytype, opts: ComboOpts) ?g.NewVt {
+    pub fn build(parent: *iArea, area_o: ?Rect, enum_ptr: anytype, opts: ComboOpts) g.WgStatus {
         const info = @typeInfo(@TypeOf(enum_ptr));
         if (info != .pointer) @compileError("expected a pointer to enum");
         if (info.pointer.is_const or info.pointer.size != .one) @compileError("invalid pointer");
@@ -22,8 +22,8 @@ pub const Combo = struct {
         if (child_info != .@"enum") @compileError("Expected an enum");
 
         const Gen = ComboGeneric(info.pointer.child);
-        const area = area_o orelse return null;
-        return Gen.build(gui, area, enum_ptr, opts);
+        const area = area_o orelse return .failed;
+        return Gen.build(parent, area, enum_ptr, opts);
     }
 };
 
@@ -66,29 +66,24 @@ pub fn ComboUser(user_data: type) type {
                 vt.area.dirty(gui);
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = gui.dstate.vLayout(area.inset(gui.dstate.scale));
-                vt.area.addChildOpt(
-                    gui,
-                    vt,
-                    Widget.Textbox.buildOpts(gui, ly.getArea(), .{
-                        .commit_cb = &textbox_cb,
-                        .commit_vt = &self.cbhandle,
-                        .commit_when = .on_change,
-                    }),
-                );
+                _ = Widget.Textbox.buildOpts(vt.area, ly.getArea(), .{
+                    .commit_cb = &textbox_cb,
+                    .commit_vt = &self.cbhandle,
+                    .commit_when = .on_change,
+                });
                 if (vt.area.children.items.len > 0) {
                     gui.grabFocus(vt.area.children.items[0], vt);
                 }
                 ly.pushRemaining();
-                const vscroll = VScroll.build(gui, ly.getArea(), .{
+                if (VScroll.build(vt.area, ly.getArea(), .{
                     .build_cb = &build_scroll_cb,
                     .build_vt = &self.cbhandle,
                     .win = vt,
                     .item_h = gui.dstate.style.config.default_item_h,
                     .count = p.opts.count,
                     .index_ptr = &p.index,
-                }) orelse return;
-                vt.area.addChild(gui, vt, vscroll);
-                self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vscroll.vt));
+                }) != .good) return;
+                self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vt.area.getLastChild()));
             }
 
             pub fn textbox_cb(pop_vt: *CbHandle, gui: *Gui, str: []const u8, _: usize) void {
@@ -164,14 +159,16 @@ pub fn ComboUser(user_data: type) type {
         current: usize = 0,
         user: user_data,
 
-        pub fn build(gui: *Gui, area: Rect, opts: ComboVt, user: user_data) g.NewVt {
+        pub fn build(parent: *iArea, area: Rect, opts: ComboVt, user: user_data) g.WgStatus {
+            const gui = parent.win_ptr.gui_ptr;
             const self = gui.create(@This());
             self.* = .{
-                .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+                .vt = .UNINITILIZED,
                 .opts = opts,
                 .user = user,
             };
-            return .{ .vt = &self.vt, .onclick = onclick };
+            parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
+            return .good;
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -247,28 +244,29 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 vt.area.clearChildren(gui, vt);
                 const info = @typeInfo(enumT);
                 vt.area.dirty(gui);
-                vt.area.addChildOpt(gui, vt, VScroll.build(gui, area, .{
+                _ = VScroll.build(&vt.area, area, .{
                     .build_cb = &build_cb,
                     .build_vt = &self.cbhandle,
                     .win = vt,
                     .count = info.@"enum".fields.len,
                     .item_h = gui.dstate.style.config.default_item_h,
-                }));
+                });
             }
 
             pub fn build_cb(cb: *CbHandle, area: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
+                _ = win;
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = gui.dstate.vLayout(area.area);
                 const info = @typeInfo(enumT);
                 inline for (info.@"enum".fields, 0..) |field, i| {
                     if (i >= index) {
-                        area.addChild(gui, win, Widget.Button.build(
-                            gui,
+                        _ = Widget.Button.build(
+                            area,
                             ly.getArea(),
                             field.name,
                             .{ .cb_vt = &p.cbhandle, .cb_fn = &ParentT.buttonCb, .id = field.value },
-                        ) orelse return);
+                        );
                     }
                 }
             }
@@ -296,14 +294,16 @@ pub fn ComboGeneric(comptime enumT: type) type {
         enum_ptr: *enumT,
         opts: ComboOpts,
 
-        pub fn build(gui: *Gui, area: Rect, enum_ptr: *enumT, opts: ComboOpts) g.NewVt {
+        pub fn build(parent: *iArea, area: Rect, enum_ptr: *enumT, opts: ComboOpts) g.WgStatus {
+            const gui = parent.win_ptr.gui_ptr;
             const self = gui.create(@This());
             self.* = .{
-                .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+                .vt = .UNINITILIZED,
                 .enum_ptr = enum_ptr,
                 .opts = opts,
             };
-            return .{ .vt = &self.vt, .onclick = onclick };
+            parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
+            return .good;
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -350,6 +350,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                     gui,
                     &PoppedWindow.deinit,
                     .{ .area = area },
+                    &popped.vt,
                 ),
                 .name = "noname",
             };

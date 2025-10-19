@@ -14,6 +14,7 @@ const graph = g.graph;
 const getVt = g.getVt;
 const CbHandle = g.CbHandle;
 const NewVt = g.NewVt;
+const WgStatus = g.WgStatus;
 
 // Write a widget that is a static text box.
 // Works like a tabs or whatever which holds all the alloc for string, so scrolling doesn't realloc
@@ -42,17 +43,25 @@ pub const VScroll = struct {
     sc_count: usize = 0,
     has_scroll: bool = false,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, opts: Opts) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, opts: Opts) WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+
+        const area = area_o orelse return .failed;
+        const needs_scroll = opts.force_scroll or opts.item_h * @as(f32, @floatFromInt(opts.count)) > area.h;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .opts = opts,
             .index_ptr = opts.index_ptr orelse &self.__index,
             .sc_count = opts.count,
         };
+        parent.addChild(&self.vt, .{
+            .area = area,
+            .deinit_fn = deinit,
+            .draw_fn = draw,
+            .onscroll = if (needs_scroll) onScroll else null,
+        });
 
-        const needs_scroll = opts.force_scroll or opts.item_h * @as(f32, @floatFromInt(opts.count)) > area.h;
         if (self.index_ptr.* >= self.opts.count) {
             self.index_ptr.* = if (self.opts.count > 0) self.opts.count - 1 else 0;
         }
@@ -61,8 +70,7 @@ pub const VScroll = struct {
         //self.sc_count = opts.count - self.getFitted();
 
         const split = self.vt.area.split(.vertical, if (needs_scroll) getAreaW(self.vt.area.w, gui.dstate.scale) else self.vt.area.w);
-        var onscroll: ?g.NewVt.Onscroll = null;
-        _ = self.vt.addEmpty(gui, opts.win, split[0]);
+        _ = self.vt.addEmpty(split[0]);
         if (needs_scroll) {
             if (opts.current_index) |ci| {
                 if (ci < self.index_ptr.*) {
@@ -72,23 +80,14 @@ pub const VScroll = struct {
                 }
             }
             self.has_scroll = true;
-            onscroll = onScroll;
-            self.vt.addChildOpt(gui, opts.win, ScrollBar.build(
-                gui,
-                split[1],
-                self.index_ptr,
-                self.sc_count,
-                opts.item_h,
-                &self.vt,
-                &notifyChange,
-            ));
+            _ = ScrollBar.build(&self.vt, split[1], self.index_ptr, self.sc_count, opts.item_h, &self.vt, &notifyChange);
         } else {
             self.index_ptr.* = 0;
-            _ = self.vt.addEmpty(gui, opts.win, split[1]);
+            _ = self.vt.addEmpty(split[1]);
         }
 
         self.rebuild(gui, opts.win);
-        return .{ .vt = &self.vt, .onscroll = onscroll };
+        return .good;
     }
 
     pub fn getAreaW(parent_w: f32, scale: f32) f32 {
@@ -193,27 +192,31 @@ pub const Checkbox = struct {
     opts: Opts,
     name: []const u8,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, name: []const u8, opts: Opts, set: ?bool) ?NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, name: []const u8, opts: Opts, set: ?bool) WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit },
+            .vt = .UNINITILIZED,
             .opts = opts,
             .bool_ptr = opts.bool_ptr orelse &self.__bool,
             .name = name,
         };
-        self.__bool = set orelse self.__bool;
-        self.vt.can_tab_focus = true;
-        self.vt.focus_ev_fn = &fevent;
-        self.vt.draw_fn = switch (opts.style) {
-            .ableton => draw,
-            .check => drawCheck,
-            .dropdown => drawDropdown,
-        };
-        return .{
-            .vt = &self.vt,
+        parent.addChild(&self.vt, .{
+            .area = area,
+            .deinit_fn = deinit,
+            .can_tab_focus = true,
+            .focus_ev_fn = fevent,
             .onclick = onclick,
-        };
+            .draw_fn = switch (opts.style) {
+                .ableton => draw,
+                .check => drawCheck,
+                .dropdown => drawDropdown,
+            },
+        });
+
+        self.__bool = set orelse self.__bool;
+        return .good;
     }
 
     pub fn getWidth(gui: *const Gui, name: []const u8, opts: Opts) f32 {
@@ -335,16 +338,20 @@ pub const Button = struct {
     is_down: bool = false,
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, name: []const u8, opts: Opts) ?NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, name: []const u8, opts: Opts) WgStatus {
+        const area = area_o orelse return .failed;
+        const gui = parent.win_ptr.gui_ptr;
+
+        const text = gui.alloc.dupe(u8, name) catch return .failed;
         const self = gui.create(@This());
-        self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = opts.custom_draw orelse draw, .focus_ev_fn = fevent },
-            .text = gui.alloc.dupe(u8, name) catch return null,
-            .opts = opts,
-        };
-        return .{ .vt = &self.vt, .onclick = onclick };
+        self.* = .{ .vt = .UNINITILIZED, .text = text, .opts = opts };
+        parent.addChild(
+            &self.vt,
+            .{ .area = area, .deinit_fn = deinit, .draw_fn = opts.custom_draw orelse draw, .focus_ev_fn = fevent, .onclick = onclick },
+        );
+        return .good;
     }
+
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         gui.alloc.free(self.text);
@@ -442,14 +449,15 @@ pub const ScrollBar = struct {
     item_h: f32,
     usable_h: f32,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, index_ptr: *usize, count: usize, item_h: f32, parent_vt: *iArea, notify_fn: NotifyFn) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, index_ptr: *usize, count: usize, item_h: f32, parent_vt: *iArea, notify_fn: NotifyFn) WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
 
         self.* = .{
             .parent_vt = parent_vt,
             .notify_fn = notify_fn,
-            .vt = .{ .area = area, .draw_fn = draw, .deinit_fn = deinit },
+            .vt = .UNINITILIZED,
             .index_ptr = index_ptr,
             .count = count,
             .usable_h = @trunc(area.h / item_h) * item_h,
@@ -457,7 +465,8 @@ pub const ScrollBar = struct {
             .shuttle_h = calculateShuttleW(count, item_h, self.usable_h, shuttle_min_w),
             .shuttle_pos = calculateShuttlePos(index_ptr.*, count, self.usable_h, self.shuttle_h),
         };
-        return .{ .vt = &self.vt, .onclick = onclick };
+        parent.addChild(&self.vt, .{ .area = area, .draw_fn = draw, .deinit_fn = deinit, .onclick = onclick });
+        return .good;
     }
 
     pub fn updateCount(self: *@This(), new_count: usize) void {
@@ -557,35 +566,44 @@ pub const Text = struct {
     bg_col: u32,
 
     /// The passed in string is not copied or freed.
-    pub fn buildStatic(gui: *Gui, area_o: ?Rect, owned_string: []const u8, bg_col: ?u32) ?NewVt {
-        const area = area_o orelse return null;
+    pub fn buildStatic(parent: *iArea, area_o: ?Rect, owned_string: []const u8, bg_col: ?u32) WgStatus {
+        const area = area_o orelse return .failed;
+        const gui = parent.win_ptr.gui_ptr;
+
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .is_alloced = false,
             .bg_col = bg_col orelse gui.dstate.nstyle.color.bg,
             .text = owned_string,
         };
-        return .{ .vt = &self.vt };
+        parent.addChild(
+            &self.vt,
+            .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+        );
+        return .good;
     }
 
-    pub fn build(gui: *Gui, area_o: ?Rect, comptime fmt: []const u8, args: anytype) ?NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, comptime fmt: []const u8, args: anytype) WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+
+        const area = area_o orelse return .failed;
+        var vec = std.ArrayList(u8).initCapacity(gui.alloc, 30) catch return .failed;
         const self = gui.create(@This());
-        var vec = std.ArrayList(u8).initCapacity(gui.alloc, 30) catch return null;
         vec.writer().print(fmt, args) catch {
             vec.deinit();
             gui.alloc.destroy(self);
-            return null;
+            return .failed;
         };
 
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .bg_col = gui.dstate.nstyle.color.bg,
             .is_alloced = true,
-            .text = vec.toOwnedSlice() catch return null,
+            .text = vec.toOwnedSlice() catch return .failed,
         };
-        return .{ .vt = &self.vt };
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw });
+        return .good;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -611,15 +629,17 @@ pub const NumberDisplay = struct {
     last_drawn: usize = 0,
     bg_col: u32,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, number_ptr: *usize) ?NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, number_ptr: *usize) WgStatus {
+        const area = area_o orelse return .failed;
+        const gui = parent.win_ptr.gui_ptr;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .bg_col = gui.dstate.nstyle.color.bg,
             .num_ptr = number_ptr,
         };
-        return .{ .vt = &self.vt, .onpoll = pollNumber };
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onpoll = pollNumber });
+        return .good;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {

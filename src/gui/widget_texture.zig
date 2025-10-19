@@ -24,17 +24,19 @@ pub const GLTexture = struct {
     tex: graph.Texture,
     opts: Opts,
 
-    pub fn build(gui: *Gui, area_o: ?Rect, tex: graph.Texture, uv: Rect, opts: Opts) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, tex: graph.Texture, uv: Rect, opts: Opts) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
 
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .uv = uv,
             .tex = tex,
             .opts = opts,
         };
-        return .{ .vt = &self.vt, .onclick = onclick };
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
+        return .good;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {

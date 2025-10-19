@@ -10,6 +10,7 @@ const Color = graph.Colori;
 const VScroll = g.Widget.VScroll;
 const Widget = g.Widget;
 const CbHandle = g.CbHandle;
+const WgStatus = g.WgStatus;
 
 pub const Colorpicker = struct {
     const CommitCb = *const fn (*CbHandle, *Gui, color: u32, user_id: usize) void;
@@ -25,15 +26,17 @@ pub const Colorpicker = struct {
 
     color_hsv: graph.Hsva,
 
-    pub fn build(gui: *Gui, area: Rect, color: u32, opts: Opts) g.NewVt {
+    pub fn build(parent: *iArea, area: Rect, color: u32, opts: Opts) WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .opts = opts,
             .color = color,
             .color_hsv = graph.ptypes.Hsva.fromInt(color),
         };
-        return .{ .vt = &self.vt, .onclick = onclick };
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
+        return .good;
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
@@ -69,6 +72,7 @@ pub const Colorpicker = struct {
                 gui,
                 &ColorpickerTransient.deinit,
                 .{ .area = area },
+                &tr.vt,
             ),
             .parent_ptr = self,
         };
@@ -100,51 +104,51 @@ const ColorpickerTransient = struct {
         const pad = gui.dstate.scale * 5;
         const slider_w = 40 * gui.dstate.scale;
         const sv_area = Rec(ar.x, ar.y, ar.w - (slider_w + pad) * 1, ar.h);
-        const sv = win.area.addEmpty(gui, win, sv_area);
-        sv.addChild(gui, win, WarpArea.build(
-            gui,
+        const sv = win.area.addEmpty(sv_area);
+        _ = WarpArea.build(
+            sv,
             sv_area,
             &self.sv_handle.x,
             &self.sv_handle.y,
             &self.cbhandle,
             &warpNotify,
             .{ .x = 10, .y = 10 },
-        ));
+        );
         const color = self.parent_ptr.color_hsv;
         self.sv_handle.x = color.s * sv_area.w;
         self.sv_handle.y = (1.0 - color.v) * sv_area.h;
 
         const h_area = Rec(sv_area.x + sv_area.w + pad, ar.y, slider_w, ar.h);
-        const hue = win.area.addEmpty(gui, win, h_area);
+        const hue = win.area.addEmpty(h_area);
 
         self.hue_handle = color.h / 360.0 * h_area.h;
 
-        hue.addChild(gui, win, WarpArea.build(
-            gui,
+        _ = WarpArea.build(
+            hue,
             h_area,
             null,
             &self.hue_handle,
             &self.cbhandle,
             &warpNotify,
             .{ .x = h_area.w, .y = 10 },
-        ));
+        );
 
         var vy = gui.dstate.vLayout(ly.getArea() orelse return);
 
-        a.addChildOpt(gui, win, Widget.Button.build(
-            gui,
+        _ = Widget.Button.build(
+            a,
             vy.getArea(),
             "Done",
             .{ .cb_vt = &self.cbhandle, .cb_fn = &closeBtnCb, .id = 0 },
-        ));
+        );
 
         const Help = struct {
-            fn valueGroup(cb: *CbHandle, a1: anytype, gui1: *Gui, win1: *iWindow, layout: anytype, ptr: *f32, name: []const u8, min: f32, max: f32, nudge: f32) void {
+            fn valueGroup(cb: *CbHandle, a1: anytype, layout: anytype, ptr: *f32, name: []const u8, min: f32, max: f32, nudge: f32) void {
                 const hue_s = layout.getArea() orelse return;
                 var vy2 = g.HorizLayout{ .count = 2, .bounds = hue_s };
-                a1.addChildOpt(gui1, win1, Widget.Text.build(gui1, vy2.getArea(), "{s}", .{name}));
+                _ = Widget.Text.build(a1, vy2.getArea(), "{s}", .{name});
 
-                a1.addChildOpt(gui1, win1, Widget.StaticSlider.build(gui1, vy2.getArea(), ptr, .{
+                _ = Widget.StaticSlider.build(a1, vy2.getArea(), ptr, .{
                     .display_bounds_while_editing = false,
                     .clamp_edits = true,
                     .default = max,
@@ -154,19 +158,19 @@ const ColorpickerTransient = struct {
                     .commit_cb = ssliderCbCommit,
                     .slide_cb = ssliderCb,
                     .commit_vt = cb,
-                }));
+                });
             }
         };
 
-        Help.valueGroup(&self.cbhandle, a, gui, win, &vy, &self.parent_ptr.color_hsv.h, "Hue", 0, 360, 5);
-        Help.valueGroup(&self.cbhandle, a, gui, win, &vy, &self.parent_ptr.color_hsv.s, "Saturation", 0, 1, 0.02);
-        Help.valueGroup(&self.cbhandle, a, gui, win, &vy, &self.parent_ptr.color_hsv.v, "Value", 0, 1, 0.02);
-        Help.valueGroup(&self.cbhandle, a, gui, win, &vy, &self.parent_ptr.color_hsv.a, "Alpha", 0, 1, 0.02);
+        Help.valueGroup(&self.cbhandle, a, &vy, &self.parent_ptr.color_hsv.h, "Hue", 0, 360, 5);
+        Help.valueGroup(&self.cbhandle, a, &vy, &self.parent_ptr.color_hsv.s, "Saturation", 0, 1, 0.02);
+        Help.valueGroup(&self.cbhandle, a, &vy, &self.parent_ptr.color_hsv.v, "Value", 0, 1, 0.02);
+        Help.valueGroup(&self.cbhandle, a, &vy, &self.parent_ptr.color_hsv.a, "Alpha", 0, 1, 0.02);
 
-        a.addChildOpt(gui, win, Widget.Textbox.buildOpts(gui, vy.getArea(), .{
+        _ = Widget.Textbox.buildOpts(a, vy.getArea(), .{
             .commit_cb = &pastedTextboxCb,
             .commit_vt = &self.cbhandle,
-        }));
+        });
     }
 
     pub fn pastedTextboxCb(cb: *CbHandle, gui: *Gui, slice: []const u8, _: usize) void {
@@ -278,17 +282,20 @@ const WarpArea = struct {
 
     handle_dim: graph.Vec2f,
 
-    pub fn build(gui: *Gui, area: Rect, x: ?*f32, y: ?*f32, warp_notify_vt: *CbHandle, warp_notify_fn: WarpNotifyFn, handle_dim: graph.Vec2f) g.NewVt {
+    pub fn build(parent: *iArea, area: Rect, x: ?*f32, y: ?*f32, warp_notify_vt: *CbHandle, warp_notify_fn: WarpNotifyFn, handle_dim: graph.Vec2f) WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw },
+            .vt = .UNINITILIZED,
             .xptr = x,
             .yptr = y,
             .notify_vt = warp_notify_vt,
             .notify_fn = warp_notify_fn,
             .handle_dim = handle_dim,
         };
-        return .{ .vt = &self.vt, .onclick = onclick };
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
+        return .good;
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {

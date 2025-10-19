@@ -14,19 +14,16 @@ const Widget = g.Widget;
 pub const Template = struct {
     vt: iArea,
 
-    // Widget build functions are not part of the vtable and thus can have any arguments. They must return a ?*iArea or *iArea.
-    // having the area:?Rect be optional and then returning a ? removes excessive boiler plate "orelse return" when layouting.
-    // if an error occurs in build, free any resources and return null.
-    pub fn build(gui: *Gui, area_o: ?Rect) ?*iArea {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
 
         self.* = .{
-            .vt = iArea.init(gui, area),
+            .vt = .UNINITILIZED,
         };
-        self.vt.draw_fn = &draw;
-        self.vt.deinit_fn = &deinit; //we must free our memory !
-        return &self.vt;
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw });
+        return .good;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {

@@ -76,21 +76,31 @@ pub const StaticSlider = struct {
     buf: [32]u8 = undefined,
     fbs: std.io.FixedBufferStream([]u8),
 
-    pub fn build(gui: *Gui, area_o: ?Rect, number: ?*f32, opts: StaticSliderOpts) ?NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, number: ?*f32, opts: StaticSliderOpts) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focus_ev_fn = fevent },
+            .vt = .UNINITILIZED,
             .opts = opts,
             ._num = opts.default,
             .num = number orelse &self._num,
             .state = .display,
             .fbs = .{ .buffer = &self.buf, .pos = 0 },
         };
+        parent.addChild(&self.vt, .{
+            .area = area,
+            .deinit_fn = deinit,
+            .draw_fn = draw,
+            .focus_ev_fn = fevent,
+
+            .onclick = onclick,
+            .onscroll = scroll,
+        });
         if (opts.max == opts.min) {
             std.debug.print("Static slider has invalid max min \n", .{});
         }
-        return .{ .vt = &self.vt, .onclick = onclick, .onscroll = scroll };
+        return .good;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {

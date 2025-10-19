@@ -33,9 +33,9 @@ fn numberTypeFromPtr(comptime T: type) type {
 }
 
 pub const Slider = struct {
-    pub fn build(gui: *Gui, area_o: ?Rect, ptr: anytype, min: anytype, max: anytype, opts: SliderOptions) ?g.NewVt {
+    pub fn build(parent: *iArea, area_o: ?Rect, ptr: anytype, min: anytype, max: anytype, opts: SliderOptions) g.WgStatus {
         const Gen = SliderGeneric(numberTypeFromPtr(@TypeOf(ptr)));
-        return Gen.build(gui, area_o, ptr, min, max, opts);
+        return Gen.build(parent, area_o, ptr, min, max, opts);
     }
 };
 
@@ -56,13 +56,14 @@ pub fn SliderGeneric(comptime number_T: type) type {
         nudge_dist: f32,
         opts: SliderOptions,
 
-        pub fn build(gui: *Gui, area_o: ?Rect, ptr: *number_T, min: anytype, max: anytype, opts: SliderOptions) ?g.NewVt {
-            const area = area_o orelse return null;
-            if (min >= max) return null;
+        pub fn build(parent: *iArea, area_o: ?Rect, ptr: *number_T, min: anytype, max: anytype, opts: SliderOptions) g.WgStatus {
+            const gui = parent.win_ptr.gui_ptr;
+            const area = area_o orelse return .failed;
+            if (min >= max) return .failed;
             const self = gui.create(@This());
 
             self.* = .{
-                .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focus_ev_fn = fevent },
+                .vt = .UNINITILIZED,
                 .ptr = ptr,
                 .shuttle_rect = Rec(0, 0, 16 * gui.dstate.scale, area.h),
                 .min = std.math.lossyCast(number_T, min),
@@ -70,9 +71,17 @@ pub fn SliderGeneric(comptime number_T: type) type {
                 .nudge_dist = opts.nudge,
                 .opts = opts,
             };
-            self.vt.can_tab_focus = true;
+            parent.addChild(&self.vt, .{
+                .area = area,
+                .deinit_fn = deinit,
+                .draw_fn = draw,
+                .focus_ev_fn = fevent,
+
+                .can_tab_focus = true,
+                .onclick = onclick,
+            });
             self.shuttle_rect.x = self.valueToShuttlePos();
-            return .{ .vt = &self.vt, .onclick = onclick };
+            return .good;
         }
 
         pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {

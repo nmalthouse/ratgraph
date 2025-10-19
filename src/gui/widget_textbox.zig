@@ -39,14 +39,16 @@ pub fn NumberDummy(comptime T: type) type {
         __value: T,
         ptr: *T,
 
-        pub fn build(gui: *Gui, area: Rect, number: ?*T, default: T) g.NewVt {
+        pub fn build(parent: *iArea, area: Rect, number: ?*T, default: T) g.WgStatus {
+            const gui = parent.win_ptr.gui_ptr;
             const self = gui.create(@This());
             self.* = .{
                 .__value = default,
                 .ptr = number orelse &self.__value,
-                .vt = .{ .area = area, .deinit_fn = deinit },
+                .vt = .UNINITILIZED,
             };
-            return .{ .vt = &self.vt };
+            parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit });
+            return .good;
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
@@ -70,8 +72,8 @@ pub fn NumberDummy(comptime T: type) type {
 }
 
 pub const TextboxNumber = struct {
-    pub fn build(gui: *Gui, area_o: ?Rect, number: anytype, win: *iWindow, opts: TextboxOptions) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn build(parent: *iArea, area_o: ?Rect, number: anytype, opts: TextboxOptions) g.WgStatus {
+        const area = area_o orelse return .failed;
         //const invalid_type_error = "wrong type for textbox number!";
         const pinfo = @typeInfo(@TypeOf(number));
         const is_pointer = (pinfo == .pointer);
@@ -80,18 +82,17 @@ pub const TextboxNumber = struct {
 
         var opt = opts;
         opt.restricted_charset = charsetForNum(number_type);
-        const dummy = ND.build(gui, area, if (is_pointer) number else null, if (is_pointer) 0 else number);
-        dummy.vt.addChild(gui, win, Textbox.buildNumber(
-            gui,
+        _ = ND.build(parent, area, if (is_pointer) number else null, if (is_pointer) 0 else number);
+        const dummy = parent.getLastChild() orelse return .good;
+        return Textbox.buildNumber(
+            dummy,
             area,
-            dummy.vt,
+            dummy,
             &ND.printTo,
             &ND.parseFrom,
 
             opt,
-        ) orelse return dummy);
-
-        return dummy;
+        );
     }
 };
 
@@ -234,38 +235,41 @@ pub const Textbox = struct {
     //    return Self{ .codepoints = std.ArrayList(u8).init(alloc), .head = 0, .tail = 0 };
     //}
 
-    pub fn build(gui: *Gui, area_o: ?Rect) ?g.NewVt {
-        return buildOpts(gui, area_o, .{});
+    pub fn build(parent: *iArea, area_o: ?Rect) g.WgStatus {
+        return buildOpts(parent, area_o, .{});
     }
 
-    pub fn buildOpts(gui: *Gui, area_o: ?Rect, opts: TextboxOptions) ?g.NewVt {
-        const area = area_o orelse return null;
+    pub fn buildOpts(parent: *iArea, area_o: ?Rect, opts: TextboxOptions) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+        const area = area_o orelse return .failed;
         const self = gui.create(@This());
         self.* = .{
-            .vt = .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focus_ev_fn = fevent },
+            .vt = .UNINITILIZED,
             .codepoints = std.ArrayList(u8).init(gui.alloc),
             .opts = opts,
             .head = 0,
             .tail = 0,
         };
-        self.codepoints.appendSlice(opts.init_string) catch return null;
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focus_ev_fn = fevent, .can_tab_focus = true, .onclick = onclick });
+        self.codepoints.appendSlice(opts.init_string) catch return .good;
         self.move_to(.end);
-        self.vt.can_tab_focus = true;
-        return .{ .vt = &self.vt, .onclick = onclick };
+        return .good;
     }
 
-    pub fn buildNumber(gui: *Gui, area: Rect, num_vt: *iArea, num_print: NumberPrintFn, num_parse: NumberParseFn, opts: TextboxOptions) ?g.NewVt {
-        const newvt = buildOpts(gui, area, opts) orelse return null;
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", newvt.vt));
-        newvt.vt.dirty(gui);
-        self.reset("") catch return newvt;
+    pub fn buildNumber(parent: *iArea, area: Rect, num_vt: *iArea, num_print: NumberPrintFn, num_parse: NumberParseFn, opts: TextboxOptions) g.WgStatus {
+        const gui = parent.win_ptr.gui_ptr;
+
+        if (buildOpts(parent, area, opts) != .good) return .failed;
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", parent.getLastChild() orelse return .failed));
+        self.vt.dirty(gui);
+        self.reset("") catch return .good;
         num_print(num_vt, &self.codepoints);
         self.number = .{
             .print_cb = num_print,
             .parse_cb = num_parse,
             .vt = num_vt,
         };
-        return newvt;
+        return .good;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
