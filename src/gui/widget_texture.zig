@@ -53,7 +53,7 @@ pub const GLTexture = struct {
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
 
-        vt.dirty(cb.gui);
+        vt.dirty();
         if (self.opts.cb_fn) |cbfn|
             cbfn(self.opts.cb_vt orelse return, self.opts.id, cb, win);
     }

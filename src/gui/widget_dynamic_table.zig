@@ -51,7 +51,7 @@ pub const DynamicTable = struct {
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {
         if (self.vt.children.items.len != 2)
             return;
-        self.vt.dirty(gui);
+        self.vt.dirty();
         const child = self.vt.children.items[1];
         child.clearChildren(gui, win);
 
@@ -139,7 +139,7 @@ const TableHeader = struct {
         const new = std.math.clamp(manip + delta_perc, min_perc, max_perc);
         cpos[ind] = new;
         self.parent.rebuild(cb.gui, win);
-        vt.dirty(cb.gui); //TODO fix the dirty setting stuff
+        vt.dirty(); //TODO fix the dirty setting stuff
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
