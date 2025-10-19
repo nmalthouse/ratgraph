@@ -20,7 +20,7 @@ const WgStatus = g.WgStatus;
 // Works like a tabs or whatever which holds all the alloc for string, so scrolling doesn't realloc
 
 pub const VScroll = struct {
-    pub const BuildCb = *const fn (*CbHandle, current_area: *iArea, index: usize, *Gui, *iWindow) void;
+    pub const BuildCb = *const fn (*CbHandle, current_area: *iArea, index: usize) void;
     pub const Opts = struct {
         build_cb: BuildCb,
         build_vt: *CbHandle,
@@ -135,7 +135,7 @@ pub const VScroll = struct {
         const child = self.vt.children.items[0];
         child.clearChildren(gui, win);
 
-        self.opts.build_cb(self.opts.build_vt, child, self.index_ptr.*, gui, win);
+        self.opts.build_cb(self.opts.build_vt, child, self.index_ptr.*);
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, window: *iWindow) void {
@@ -330,6 +330,7 @@ pub const Button = struct {
         cb_fn: ?ButtonCallbackT = null,
         id: g.Uid = 0,
         custom_draw: ?iArea.DrawFn = null,
+        tab_focus: bool = false,
         user_1: u32 = 0,
     };
     vt: iArea,
@@ -347,7 +348,14 @@ pub const Button = struct {
         self.* = .{ .vt = .UNINITILIZED, .text = text, .opts = opts };
         parent.addChild(
             &self.vt,
-            .{ .area = area, .deinit_fn = deinit, .draw_fn = opts.custom_draw orelse draw, .focus_ev_fn = fevent, .onclick = onclick },
+            .{
+                .area = area,
+                .deinit_fn = deinit,
+                .draw_fn = opts.custom_draw orelse draw,
+                .focus_ev_fn = fevent,
+                .onclick = onclick,
+                .can_tab_focus = opts.tab_focus,
+            },
         );
         return .good;
     }

@@ -229,7 +229,9 @@ pub const MyInspector = struct {
         }
     }
 
-    pub fn buildScrollItems(cb: *CbHandle, vt: *iArea, index: usize, gui: *Gui, _: *iWindow) void {
+    pub fn buildScrollItems(cb: *CbHandle, vt: *iArea, index: usize) void {
+        const gui = vt.win_ptr.gui_ptr;
+
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = gui.dstate.vLayout(vt.area);
         for (index..10) |i| {

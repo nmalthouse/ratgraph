@@ -88,14 +88,16 @@ pub const TextView = struct {
         vscr.gotoBottom();
     }
 
-    pub fn buildScroll(cb: *CbHandle, layout: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
+    pub fn buildScroll(cb: *CbHandle, layout: *iArea, index: usize) void {
+        const gui = layout.win_ptr.gui_ptr;
+
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = layout.area };
         if (index >= self.lines.items.len) return;
         for (self.lines.items[index..], index..) |line, i| {
             _ = i;
             //const color: u32 = if (i % 2 == 0) 0xffff_ffff else 0xff_0000_ff;
-            layout.addChildOpt(gui, win, Widget.Text.buildStatic(gui, ly.getArea(), line, gui.dstate.nstyle.color.text_bg));
+            _ = Widget.Text.buildStatic(layout, ly.getArea(), line, gui.dstate.nstyle.color.text_bg);
         }
     }
 

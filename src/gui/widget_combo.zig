@@ -66,7 +66,7 @@ pub fn ComboUser(user_data: type) type {
                 vt.area.dirty(gui);
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = gui.dstate.vLayout(area.inset(gui.dstate.scale));
-                _ = Widget.Textbox.buildOpts(vt.area, ly.getArea(), .{
+                _ = Widget.Textbox.buildOpts(&vt.area, ly.getArea(), .{
                     .commit_cb = &textbox_cb,
                     .commit_vt = &self.cbhandle,
                     .commit_when = .on_change,
@@ -75,7 +75,7 @@ pub fn ComboUser(user_data: type) type {
                     gui.grabFocus(vt.area.children.items[0], vt);
                 }
                 ly.pushRemaining();
-                if (VScroll.build(vt.area, ly.getArea(), .{
+                if (VScroll.build(&vt.area, ly.getArea(), .{
                     .build_cb = &build_scroll_cb,
                     .build_vt = &self.cbhandle,
                     .win = vt,
@@ -83,7 +83,7 @@ pub fn ComboUser(user_data: type) type {
                     .count = p.opts.count,
                     .index_ptr = &p.index,
                 }) != .good) return;
-                self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vt.area.getLastChild()));
+                self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vt.area.getLastChild() orelse return));
             }
 
             pub fn textbox_cb(pop_vt: *CbHandle, gui: *Gui, str: []const u8, _: usize) void {
@@ -96,7 +96,9 @@ pub fn ComboUser(user_data: type) type {
                 }
             }
 
-            pub fn build_scroll_cb(cb: *CbHandle, area: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
+            pub fn build_scroll_cb(cb: *CbHandle, area: *iArea, index: usize) void {
+                const gui = area.win_ptr.gui_ptr;
+
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
                 var ly = gui.dstate.vLayout(area.area);
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
@@ -123,13 +125,12 @@ pub fn ComboUser(user_data: type) type {
                     const i = if (do_search) self.search_list.items[pre_i] else pre_i;
                     const name = p.opts.name_cb(p.opts.user_vt, i, gui, p.user);
                     //if (do_search and !std.mem.containsAtLeast(u8, name, 1, self.search_string)) continue;
-                    area.addChild(gui, win, Widget.Button.build(
-                        gui,
+                    _ = Widget.Button.build(
+                        area,
                         ly.getArea(),
                         name,
-                        .{ .cb_vt = &p.cbhandle, .cb_fn = &ParentT.buttonCb, .id = i },
-                    ) orelse return);
-                    area.children.items[area.children.items.len - 1].can_tab_focus = true;
+                        .{ .cb_vt = &p.cbhandle, .cb_fn = &ParentT.buttonCb, .id = i, .tab_focus = true },
+                    );
                 }
             }
 
@@ -214,6 +215,7 @@ pub fn ComboUser(user_data: type) type {
                     gui,
                     &PoppedWindow.deinit,
                     .{ .area = area },
+                    &popped.vt,
                 ),
                 .search_list = std.ArrayList(usize).init(gui.alloc),
                 .name = "noname",
@@ -253,8 +255,8 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 });
             }
 
-            pub fn build_cb(cb: *CbHandle, area: *iArea, index: usize, gui: *Gui, win: *iWindow) void {
-                _ = win;
+            pub fn build_cb(cb: *CbHandle, area: *iArea, index: usize) void {
+                const gui = area.win_ptr.gui_ptr;
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = gui.dstate.vLayout(area.area);

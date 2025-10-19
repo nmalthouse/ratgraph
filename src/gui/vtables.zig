@@ -211,10 +211,10 @@ pub const iArea = struct {
 
 pub const ScissorId = enum(u8) { none = std.math.maxInt(u8), _ };
 
-pub fn label(lay: *iArea, gui: *Gui, win: *iWindow, area_o: ?Rect, comptime fmt: []const u8, args: anytype) ?Rect {
+pub fn label(lay: *iArea, area_o: ?Rect, comptime fmt: []const u8, args: anytype) ?Rect {
     const area = area_o orelse return null;
     const sp = area.split(.vertical, area.w / 2);
-    lay.addChildOpt(gui, win, Widget.Text.build(gui, sp[0], fmt, args));
+    _ = Widget.Text.build(lay, sp[0], fmt, args);
     return sp[1];
 }
 
