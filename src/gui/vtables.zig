@@ -225,8 +225,14 @@ pub fn label(lay: *iArea, area_o: ?Rect, comptime fmt: []const u8, args: anytype
 }
 
 pub const iWindow = struct {
+    const Background = union(enum) {
+        window,
+        color: u32,
+        none,
+    };
     pub const InitArgs = struct {
         area: Rect = .Empty,
+        bg: Background = .{ .window = {} },
     };
     const BuildfnT = *const fn (*iWindow, *Gui, Rect) void;
 
@@ -251,6 +257,7 @@ pub const iWindow = struct {
     scissors: ArrayList(?struct { *iArea, Rect }) = .{},
 
     draw_scissor_state: ScissorId = .none,
+    bg: Background,
 
     pub fn draw(self: *iWindow, gui: *Gui, dctx: *DrawState) void {
         self.area.draw(gui, dctx, self);
@@ -286,6 +293,7 @@ pub const iWindow = struct {
     pub fn init(build_fn: BuildfnT, gui: *Gui, deinit_fn: *const fn (*iWindow, *Gui) void, args: InitArgs, reserved_memory: *iWindow) iWindow {
         reserved_memory.* = .{
             .gui_ptr = gui,
+            .bg = args.bg,
             .alloc = gui.alloc,
             .deinit_fn = deinit_fn,
             .build_fn = build_fn,
@@ -295,8 +303,14 @@ pub const iWindow = struct {
     }
 
     fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
-    fn draw_area(vt: *iArea, _: *Gui, d: *DrawState) void {
-        GuiHelp.drawWindowFrame(d, vt.area);
+    fn draw_area(vt: *iArea, _: *Gui, dctx: *DrawState) void {
+        const self: *iWindow = @alignCast(@fieldParentPtr("area", vt));
+        switch (self.bg) {
+            .window => GuiHelp.drawWindowFrame(dctx, self.area.area),
+            .none => {},
+            .color => |col| dctx.ctx.rect(self.area.area, col),
+        }
+        //GuiHelp.drawWindowFrame(d, vt.area);
     }
 
     // the implementers deinit fn should call this first

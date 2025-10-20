@@ -57,7 +57,14 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
     }
 
     for (c_source_files) |cfile| {
-        mod.addCSourceFile(.{ .file = b.path(cfile), .flags = &[_][]const u8{ "-Wall", "-DSPNG_USE_MINIZ=" } });
+        mod.addCSourceFile(.{ .file = b.path(cfile), .flags = &[_][]const u8{
+            "-Wall",
+            "-DSPNG_USE_MINIZ=",
+            "-DMINIZ_NO_ARCHIVE_APIS=",
+            "-DMINIZ_NO_ARCHIVE_WRITING_APIS=",
+            "-DMINIZ_NO_STDIO=",
+            "-DMINIZ_NO_TIME=",
+        } });
     }
     mod.link_libc = true;
     if (mod.resolved_target) |rt| {

@@ -18,6 +18,7 @@ pub const Lua = @import("lua.zig");
 pub const V3 = za.Vec3;
 pub const AssetBake = @import("assetbake.zig");
 pub const OnlineFont = @import("graphics/online_font.zig").OnlineFont;
+pub const miniz = @import("miniz.zig");
 
 pub const meshutil = @import("mesh.zig");
 pub const ptypes = @import("graphics/types.zig");
