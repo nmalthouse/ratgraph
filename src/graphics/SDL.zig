@@ -174,7 +174,7 @@ pub const Window = struct {
 
     should_exit: bool = false,
 
-    mouse: MouseState = undefined,
+    mouse: MouseState = .{},
     mod: keycodes.KeymodMask = 0,
     /// Never put scroll_lock, caps_lock and num_lock in Window.mod when set
     exclude_locking_mod: bool = true,
@@ -355,7 +355,7 @@ pub const Window = struct {
         if (self.target_frame_len_ns) |tft| {
             const frame_took = self.frame_time.read();
             if (frame_took < tft)
-                std.time.sleep(tft - frame_took);
+                std.Thread.sleep(tft - frame_took);
         }
     }
 
@@ -419,9 +419,10 @@ pub const Window = struct {
 
         c.SDL_PumpEvents();
         {
-            var fx: f32 = undefined;
-            var fy: f32 = undefined;
-            setButtonsSDL(&self.mouse, c.SDL_GetMouseState(&fx, &fy));
+            var fx: f32 = 0;
+            var fy: f32 = 0;
+            const mstate = c.SDL_GetMouseState(&fx, &fy);
+            setButtonsSDL(&self.mouse, mstate);
             self.mouse.pos = .{ .x = fx, .y = fy };
 
             _ = c.SDL_GetRelativeMouseState(&fx, &fy);

@@ -92,14 +92,14 @@ pub const AssetMap = struct {
     pub const FreeListItem = struct { start: u32, end: u32 };
 
     fn createFreelist(alloc: std.mem.Allocator, old_map: ?*const BakedManifestJson.IdMap) !std.ArrayList(FreeListItem) {
-        var freelist = std.ArrayList(FreeListItem).init(alloc);
+        var freelist = std.ArrayList(FreeListItem){};
 
-        var sorted_ids = std.ArrayList(u32).init(alloc);
-        defer sorted_ids.deinit();
+        var sorted_ids = std.ArrayList(u32){};
+        defer sorted_ids.deinit(alloc);
         if (old_map) |ob| {
             var it = ob.map.iterator();
             while (it.next()) |item| {
-                try sorted_ids.append(item.value_ptr.id);
+                try sorted_ids.append(alloc, item.value_ptr.id);
             }
             std.sort.heap(u32, sorted_ids.items, {}, std.sort.asc(u32));
         }
@@ -112,11 +112,11 @@ pub const AssetMap = struct {
                 }
                 var end = start;
                 while (end < t) : (end += 1) {}
-                try freelist.append(.{ .start = start, .end = end });
+                try freelist.append(alloc, .{ .start = start, .end = end });
                 start = t + 1;
             }
         }
-        try freelist.append(.{ .start = start, .end = std.math.maxInt(u32) });
+        try freelist.append(alloc, .{ .start = start, .end = std.math.maxInt(u32) });
 
         return freelist;
     }
@@ -132,8 +132,8 @@ pub const AssetMap = struct {
 
     pub fn initTesting(alloc: std.mem.Allocator, test_names: []const []const u8) !Self {
         var ret = Self{
-            .resource_rect_lut = std.ArrayList(?Rect).init(alloc),
-            .id_name_lut = std.ArrayList(?[]const u8).init(alloc),
+            .resource_rect_lut = .{},
+            .id_name_lut = .{},
             .alloc = alloc,
             .name_id_map = std.StringHashMap(u32).init(alloc),
             .dir = undefined,
@@ -143,7 +143,7 @@ pub const AssetMap = struct {
         for (test_names) |tn| {
             const str = try alloc.dupe(u8, tn);
             try ret.name_id_map.put(str, @intCast(ret.id_name_lut.items.len));
-            try ret.id_name_lut.append(str);
+            try ret.id_name_lut.append(ret.alloc, str);
         }
 
         return ret;
@@ -161,8 +161,8 @@ pub const AssetMap = struct {
         var ret = Self{
             .file_prefix = try alloc.dupe(u8, file_prefix),
             .dir = dir,
-            .resource_rect_lut = std.ArrayList(?Rect).init(alloc),
-            .id_name_lut = std.ArrayList(?[]const u8).init(alloc),
+            .resource_rect_lut = .{},
+            .id_name_lut = .{},
             .alloc = alloc,
             .name_id_map = std.StringHashMap(u32).init(alloc),
         };
@@ -170,10 +170,10 @@ pub const AssetMap = struct {
         var i: usize = 0;
         for (parsed.value.rects) |r| {
             while (i != @as(usize, @intCast(r.id))) : (i += 1) {
-                try ret.resource_rect_lut.append(null);
+                try ret.resource_rect_lut.append(alloc, null);
             }
             i += 1;
-            try ret.resource_rect_lut.append(graph.Rec(r.x, r.y, r.w, r.h));
+            try ret.resource_rect_lut.append(alloc, graph.Rec(r.x, r.y, r.w, r.h));
         }
 
         //Ensure names are inserted in proper order. Iterate the mapping, put each item into a list, sort by id, and apply same routine as above
@@ -185,11 +185,11 @@ pub const AssetMap = struct {
                 return lhs.id < rhs.id;
             }
         };
-        var tmp_name_mapping = std.ArrayList(TmpMap).init(alloc);
-        defer tmp_name_mapping.deinit();
+        var tmp_name_mapping = std.ArrayList(TmpMap){};
+        defer tmp_name_mapping.deinit(alloc);
         var it = parsed.value.name_id_map.map.iterator();
         while (it.next()) |item| {
-            try tmp_name_mapping.append(.{ .name = item.key_ptr.*, .id = item.value_ptr.id });
+            try tmp_name_mapping.append(alloc, .{ .name = item.key_ptr.*, .id = item.value_ptr.id });
             //const name = try alloc.dupe(u8, item.key_ptr.*);
             //try ret.id_name_lut.append(name);
             //try ret.name_id_map.put(name, item.value_ptr.*);
@@ -198,11 +198,11 @@ pub const AssetMap = struct {
         i = 0;
         for (tmp_name_mapping.items) |n| {
             while (i != @as(usize, @intCast(n.id))) : (i += 1) {
-                try ret.id_name_lut.append(null);
+                try ret.id_name_lut.append(ret.alloc, null);
             }
             i += 1;
             const name_a = try alloc.dupe(u8, n.name);
-            try ret.id_name_lut.append(name_a);
+            try ret.id_name_lut.append(ret.alloc, name_a);
             try ret.name_id_map.put(name_a, n.id);
         }
 
@@ -229,24 +229,26 @@ pub const AssetMap = struct {
         };
 
         const file = try self.dir.openFile(udata_filename, .{});
-        var re = file.reader();
+        var read_buf: [1024]u8 = undefined;
+        var read = file.reader(&read_buf);
+        var re = &read.interface;
 
-        var path_buf = std.ArrayList(u8).init(self.alloc);
-        defer path_buf.deinit();
-        var data_buf = std.ArrayList(u8).init(self.alloc);
-        defer data_buf.deinit();
+        var path_buf = std.ArrayList(u8){};
+        defer path_buf.deinit(self.alloc);
+        var data_buf = std.ArrayList(u8){};
+        defer data_buf.deinit(self.alloc);
 
-        const num_items = try re.readInt(u32, .big);
+        const num_items = try re.takeInt(u32, .big);
         for (0..num_items) |i| {
             _ = i;
 
-            const path_len = try re.readInt(u32, .big);
-            try path_buf.resize(path_len);
-            _ = try re.readAtLeast(path_buf.items, path_len);
-            const data_len = try re.readInt(u32, .big);
+            const path_len = try re.takeInt(u32, .big);
+            try path_buf.resize(self.alloc, path_len);
+            _ = try re.readSliceAll(path_buf.items);
+            const data_len = try re.takeInt(u32, .big);
 
-            try data_buf.resize(data_len);
-            _ = try re.readAtLeast(data_buf.items, data_len);
+            try data_buf.resize(self.alloc, data_len);
+            _ = try re.readSliceAll(data_buf.items);
 
             if (self.name_id_map.getEntry(path_buf.items)) |entry| {
                 try ret.name_map.put(entry.key_ptr.*, try self.alloc.dupe(u8, data_buf.items));
@@ -268,7 +270,7 @@ pub const AssetMap = struct {
     pub fn addSymbol(self: *Self, name: []const u8) !u32 {
         const str_all = try self.alloc.dupe(u8, name);
         errdefer self.alloc.free(str_all);
-        try self.id_name_lut.append(str_all);
+        try self.id_name_lut.append(self.alloc, str_all);
         const id: u32 = @intCast(self.id_name_lut.items.len - 1);
         try self.name_id_map.put(str_all, id);
         return id;
@@ -298,13 +300,17 @@ pub const AssetMap = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.resource_rect_lut.deinit();
+        self.resource_rect_lut.deinit(
+            self.alloc,
+        );
 
         for (self.id_name_lut.items) |on| {
             if (on) |n|
                 self.alloc.free(n);
         }
-        self.id_name_lut.deinit();
+        self.id_name_lut.deinit(
+            self.alloc,
+        );
         self.name_id_map.deinit();
         self.alloc.free(self.file_prefix);
     }
@@ -369,7 +375,7 @@ pub fn assetBake(
     //if a resource has an id in old_bake then use that id otherwise get it from freelist
     //we create freelist by gathering all old ids, sorting then iterating and generating a freelist.
     var freelist = try AssetMap.createFreelist(alloc, if (old_bake) |ob| &ob.name_id_map else null);
-    defer freelist.deinit();
+    defer freelist.deinit(alloc);
 
     var idir = try dir.openDir(sub_path, .{ .iterate = true });
     defer idir.close();
@@ -377,12 +383,12 @@ pub fn assetBake(
         alloc,
     );
 
-    var bmps = std.ArrayList(graph.Bitmap).init(alloc);
+    var bmps = std.ArrayList(graph.Bitmap){};
     defer {
         for (bmps.items) |bmp| {
             bmp.deinit();
         }
-        bmps.deinit();
+        bmps.deinit(alloc);
     }
 
     var rpack = graph.RectPack.init(alloc);
@@ -393,12 +399,10 @@ pub fn assetBake(
         path: []const u8, //allocated
         basename: []const u8, //slice of path
         dir_path: []const u8, //slice of path
-    }).init(alloc);
+    }){};
     defer {
-        json_files.deinit();
+        json_files.deinit(alloc);
     }
-
-    var temp_name_buf: [1024]u8 = undefined;
 
     //First we walk the directory and all children, creating a list of images and a list of json files.
     var uid_bmp_index_map = std.AutoHashMap(u32, u32).init(alloc);
@@ -432,8 +436,8 @@ pub fn assetBake(
         alloc,
     );
     defer walker.deinit();
-    var path_scratch = std.ArrayList(u8).init(alloc);
-    defer path_scratch.deinit();
+    var path_scratch = std.ArrayList(u8){};
+    defer path_scratch.deinit(alloc);
 
     if (options.do_tiled) { //Make the tiled scratch directory
         dir.makeDir(TILED_SCRATCH_NAME) catch |err| switch (err) {
@@ -449,7 +453,7 @@ pub fn assetBake(
 
     while (try walker.next()) |w| {
         path_scratch.clearRetainingCapacity();
-        try path_scratch.appendSlice(w.path);
+        try path_scratch.appendSlice(alloc, w.path);
         sanitizePath(path_scratch.items);
         const wpath = path_scratch.items;
         switch (w.kind) {
@@ -478,35 +482,13 @@ pub fn assetBake(
                 }
                 if (std.mem.endsWith(u8, w.basename, ".png")) {
                     const index = bmps.items.len;
-                    try bmps.append(try graph.Bitmap.initFromPngFile(alloc, w.dir, w.basename));
+                    try bmps.append(alloc, try graph.Bitmap.initFromPngFile(alloc, w.dir, w.basename));
                     try rpack.appendRect(index, bmps.items[index].w + pixel_extrude * 2, bmps.items[index].h + pixel_extrude * 2);
                     try uid_bmp_index_map.put(@intCast(index), @intCast(ind));
                     //names has the same indicies as bmps
-                } else if (std.mem.endsWith(u8, w.basename, ".ora")) {
-                    const index = bmps.items.len;
-                    const png_buf = try oraFileToPngBuffer(w.dir, w.basename, alloc);
-                    defer png_buf.deinit();
-                    var bmp = try graph.Bitmap.initFromPngBuffer(alloc, png_buf.items);
-                    try bmps.append(bmp);
-                    try rpack.appendRect(index, bmps.items[index].w + pixel_extrude * 2, bmps.items[index].h + pixel_extrude * 2);
-                    try uid_bmp_index_map.put(@intCast(index), @intCast(ind));
-                    const dirname = wpath[0 .. wpath.len - w.basename.len];
-                    if (tiled_scratch_dir) |scrdir|
-                        scrdir.makePath(dirname) catch |err| switch (err) {
-                            error.PathAlreadyExists => {},
-                            else => return err,
-                        };
-                    var fbs = std.io.FixedBufferStream([]u8){ .buffer = &temp_name_buf, .pos = 0 };
-                    const wr = fbs.writer();
-                    _ = try wr.write(dirname);
-                    _ = try wr.write(w.basename[0 .. w.basename.len - ".ora".len]);
-                    _ = try wr.write(".png");
-                    if (tiled_scratch_dir) |scrdir|
-                        try bmp.writeToPngFile(scrdir, fbs.getWritten());
-                    try tiled_substite_path.put(nameid, try talloc.dupe(u8, fbs.getWritten()));
                 } else {
                     const path = try talloc.dupe(u8, wpath);
-                    try json_files.append(.{
+                    try json_files.append(alloc, .{
                         .path = path,
                         .dir_path = path[0 .. wpath.len - w.basename.len],
                         .basename = path[wpath.len - w.basename.len ..],
@@ -516,8 +498,8 @@ pub fn assetBake(
             else => {},
         }
     }
-    var id_rects = std.ArrayList(IdRect).init(alloc);
-    defer id_rects.deinit();
+    var id_rects = std.ArrayList(IdRect){};
+    defer id_rects.deinit(alloc);
 
     //Pack all the rectangles and output to a file
     const out_size = try rpack.packOptimalSize();
@@ -582,7 +564,7 @@ pub fn assetBake(
                 );
             }
         }
-        try id_rects.append(.{
+        try id_rects.append(alloc, .{
             .id = uid_bmp_index_map.get(@intCast(rect.id)).?,
             .x = x + pixel_extrude,
             .y = yy + pixel_extrude,
@@ -594,8 +576,9 @@ pub fn assetBake(
 
     var userdataout = try output_dir.createFile(userdata_filename, .{});
     defer userdataout.close();
-    const uout = userdataout.writer();
-    const wr = uout;
+    var udate_buf: [1024]u8 = undefined;
+    const uwriter = userdataout.writer(&udate_buf);
+    var wr = uwriter.interface;
     try wr.writeInt(u32, @intCast(json_files.items.len), .big);
 
     for (json_files.items) |jf| {
@@ -613,31 +596,30 @@ pub fn assetBake(
 
     var out = try output_dir.createFile(manifest_filename, .{});
     defer out.close();
-    try std.json.stringify(
-        BakedManifestJson{
-            .rects = id_rects.items,
-            .name_id_map = BakedManifestJson.IdMap{
-                .map = out_name_id_map.unmanaged,
-            },
-            .build_timestamp = @intCast(std.time.timestamp()),
+    var out_buf: [1024]u8 = undefined;
+    var ow = out.writer(&out_buf);
+    try std.json.Stringify.value(BakedManifestJson{
+        .rects = id_rects.items,
+        .name_id_map = BakedManifestJson.IdMap{
+            .map = out_name_id_map.unmanaged,
         },
-        .{},
-        out.writer(),
-    );
+        .build_timestamp = @intCast(std.time.timestamp()),
+    }, .{}, &ow.interface);
+    try ow.interface.flush();
 
     if (options.do_tiled) {
         const TileImage = Tiled.TileMap.ExternalTileset.TileImage;
         var max_w: u32 = 0;
         var max_h: u32 = 0;
-        var tiles = std.ArrayList(TileImage).init(alloc);
-        defer tiles.deinit();
+        var tiles = std.ArrayList(TileImage){};
+        defer tiles.deinit(alloc);
         var name_it = out_name_id_map.iterator();
         while (name_it.next()) |item| {
             //TODO .ora images need to be written to a scratch dir so tiled can load them
-            var new_name = std.ArrayList(u8).init(talloc);
-            try new_name.appendSlice(sub_path);
-            try new_name.append('/');
-            try new_name.appendSlice(item.key_ptr.*);
+            var new_name = std.ArrayList(u8){};
+            try new_name.appendSlice(alloc, sub_path);
+            try new_name.append(alloc, '/');
+            try new_name.appendSlice(alloc, item.key_ptr.*);
             //We might need to append the dir prefix to fileimage path?
             const binctx = IdRect.SearchCtx{ .key = item.value_ptr.id };
             if (std.sort.binarySearch(IdRect, id_rects.items, binctx, IdRect.compare)) |ri| {
@@ -650,12 +632,12 @@ pub fn assetBake(
                 max_w = @max(max_w, w);
                 max_h = @max(max_h, h);
                 if (tiled_substite_path.get(item.key_ptr.*)) |sub_name| {
-                    try new_name.resize(0);
-                    try new_name.appendSlice(TILED_SCRATCH_NAME);
-                    try new_name.append('/');
-                    try new_name.appendSlice(sub_name);
+                    try new_name.resize(alloc, 0);
+                    try new_name.appendSlice(alloc, TILED_SCRATCH_NAME);
+                    try new_name.append(alloc, '/');
+                    try new_name.appendSlice(alloc, sub_name);
                 }
-                try tiles.append(.{
+                try tiles.append(alloc, .{
                     .image = new_name.items,
                     .id = item.value_ptr.id,
                     .imageheight = h,
@@ -673,9 +655,13 @@ pub fn assetBake(
         };
         //We output this to dir so that we don't need to backtrack in the image paths as dir is always above sub_path
         var outfile = try dir.createFile(tiled_filename, .{});
-        try std.json.stringify(new_tsj, .{}, outfile.writer());
+        var outbuf2: [1024]u8 = undefined;
+        var out_wr = outfile.writer(&outbuf2);
+        try std.json.Stringify.value(new_tsj, .{}, &out_wr.interface);
+        try out_wr.interface.flush();
         outfile.close();
     }
+    try wr.flush();
 }
 
 fn oraFileToPngBuffer(dir: std.fs.Dir, path: []const u8, alloc: std.mem.Allocator) !std.ArrayList(u8) {

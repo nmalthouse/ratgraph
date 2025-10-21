@@ -43,7 +43,7 @@ pub const Tabs = struct {
 
         self.* = .{
             .vt = .UNINITILIZED,
-            .tabs = std.ArrayList(Tab).init(gui.alloc),
+            .tabs = .{},
             .opts = opts,
         };
         parent.addChild(
@@ -52,8 +52,8 @@ pub const Tabs = struct {
         );
         if (opts.index_ptr == null)
             self.opts.index_ptr = &self.__selected_tab_index;
-        self.tabs.appendSlice(tabs) catch {
-            self.tabs.deinit();
+        self.tabs.appendSlice(gui.alloc, tabs) catch {
+            self.tabs.deinit(gui.alloc);
             gui.alloc.destroy(self);
             return .failed;
         };
@@ -79,7 +79,7 @@ pub const Tabs = struct {
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        self.tabs.deinit();
+        self.tabs.deinit(gui.alloc);
         gui.alloc.destroy(self);
     }
 

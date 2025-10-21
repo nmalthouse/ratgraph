@@ -4,12 +4,12 @@
     .version = "0.0.1",
     .dependencies = .{
         .sdl = .{
-            .url = "https://github.com/castholm/SDL/archive/refs/tags/v0.2.6+3.2.20.tar.gz",
-            .hash = "sdl-0.2.6+3.2.20-7uIn9JkjfwGIQ6j3-etow2rCe-Zt16Yj-2gdp9jW7WZ9",
+            .url = "git+https://github.com/castholm/SDL.git#1d4b8dcc03bd216712b55318b4ad2402b5511490",
+            .hash = "sdl-0.3.1+3.2.24-7uIn9L9AfwFQf90JcTh3Slw__ZA8SEomk6fQI9F8ItY0",
         },
         .zalgebra = .{
-            .url = "git+https://github.com/kooparse/zalgebra.git#7cf3b90edc28a138d666deab5dfde9dce89dff56",
-            .hash = "zalgebra-0.0.0-aaiVSh1nAQDYYHlXEm3nm7G7r7utN4aObxs43TLdjEuc",
+            .url = "git+https://github.com/kooparse/zalgebra.git#df88d0e930b6a49ba539a45c005826cdb57e70c6",
+            .hash = "zalgebra-0.0.0-aaiVSqhwAQCC7FarzEIQtMtlbL8CGfHXTZNirrd4tPwI",
         },
     },
     .paths = .{

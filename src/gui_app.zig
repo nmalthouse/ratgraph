@@ -633,6 +633,7 @@ pub const GuiConfig = struct {
 
     //Map Style9Slices to rects
     nineSliceLut: std.ArrayList(Rect),
+    alloc: std.mem.Allocator,
     config: ConfigJson = .{},
     texture: graph.Texture,
 
@@ -651,14 +652,15 @@ pub const GuiConfig = struct {
         var manifest = try graph.AssetBake.AssetMap.initFromManifest(alloc, output_path, BAKE_NAME);
         defer manifest.deinit();
         var ret = Self{
-            .nineSliceLut = std.ArrayList(Rect).init(alloc),
+            .alloc = alloc,
+            .nineSliceLut = .{},
             .texture = try graph.AssetBake.AssetMap.initTextureFromManifest(alloc, output_path, BAKE_NAME),
         };
         errdefer ret.deinit();
-        try ret.nineSliceLut.resize(@typeInfo(Style9Slices).@"enum".fields.len);
-        var found = std.ArrayList(bool).init(alloc);
-        defer found.deinit();
-        try found.appendNTimes(false, ret.nineSliceLut.items.len);
+        try ret.nineSliceLut.resize(ret.alloc, @typeInfo(Style9Slices).@"enum".fields.len);
+        var found = std.ArrayList(bool){};
+        defer found.deinit(alloc);
+        try found.appendNTimes(alloc, false, ret.nineSliceLut.items.len);
         for (manifest.id_name_lut.items, 0..) |l, id| {
             if (l) |name| {
                 if (std.mem.startsWith(u8, name, "nineSlice/") and std.mem.endsWith(u8, name, ".png")) {
@@ -700,7 +702,7 @@ pub const GuiConfig = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.nineSliceLut.deinit();
+        self.nineSliceLut.deinit(self.alloc);
     }
 };
 

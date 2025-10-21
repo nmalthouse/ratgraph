@@ -20,6 +20,7 @@ const WgStatus = g.WgStatus;
 // Works like a tabs or whatever which holds all the alloc for string, so scrolling doesn't realloc
 
 pub const VScroll = struct {
+    const max_scroll = 1E9;
     pub const BuildCb = *const fn (*CbHandle, current_area: *iArea, index: usize) void;
     pub const Opts = struct {
         build_cb: BuildCb,
@@ -101,7 +102,7 @@ pub const VScroll = struct {
 
     pub fn getScrollableCount(self: *@This()) usize {
         const fitted = @trunc(self.vt.area.h / self.opts.item_h) - 2; // -1 so user can see scroll has ended
-        if (fitted > 1 and fitted < std.math.maxInt(usize)) {
+        if (fitted > 1 and fitted < max_scroll) {
             const fw: usize = @intFromFloat(fitted);
             if (fw < self.opts.count)
                 return self.opts.count - fw;
@@ -596,10 +597,10 @@ pub const Text = struct {
         const gui = parent.win_ptr.gui_ptr;
 
         const area = area_o orelse return .failed;
-        var vec = std.ArrayList(u8).initCapacity(gui.alloc, 30) catch return .failed;
+        var vec = std.ArrayList(u8){};
         const self = gui.create(@This());
-        vec.writer().print(fmt, args) catch {
-            vec.deinit();
+        vec.print(gui.alloc, fmt, args) catch {
+            vec.deinit(gui.alloc);
             gui.alloc.destroy(self);
             return .failed;
         };
@@ -608,7 +609,7 @@ pub const Text = struct {
             .vt = .UNINITILIZED,
             .bg_col = gui.dstate.nstyle.color.bg,
             .is_alloced = true,
-            .text = vec.toOwnedSlice() catch return .failed,
+            .text = vec.toOwnedSlice(gui.alloc) catch return .failed,
         };
         parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw });
         return .good;

@@ -286,19 +286,7 @@ pub fn main() !void {
     const sc = 2;
     var gui = try Gui.init(alloc, &win, cache_dir, std.fs.cwd(), &font.font, &draw);
     defer gui.deinit();
-    const do_test_builder = true;
-    if (do_test_builder)
-        try gui.openTestBuilder(std.fs.cwd(), "testdum.txt");
 
-    defer {
-        if (do_test_builder)
-            gui.closeTestBuilder();
-    }
-    var demo = if (!do_test_builder) try guis.Demo.init(alloc, std.fs.cwd(), "testdum.txt") else {};
-    defer {
-        if (!do_test_builder)
-            demo.deinit();
-    }
     gui.dstate.style.config.default_item_h = hh;
     gui.dstate.style.config.text_h = TEXT_H;
 
@@ -316,7 +304,7 @@ pub fn main() !void {
     try gui.active_windows.append(gui.alloc, glview);
     while (!win.should_exit) {
         try draw.begin(0xff, win.screen_dimensions.toF());
-        win.pumpEvents(if (do_test_builder) .wait else .poll);
+        win.pumpEvents(.wait);
         gui.clamp_window = Rec(0, 0, draw.screen_dimensions.x, draw.screen_dimensions.y);
         if (win.keyRising(.ESCAPE))
             win.should_exit = true;

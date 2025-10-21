@@ -81,7 +81,7 @@ pub fn compressGzip(alloc: std.mem.Allocator, input: []const u8, wr: anytype) !v
 
     const defel: Status = @enumFromInt(c.mz_deflateInit2(
         &stream,
-        c.MZ_UBER_COMPRESSION,
+        c.MZ_BEST_COMPRESSION,
         c.MZ_DEFLATED,
         -c.MZ_DEFAULT_WINDOW_BITS,
         8,

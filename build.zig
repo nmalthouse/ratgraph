@@ -5,9 +5,6 @@ fn getSrcDir() []const u8 {
 }
 const srcdir = getSrcDir();
 
-//const LUA_SRC: ?[]const u8 = "lua5.4.7/src/";
-const LUA_SRC = null;
-
 const USE_SYSTEM_FREETYPE = false;
 
 pub const ToLink = enum {
@@ -48,13 +45,6 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
         cdir ++ "/miniz/miniz_tinfl.c",
         cdir ++ "/miniz/miniz_tdef.c",
     };
-
-    if (LUA_SRC) |lsrc| {
-        const paths = [_][]const u8{ "lapi.c", "lauxlib.c", "lbaselib.c", "lcode.c", "lcorolib.c", "lctype.c", "ldblib.c", "ldebug.c", "ldo.c", "ldump.c", "lfunc.c", "lgc.c", "linit.c", "liolib.c", "llex.c", "lmathlib.c", "lmem.c", "loadlib.c", "lobject.c", "lopcodes.c", "loslib.c", "lparser.c", "lstate.c", "lstring.c", "lstrlib.c", "ltable.c", "ltablib.c", "ltm.c", "lundump.c", "lutf8lib.c", "lvm.c", "lzio.c" };
-        inline for (paths) |p| {
-            mod.addCSourceFile(.{ .file = b.path(lsrc ++ p), .flags = &[_][]const u8{"-Wall"} });
-        }
-    }
 
     for (c_source_files) |cfile| {
         mod.addCSourceFile(.{ .file = b.path(cfile), .flags = &[_][]const u8{
@@ -144,6 +134,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = mode,
         }),
+        //.use_llvm = true,
     });
     b.installArtifact(exe);
 
@@ -165,8 +156,8 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/tests.zig"),
             .target = target,
             .optimize = mode,
+            .link_libc = true,
         }),
-        .link_libc = true,
     });
     unit_tests.setExecCmd(&[_]?[]const u8{ "kcov", "kcov-output", null });
     linkLibrary(b, unit_tests.root_module, &to_link);

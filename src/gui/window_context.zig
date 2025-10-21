@@ -7,7 +7,7 @@ const Rect = g.Rect;
 const Rec = g.Rec;
 const iWindow = g.iWindow;
 const Widget = g.Widget;
-const ArrayList = std.ArrayListUnmanaged;
+const ArrayList = std.ArrayList;
 const NewVt = g.NewVt;
 
 pub const BtnContextWindow = struct {

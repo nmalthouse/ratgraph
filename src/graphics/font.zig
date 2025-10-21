@@ -135,10 +135,11 @@ pub const PublicFontInterface = struct {
 
 pub const OptionalFileWriter = struct {
     writer: ?std.fs.File.Writer = null,
+    buffer: [256]u8 = undefined,
 
     pub fn print(self: *OptionalFileWriter, comptime fmt: []const u8, args: anytype) !void {
-        if (self.writer) |wr| {
-            try wr.print(fmt, args);
+        if (self.writer) |*wr| {
+            try wr.interface.print(fmt, args);
         }
     }
 };
@@ -190,25 +191,28 @@ pub const Font = struct {
         list: []const u21,
         range: [2]u21, //A range of codepoints (inclusive)
 
-        pub fn flattenList(entries: []const CharMapEntry, out: *std.ArrayList(u21)) !void {
+        pub fn flattenList(entries: []const CharMapEntry, alloc: std.mem.Allocator) ![]u21 {
+            var out = std.ArrayList(u21){};
             for (entries) |codepoint| {
                 switch (codepoint) {
                     .list => |list| {
                         for (list) |cp| {
-                            try out.append(cp);
+                            try out.append(alloc, cp);
                         }
                     },
                     .range => |range| {
                         var i = range[0];
                         while (i <= range[1]) : (i += 1) {
-                            try out.append(i);
+                            try out.append(alloc, i);
                         }
                     },
                     .unicode => |cp| {
-                        try out.append(cp);
+                        try out.append(alloc, cp);
                     },
                 }
             }
+            try out.append(alloc, std.unicode.replacement_character);
+            return out.toOwnedSlice(alloc);
         }
     };
     pub const InitOptions = struct {
@@ -254,7 +258,7 @@ pub const Font = struct {
     // This breaks it all!
     pub const padding: i32 = 0;
 
-    fn freetypeLogErr(stream: anytype, error_code: c_int) !void {
+    fn freetypeLogErr(stream: *std.io.Writer, error_code: c_int) !void {
         if (error_code == 0)
             return;
 
@@ -277,12 +281,7 @@ pub const Font = struct {
     }
 
     pub fn initFixed(alloc: Alloc, bmp: Bitmap, options: InitBitmapOptions) !Font {
-        const codepoints_i: []u21 = blk: {
-            var glyph_indices = std.ArrayList(u21).init(alloc);
-            try CharMapEntry.flattenList(options.codepoints_to_load, &glyph_indices);
-            try glyph_indices.append(std.unicode.replacement_character);
-            break :blk try glyph_indices.toOwnedSlice();
-        };
+        const codepoints_i: []u21 = try CharMapEntry.flattenList(options.codepoints_to_load, alloc);
         defer alloc.free(codepoints_i);
         //const dense_slice = try alloc.alloc(Glyph, codepoints_i.len);
         var result = Font{
@@ -323,12 +322,7 @@ pub const Font = struct {
 
     pub fn initFromBuffer(alloc: Alloc, buf: []const u8, pixel_size: f32, options: InitOptions) !Font {
         const pad = options.padding_px;
-        const codepoints_i: []u21 = blk: {
-            var glyph_indices = std.ArrayList(u21).init(alloc);
-            try glyph_indices.append(std.unicode.replacement_character);
-            try CharMapEntry.flattenList(options.codepoints_to_load, &glyph_indices);
-            break :blk try glyph_indices.toOwnedSlice();
-        };
+        const codepoints_i: []u21 = try CharMapEntry.flattenList(options.codepoints_to_load, alloc);
         var finfo: c.stbtt_fontinfo = undefined;
         _ = c.stbtt_InitFont(&finfo, @as([*c]const u8, @ptrCast(buf)), c.stbtt_GetFontOffsetForIndex(&buf[0], 0));
 
@@ -444,12 +438,7 @@ pub const Font = struct {
     }
 
     pub fn init(alloc: Alloc, dir: Dir, filename: []const u8, point_size: f32, options: InitOptions) !Self {
-        const codepoints_i: []u21 = blk: {
-            var glyph_indices = std.ArrayList(u21).init(alloc);
-            try CharMapEntry.flattenList(options.codepoints_to_load, &glyph_indices);
-            try glyph_indices.append(std.unicode.replacement_character);
-            break :blk try glyph_indices.toOwnedSlice();
-        };
+        const codepoints_i: []u21 = try CharMapEntry.flattenList(options.codepoints_to_load, alloc);
 
         var log = OptionalFileWriter{};
         if (options.debug_dir) |ddir| {
@@ -458,7 +447,7 @@ pub const Font = struct {
                 else => return err,
             };
             const font_log = try ddir.createFile("fontgen.log", .{ .truncate = true });
-            log.writer = font_log.writer();
+            log.writer = font_log.writer(&log.buffer);
             //defer font_log.close();
             try log.print("zig: Init font with arguments:\nfilename: \"{s}\"\npoint_size: {d}\n", .{
                 filename,
@@ -489,7 +478,9 @@ pub const Font = struct {
 
         //TODO switch to using a grid rather than rect packing
 
-        const stderr = std.io.getStdErr().writer();
+        var stderr_buf: [256]u8 = undefined;
+        var stderr_wr = std.fs.File.stderr().writer(&stderr_buf);
+        const stderr = &stderr_wr.interface;
 
         var ftlib: c.FT_Library = undefined;
         try freetypeLogErr(stderr, c.FT_Init_FreeType(&ftlib));
@@ -498,7 +489,9 @@ pub const Font = struct {
 
         const infile = try dir.openFile(filename, .{});
         defer infile.close();
-        const file_slice = try infile.reader().readAllAlloc(alloc, std.math.maxInt(usize));
+        var file_buf: [1024]u8 = undefined;
+        var inf_r = infile.reader(&file_buf);
+        const file_slice = try inf_r.interface.allocRemaining(alloc, .unlimited);
         defer alloc.free(file_slice);
 
         {
@@ -634,11 +627,11 @@ pub const Font = struct {
         var pack_ctx = RectPack.init(alloc);
         defer pack_ctx.deinit();
 
-        var bitmaps = std.ArrayList(Bitmap).init(alloc);
+        var bitmaps = std.ArrayList(Bitmap){};
         defer {
             for (bitmaps.items) |*bitmap|
                 bitmap.deinit();
-            bitmaps.deinit();
+            bitmaps.deinit(alloc);
         }
 
         var timer = try std.time.Timer.start();
@@ -669,7 +662,7 @@ pub const Font = struct {
                         @as([*c]u8, @ptrCast(bitmap.buffer[0 .. bitmap.rows * bitmap.width])),
                     );
                 }
-                try bitmaps.append(try Bitmap.initFromBuffer(alloc, bitmap.buffer[0 .. bitmap.width * bitmap.rows], bitmap.width, bitmap.rows, .g_8));
+                try bitmaps.append(alloc, try Bitmap.initFromBuffer(alloc, bitmap.buffer[0 .. bitmap.width * bitmap.rows], bitmap.width, bitmap.rows, .g_8));
 
                 try pack_ctx.appendRect(code_i, bitmap.width + padding + padding, bitmap.rows + padding + padding);
             }
@@ -725,9 +718,9 @@ pub const Font = struct {
             try Bitmap.copySubR(&texture_bitmap, cx, cy, gbmp, 0, 0, gbmp.w, gbmp.h);
         }
         if (options.debug_dir) |ddir| {
-            var out = std.ArrayList(u8).init(alloc);
-            defer out.deinit();
-            try out.writer().print("freetype_{s}.png", .{filename});
+            var out = std.ArrayList(u8){};
+            defer out.deinit(alloc);
+            try out.print(alloc, "freetype_{s}.png", .{filename});
             std.mem.replaceScalar(u8, out.items, '/', '.');
             std.debug.print("{s}\n", .{out.items});
             try texture_bitmap.writeToPngFile(ddir, out.items);
@@ -740,6 +733,9 @@ pub const Font = struct {
             .min_filter = c.GL_LINEAR,
             .mag_filter = c.GL_NEAREST,
         });
+        if (log.writer) |*wr| {
+            try wr.interface.flush();
+        }
 
         return result;
     }
@@ -787,25 +783,25 @@ pub const RectPack = struct {
     const ExtraNodeCount = 200;
     const InitRectPos = 50;
 
-    rects: std.ArrayList(RectType),
-    nodes: std.ArrayList(NodeType),
+    alloc: std.mem.Allocator,
+    rects: std.ArrayList(RectType) = .{},
+    nodes: std.ArrayList(NodeType) = .{},
 
     running_size: usize = 0,
 
     pub fn init(alloc: Alloc) Self {
         return Self{
-            .rects = std.ArrayList(RectType).init(alloc),
-            .nodes = std.ArrayList(NodeType).init(alloc),
+            .alloc = alloc,
         };
     }
 
-    pub fn deinit(self: Self) void {
-        self.rects.deinit();
-        self.nodes.deinit();
+    pub fn deinit(self: *Self) void {
+        self.rects.deinit(self.alloc);
+        self.nodes.deinit(self.alloc);
     }
 
     pub fn appendRect(self: *Self, id: anytype, w: anytype, h: anytype) !void {
-        try self.rects.append(.{
+        try self.rects.append(self.alloc, .{
             .was_packed = 0,
             .id = @intCast(id),
             .x = InitRectPos,
@@ -842,7 +838,7 @@ pub const RectPack = struct {
         if (self.rects.items.len == 0)
             return;
 
-        try self.nodes.resize(parent_area_w + ExtraNodeCount);
+        try self.nodes.resize(self.alloc, parent_area_w + ExtraNodeCount);
         var rect_ctx: c.stbrp_context = undefined;
 
         c.stbrp_init_target(
@@ -909,7 +905,7 @@ pub const Bitmap = struct {
     };
 
     format: ImageFormat = .rgba_8,
-    data: std.ArrayList(u8),
+    data: std.array_list.Managed(u8),
     w: u32,
     h: u32,
 
@@ -920,14 +916,14 @@ pub const Bitmap = struct {
     pub fn initBlank(alloc: Alloc, width: anytype, height: anytype, format: ImageFormat) !Self {
         const h = lcast(u32, height);
         const w = lcast(u32, width);
-        var ret = Self{ .format = format, .data = std.ArrayList(u8).init(alloc), .w = lcast(u32, width), .h = lcast(u32, height) };
+        var ret = Self{ .format = format, .data = std.array_list.Managed(u8).init(alloc), .w = lcast(u32, width), .h = lcast(u32, height) };
         try ret.data.appendNTimes(0, w * h * ImageFormat.toChannelCount(format));
         return ret;
     }
 
     pub fn initFromBuffer(alloc: Alloc, buffer: []const u8, width: anytype, height: anytype, format: ImageFormat) !Bitmap {
         const copy = try alloc.dupe(u8, buffer);
-        return Bitmap{ .data = std.ArrayList(u8).fromOwnedSlice(alloc, copy), .w = lcast(u32, width), .h = lcast(u32, height), .format = format };
+        return Bitmap{ .data = std.array_list.Managed(u8).fromOwnedSlice(alloc, copy), .w = lcast(u32, width), .h = lcast(u32, height), .format = format };
     }
 
     pub fn initFromPngBuffer(alloc: Alloc, buffer: []const u8) !Bitmap {
@@ -955,7 +951,7 @@ pub const Bitmap = struct {
 
         _ = c.spng_decode_image(pngctx, &decoded_data[0], out_size, @intCast(@intFromEnum(fmt)), 0);
 
-        return Bitmap{ .format = fmt, .w = ihdr.width, .h = ihdr.height, .data = std.ArrayList(u8).fromOwnedSlice(alloc, decoded_data) };
+        return Bitmap{ .format = fmt, .w = ihdr.width, .h = ihdr.height, .data = std.array_list.Managed(u8).fromOwnedSlice(alloc, decoded_data) };
     }
 
     pub fn initFromQoiBuffer(alloc: std.mem.Allocator, qoi_buf: []const u8) !Bitmap {
@@ -1057,6 +1053,8 @@ pub const Bitmap = struct {
     pub fn writeToPngFile(self: *Self, dir: Dir, sub_path: []const u8) !void {
         var out_file = try dir.createFile(sub_path, .{});
         defer out_file.close();
+        var out_buf: [1024]u8 = undefined;
+        var out_wr = out_file.writer(&out_buf);
         const pngctx = c.spng_ctx_new(c.SPNG_CTX_ENCODER);
         defer c.spng_ctx_free(pngctx);
 
@@ -1090,12 +1088,13 @@ pub const Bitmap = struct {
             std.debug.print("PNG error {s}\n", .{c.spng_strerror(err)});
         if (data) |d| {
             const sl = @as([*]u8, @ptrCast(d));
-            _ = try out_file.writer().write(sl[0..png_size]);
+            _ = try out_wr.interface.write(sl[0..png_size]);
             var c_alloc = std.heap.raw_c_allocator;
             c_alloc.free(sl[0..png_size]);
         } else {
             return error.failedToEncodePng;
         }
+        try out_wr.interface.flush();
     }
 
     pub fn copySubR(dest: *Self, des_x: u32, des_y: u32, source: *Self, src_x: u32, src_y: u32, src_w: u32, src_h: u32) !void {

@@ -58,7 +58,7 @@ pub fn NumberDummy(comptime T: type) type {
 
         pub fn printTo(vt: *iArea, arraylist: *std.ArrayList(u8)) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-            arraylist.writer().print("{d:.2}", .{self.ptr.*}) catch return;
+            arraylist.print(vt.win_ptr.gui_ptr.alloc, "{d:.2}", .{self.ptr.*}) catch return;
         }
 
         pub fn parseFrom(vt: *iArea, slice: []const u8) error{invalid}!void {
@@ -245,13 +245,13 @@ pub const Textbox = struct {
         const self = gui.create(@This());
         self.* = .{
             .vt = .UNINITILIZED,
-            .codepoints = std.ArrayList(u8).init(gui.alloc),
+            .codepoints = .{},
             .opts = opts,
             .head = 0,
             .tail = 0,
         };
         parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .focus_ev_fn = fevent, .can_tab_focus = true, .onclick = onclick });
-        self.codepoints.appendSlice(opts.init_string) catch return .good;
+        self.codepoints.appendSlice(gui.alloc, opts.init_string) catch return .good;
         self.move_to(.end);
         return .good;
     }
@@ -272,7 +272,7 @@ pub const Textbox = struct {
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        self.codepoints.deinit();
+        self.codepoints.deinit(gui.alloc);
         gui.alloc.destroy(self);
     }
 
@@ -397,10 +397,10 @@ pub const Textbox = struct {
                             //_ = Utf8It.lastCodepointSlice(&tb.head, tb.codepoints.items);
                         },
                         .copy => {
-                            try setClipboard(tb.codepoints.allocator, tb.getSelectionSlice());
+                            try setClipboard(ev.gui.alloc, tb.getSelectionSlice());
                         },
                         .paste => {
-                            try self.paste();
+                            try self.paste(ev.gui);
                         },
                     }
                 }
@@ -413,11 +413,11 @@ pub const Textbox = struct {
         self.calculateDrawStart(textArea(vt.area, ev.gui), ev.gui.dstate.style.config.text_h, ev.gui);
     }
 
-    fn paste(self: *Self) !void {
+    fn paste(self: *Self, gui: *Gui) !void {
         self.changed = true;
         try self.deleteSelection();
-        const clip = try getClipboard(self.codepoints.allocator);
-        defer self.codepoints.allocator.free(clip);
+        const clip = try getClipboard(gui.alloc);
+        defer gui.alloc.free(clip);
         // creating a utf8view ensures the paste contains valid unicode and allows us to find the length
         if (std.unicode.Utf8View.init(clip)) |clip_view| {
             var clip_it = clip_view.iterator();
@@ -428,7 +428,7 @@ pub const Textbox = struct {
                 if (self.codepoints.items.len + len > ml)
                     return;
             }
-            try self.codepoints.insertSlice(@intCast(self.head), clip);
+            try self.codepoints.insertSlice(gui.alloc, @intCast(self.head), clip);
             self.head += @intCast(clip.len);
             self.tail = self.head;
         } else |err| switch (err) {
@@ -516,7 +516,7 @@ pub const Textbox = struct {
                 if (nearest_glyph) |u_i| {
                     self.setHead(u_i, 0, true);
                 }
-                self.paste() catch {};
+                self.paste(cb.gui) catch {};
             },
             .right => {
                 const bi = g.Widget.BtnContextWindow.buttonId;
@@ -535,13 +535,12 @@ pub const Textbox = struct {
     }
 
     fn rightClickMenuBtn(cb: *CbHandle, id: g.Uid, dat: g.MouseCbState, _: *iWindow) void {
-        _ = dat;
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         self.vt.dirty();
         const bi = g.Widget.BtnContextWindow.buttonId;
         switch (id) {
-            bi("copy") => setClipboard(self.codepoints.allocator, self.getSelectionSlice()) catch return,
-            bi("paste") => self.paste() catch return,
+            bi("copy") => setClipboard(dat.gui.alloc, self.getSelectionSlice()) catch return,
+            bi("paste") => self.paste(dat.gui) catch return,
             else => {},
         }
     }
@@ -585,8 +584,9 @@ pub const Textbox = struct {
     }
 
     pub fn reset(self: *Self, new_str: []const u8) !void {
-        try self.codepoints.resize(0);
-        try self.codepoints.appendSlice(new_str);
+        const gui = self.vt.win_ptr.gui_ptr;
+        try self.codepoints.resize(gui.alloc, 0);
+        try self.codepoints.appendSlice(gui.alloc, new_str);
         self.head = 0;
         self.tail = 0;
     }
@@ -598,10 +598,11 @@ pub const Textbox = struct {
     }
 
     pub fn deleteSelection(self: *Self) !void {
+        const gui = self.vt.win_ptr.gui_ptr;
         if (self.tail == self.head) return;
         const min = @min(self.tail, self.head);
         const max = @max(self.tail, self.head);
-        try self.codepoints.replaceRange(@intCast(min), @intCast(max - min), "");
+        try self.codepoints.replaceRange(gui.alloc, @intCast(min), @intCast(max - min), "");
         self.head = min;
         self.tail = min;
     }
@@ -648,7 +649,7 @@ pub const Textbox = struct {
                 if (new_len >= ml)
                     break;
             }
-            try self.codepoints.insertSlice(@intCast(self.head), new_cp);
+            try self.codepoints.insertSlice(d.gui.alloc, @intCast(self.head), new_cp);
             self.head += new_cp.len;
             self.tail = self.head;
         }

@@ -364,13 +364,13 @@ pub const ImmediateDrawingContext = struct {
             const b = &(self.getBatch(.{ .batch_kind = .color_tri, .params = .{ .shader = colored_tri_shader } }) catch |err| break :e err).color_tri;
             const z = self.zindex;
             self.zindex += 1;
-            b.indicies.appendSlice(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len)))) catch |err| break :e err;
-            b.vertices.appendSlice(&.{
+            b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
+            b.appendVerts(&.{
                 .{ .z = z, .color = color, .pos = .{ .x = r.x + r.w, .y = r.y + r.h } },
                 .{ .z = z, .color = color, .pos = .{ .x = r.x + r.w, .y = r.y } },
                 .{ .z = z, .color = color, .pos = .{ .x = r.x, .y = r.y } },
                 .{ .z = z, .color = color, .pos = .{ .x = r.x, .y = r.y + r.h } },
-            }) catch |err| break :e err;
+            });
         });
     }
 
@@ -382,13 +382,13 @@ pub const ImmediateDrawingContext = struct {
             } }) catch |err| break :e err).color_tri;
             const z = self.zindex;
             self.zindex += 1;
-            b.indicies.appendSlice(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len)))) catch |err| break :e err;
-            b.vertices.appendSlice(&.{
+            b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
+            b.appendVerts(&.{
                 .{ .z = z, .color = vert_colors[2], .pos = .{ .x = r.x + r.w, .y = r.y + r.h } },
                 .{ .z = z, .color = vert_colors[3], .pos = .{ .x = r.x + r.w, .y = r.y } },
                 .{ .z = z, .color = vert_colors[0], .pos = .{ .x = r.x, .y = r.y } },
                 .{ .z = z, .color = vert_colors[1], .pos = .{ .x = r.x, .y = r.y + r.h } },
-            }) catch |err| break :e err;
+            });
         });
     }
 
@@ -425,7 +425,7 @@ pub const ImmediateDrawingContext = struct {
         self.zindex += 1;
         //br, tr, tl, bl
         const i: u32 = @intCast(b.vertices.items.len);
-        b.indicies.appendSlice(&.{
+        b.appendIndex(&.{
             //tl
             i + 0,  i + 4,  i + 1,  i + 4,  i + 5,  i + 1,
             //tm
@@ -444,17 +444,11 @@ pub const ImmediateDrawingContext = struct {
             i + 13, i + 10, i + 9,  i + 13, i + 14, i + 10,
             //br
             i + 10, i + 14, i + 11, i + 14, i + 15, i + 11,
-        }) catch |e| {
-            self.setErr(e);
-            return;
-        };
+        });
 
-        b.vertices.appendSlice(&.{}) catch |e| {
-            self.setErr(e);
-            return;
-        };
+        b.appendVerts(&.{});
 
-        b.vertices.appendSlice(&.{
+        b.appendVerts(&.{
             //Row 1
             .{ .z = z, .color = tint, .uv = Uv[0], .pos = .{ .y = r.y, .x = r.x } },
             .{ .z = z, .color = tint, .uv = Uv[1], .pos = .{ .y = r.y, .x = r.x + bw } },
@@ -475,10 +469,7 @@ pub const ImmediateDrawingContext = struct {
             .{ .z = z, .color = tint, .uv = Uv[13], .pos = .{ .y = r.y + r.h, .x = r.x + bw } },
             .{ .z = z, .color = tint, .uv = Uv[14], .pos = .{ .y = r.y + r.h, .x = r.x + r.w - bw } },
             .{ .z = z, .color = tint, .uv = Uv[15], .pos = .{ .y = r.y + r.h, .x = r.x + r.w } },
-        }) catch |e| {
-            self.setErr(e);
-            return;
-        };
+        });
     }
 
     pub fn rectTex(self: *Self, r: Rect, tr: Rect, texture: Texture) void {
@@ -505,13 +496,13 @@ pub const ImmediateDrawingContext = struct {
         self.zindex += 1;
         const un = GL.normalizeTexRect(tr, texture.w, texture.h);
 
-        b.indicies.appendSlice(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len)))) catch return;
-        b.vertices.appendSlice(&.{
+        b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
+        b.appendVerts(&.{
             .{ .pos = .{ .x = r.x + r.w, .y = r.y + r.h }, .z = z, .uv = .{ .x = un.x + un.w, .y = un.y + un.h }, .color = col }, //0
             .{ .pos = .{ .x = r.x + r.w, .y = r.y }, .z = z, .uv = .{ .x = un.x + un.w, .y = un.y }, .color = col }, //1
             .{ .pos = .{ .x = r.x, .y = r.y }, .z = z, .uv = .{ .x = un.x, .y = un.y }, .color = col }, //2
             .{ .pos = .{ .x = r.x, .y = r.y + r.h }, .z = z, .uv = .{ .x = un.x, .y = un.y + un.h }, .color = col }, //3
-        }) catch return;
+        });
     }
 
     pub fn rectTexTint(self: *Self, r: Rect, tr: Rect, col: u32, texture: Texture) void {
@@ -543,13 +534,13 @@ pub const ImmediateDrawingContext = struct {
         //econst h: u8 = if ((uv_offset >> 2 & 0b1) ^ ((uv_offset >> 1) & 0b1) == 1) 1 else 0;
         const h = 0; //Disable flip flags
 
-        b.indicies.appendSlice(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len)))) catch return;
-        b.vertices.appendSlice(&.{
+        b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
+        b.appendVerts(&.{
             .{ .pos = .{ .x = r.x + r.w, .y = r.y + r.h }, .z = z, .uv = uvs[uvf[(0 + h) % 4]], .color = col }, //0
             .{ .pos = .{ .x = r.x + r.w, .y = r.y }, .z = z, .uv = uvs[uvf[(1 + 4 - h) % 4]], .color = col }, //1
             .{ .pos = .{ .x = r.x, .y = r.y }, .z = z, .uv = uvs[uvf[(2 + h) % 4]], .color = col }, //2
             .{ .pos = .{ .x = r.x, .y = r.y + r.h }, .z = z, .uv = uvs[uvf[(3 + 4 - h) % 4]], .color = col }, //3
-        }) catch return;
+        });
     }
 
     pub fn text(self: *Self, pos: Vec2f, str: []const u8, param: TextParam) void {
@@ -571,8 +562,8 @@ pub const ImmediateDrawingContext = struct {
             },
         }) catch return).color_tri_tex;
 
-        b.vertices.ensureUnusedCapacity(str.len * 4) catch return;
-        b.indicies.ensureUnusedCapacity(str.len * 6) catch return;
+        b.vertices.ensureUnusedCapacity(b.alloc, str.len * 4) catch return;
+        b.indicies.ensureUnusedCapacity(b.alloc, str.len * 6) catch return;
 
         const view = std.unicode.Utf8View.init(str) catch {
             std.debug.print("broke :{s}\n", .{str});
@@ -603,14 +594,14 @@ pub const ImmediateDrawingContext = struct {
 
             //self.rect(r, 0xffffffff);
 
-            b.indicies.appendSlice(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len)))) catch return;
+            b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
             const un = GL.normalizeTexRect(g.tr, font.texture.w, font.texture.h);
-            b.vertices.appendSlice(&.{
+            b.appendVerts(&.{
                 .{ .pos = .{ .x = r.x + r.w, .y = r.y + r.h }, .z = z, .uv = .{ .x = un.x + un.w, .y = un.y + un.h }, .color = col }, //0
                 .{ .pos = .{ .x = r.x + r.w, .y = r.y }, .z = z, .uv = .{ .x = un.x + un.w, .y = un.y }, .color = col }, //1
                 .{ .pos = .{ .x = r.x, .y = r.y }, .z = z, .uv = .{ .x = un.x, .y = un.y }, .color = col }, //2
                 .{ .pos = .{ .x = r.x, .y = r.y + r.h }, .z = z, .uv = .{ .x = un.x, .y = un.y + un.h }, .color = col }, //3
-            }) catch return;
+            });
 
             vx += (g.advance_x) * SF;
         }
@@ -725,7 +716,7 @@ pub const ImmediateDrawingContext = struct {
         const o: u32 = @intCast(b.vertices.items.len);
         const up = cam.getUp();
         const right = cam.front.cross(up).norm();
-        b.indicies.appendSlice(&genQuadIndices(o)) catch return;
+        b.appendIndex(&genQuadIndices(o));
         const un = GL.normalizeTexRect(tr, texture.w, texture.h);
         const co = 0xffffffff;
 
@@ -736,12 +727,12 @@ pub const ImmediateDrawingContext = struct {
         const C = po.add(right.add(up).scale(sz));
         const D = po.sub(right.sub(up).scale(sz));
 
-        b.vertices.appendSlice(&.{
+        b.appendVerts(&.{
             VtxFmt.textured3D(B.x(), B.y(), B.z(), un.x + un.w, un.y + un.h, co),
             VtxFmt.textured3D(C.x(), C.y(), C.z(), un.x + un.w, un.y, co),
             VtxFmt.textured3D(D.x(), D.y(), D.z(), un.x, un.y, co),
             VtxFmt.textured3D(A.x(), A.y(), A.z(), un.x, un.y + un.h, co),
-        }) catch return;
+        });
     }
 
     pub fn triangle3D(self: *Self, vs: []const za.Vec3, color: u32) void {
@@ -750,12 +741,12 @@ pub const ImmediateDrawingContext = struct {
             .camera = ._3d,
         } }) catch return).color_cube;
         const of: u32 = @intCast(b.vertices.items.len);
-        b.indicies.appendSlice(&.{ of, of + 1, of + 2 }) catch return;
-        b.vertices.appendSlice(&.{
+        b.appendIndex(&.{ of, of + 1, of + 2 });
+        b.appendVerts(&.{
             VtxFmt.color3D(vs[2].x(), vs[2].y(), vs[2].z(), color),
             VtxFmt.color3D(vs[1].x(), vs[1].y(), vs[1].z(), color),
             VtxFmt.color3D(vs[0].x(), vs[0].y(), vs[0].z(), color),
-        }) catch return;
+        });
     }
 
     /// Draw a convex polygon, 'vs' is ordered winding. direction is unimportant as both sides are drawn
@@ -771,14 +762,14 @@ pub const ImmediateDrawingContext = struct {
 
         for (1..vs.len - 1) |i| {
             const ii: u32 = @intCast(i);
-            b.indicies.appendSlice(&.{
+            b.appendIndex(&.{
                 (0 + of),
                 (ii + 1 + of),
                 (ii + of),
                 (ii + of), //Back face too
                 (ii + 1 + of),
                 (0 + of),
-            }) catch return;
+            });
         }
     }
 
@@ -808,14 +799,14 @@ pub const ImmediateDrawingContext = struct {
 
         for (1..index.len - 1) |i| {
             const ii: u32 = @intCast(i);
-            b.indicies.appendSlice(&.{
+            b.appendIndex(&.{
                 (0 + of),
                 (ii + 1 + of),
                 (ii + of),
                 (ii + of), //Back face too
                 (ii + 1 + of),
                 (0 + of),
-            }) catch return;
+            });
         }
     }
 
@@ -830,9 +821,9 @@ pub const ImmediateDrawingContext = struct {
             .shader = colored_line3d_shader,
             .camera = ._3d,
         } }) catch return).color_cube;
-        b.indicies.appendSlice(&GL.genCubeIndicies(@as(u32, @intCast(b.vertices.items.len)))) catch return;
+        b.appendIndex(&GL.genCubeIndicies(@as(u32, @intCast(b.vertices.items.len))));
         // zig fmt: off
-        b.vertices.appendSlice(&.{
+        b.appendVerts(&.{
         // front
         VtxFmt.color3D(px + sx, py + sy, pz, color), //0
         VtxFmt.color3D(px + sx, py     , pz, color), //1
@@ -867,7 +858,7 @@ pub const ImmediateDrawingContext = struct {
         VtxFmt.color3D(px + sx, py + sy, pz,       color),
 
 
-    }) catch return;
+    }) ;
     // zig fmt: on
     }
 
@@ -876,12 +867,12 @@ pub const ImmediateDrawingContext = struct {
         const b = &(self.getBatch(.{ .batch_kind = .color_tri, .params = .{ .shader = colored_tri_shader } }) catch return).color_tri;
         const z = self.zindex;
         const i: u32 = @intCast(b.vertices.items.len);
-        b.indicies.appendSlice(&.{ i, i + 1, i + 2 }) catch return;
-        b.vertices.appendSlice(&.{
+        b.appendIndex(&.{ i, i + 1, i + 2 });
+        b.appendVerts(&.{
             .{ .pos = v1, .z = z, .color = color },
             .{ .pos = v2, .z = z, .color = color },
             .{ .pos = v3, .z = z, .color = color },
-        }) catch return;
+        });
     }
 
     //TODO destroy this and use a font
@@ -907,13 +898,13 @@ pub const ImmediateDrawingContext = struct {
             const un = GL.normalizeTexRect(tr, font.texture.w, font.texture.h);
             const r = Rec(x + fi * h, y, h, h);
 
-            b.indicies.appendSlice(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len)))) catch return;
-            b.vertices.appendSlice(&.{
+            b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
+            b.appendVerts(&.{
                 .{ .pos = .{ .x = r.x + r.w, .y = r.y + r.h }, .z = z, .uv = .{ .x = un.x + un.w, .y = un.y + un.h }, .color = col }, //0
                 .{ .pos = .{ .x = r.x + r.w, .y = r.y }, .z = z, .uv = .{ .x = un.x + un.w, .y = un.y }, .color = col }, //1
                 .{ .pos = .{ .x = r.x, .y = r.y }, .z = z, .uv = .{ .x = un.x, .y = un.y }, .color = col }, //2
                 .{ .pos = .{ .x = r.x, .y = r.y + r.h }, .z = z, .uv = .{ .x = un.x, .y = un.y + un.h }, .color = col }, //3
-            }) catch return;
+            });
 
             i += 1;
         }
@@ -926,10 +917,10 @@ pub const ImmediateDrawingContext = struct {
         } }) catch return).color_line;
         const z = self.zindex;
         self.zindex += 1;
-        b.vertices.appendSlice(&.{
+        b.appendVerts(&.{
             .{ .pos = start_p, .z = z, .color = color },
             .{ .pos = end_p, .z = z, .color = color },
-        }) catch return;
+        });
     }
 
     pub fn setViewport(self: *Self, vo: ?Rect) void {
@@ -1076,13 +1067,15 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
         ebo: if (batch_options.index_buffer) c_uint else void,
         vertices: std.ArrayList(vertex_type),
         indicies: if (batch_options.index_buffer) std.ArrayList(IndexType) else void,
+        alloc: std.mem.Allocator,
         primitive_mode: GL.PrimitiveMode = batch_options.primitive_mode,
 
         pub fn init(alloc: Alloc) @This() {
             var ret = @This(){
-                .vertices = std.ArrayList(vertex_type).init(alloc),
-                .indicies = if (batch_options.index_buffer) std.ArrayList(IndexType).init(alloc) else {},
+                .vertices = .{},
+                .indicies = if (batch_options.index_buffer) .{} else {},
                 .ebo = if (batch_options.index_buffer) 0 else {},
+                .alloc = alloc,
                 .vao = 0,
                 .vbo = 0,
             };
@@ -1097,9 +1090,9 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
         }
 
         pub fn deinit(self: *Self) void {
-            self.vertices.deinit();
+            self.vertices.deinit(self.alloc);
             if (batch_options.index_buffer)
-                self.indicies.deinit();
+                self.indicies.deinit(self.alloc);
         }
 
         pub fn dirty(self: *Self) bool {
@@ -1114,9 +1107,9 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
         }
 
         pub fn clear(self: *Self) !void {
-            try self.vertices.resize(0);
+            try self.vertices.resize(self.alloc, 0);
             if (batch_options.index_buffer)
-                try self.indicies.resize(0);
+                try self.indicies.resize(self.alloc, 0);
         }
 
         pub fn draw(self: *Self, params: DrawParams, view: za.Mat4, model: za.Mat4) void {
@@ -1150,6 +1143,14 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
             } else {
                 c.glDrawArrays(prim, 0, @as(c_int, @intCast(self.vertices.items.len)));
             }
+        }
+
+        pub fn appendVerts(self: *Self, verts: []const vertex_type) void {
+            self.vertices.appendSlice(self.alloc, verts) catch {};
+        }
+
+        pub fn appendIndex(self: *Self, index: []const IndexType) void {
+            self.indicies.appendSlice(self.alloc, index) catch {};
         }
     };
 }

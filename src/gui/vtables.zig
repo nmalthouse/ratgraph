@@ -8,7 +8,7 @@ pub const Rect = graph.Rect;
 pub const Rec = graph.Rec;
 pub const Uid = u64;
 const gl = graph.GL;
-const ArrayList = std.ArrayListUnmanaged;
+const ArrayList = std.ArrayList;
 const AL = std.mem.Allocator;
 
 pub const CbHandle = struct {
@@ -726,19 +726,7 @@ pub const WindowId = enum(u32) {
     _,
 };
 
-const ENABLE_TEST_BUILDER = true;
 pub const Gui = struct {
-    const TestBuilder = struct {
-        output_file: if (ENABLE_TEST_BUILDER) ?std.fs.File else void = if (ENABLE_TEST_BUILDER) null else {},
-        outj: if (ENABLE_TEST_BUILDER) std.json.WriteStream(std.fs.File.Writer, .{ .checked_to_fixed_depth = 256 }) else void = undefined,
-
-        fn emit(self: *@This(), updates: UpdateState) void {
-            if (ENABLE_TEST_BUILDER) {
-                if (self.output_file) |_|
-                    self.outj.write(updates) catch return;
-            }
-        }
-    };
     const Self = @This();
     pub const MouseGrabFn = *const fn (*iArea, MouseCbState, *iWindow) void;
     pub const TextinputFn = *const fn (*iArea, TextCbState, *iWindow) void;
@@ -761,8 +749,6 @@ pub const Gui = struct {
             std.debug.print("{}\n", .{self});
         }
     } = .{},
-
-    test_builder: TestBuilder = .{},
 
     alloc: std.mem.Allocator,
     /// All the registered windows
@@ -837,27 +823,6 @@ pub const Gui = struct {
         self.closeTransientWindow();
         self.area_window_map.deinit(self.alloc);
         self.dstate.style.deinit();
-    }
-
-    pub fn openTestBuilder(self: *Self, dir: std.fs.Dir, filename: []const u8) !void {
-        if (ENABLE_TEST_BUILDER) {
-            self.test_builder = .{
-                .output_file = try dir.createFile(filename, .{}),
-                .outj = undefined,
-            };
-
-            self.test_builder.outj = std.json.writeStream(self.test_builder.output_file.?.writer(), .{});
-
-            try self.test_builder.outj.beginArray();
-        }
-    }
-
-    pub fn closeTestBuilder(self: *Self) void {
-        if (ENABLE_TEST_BUILDER) {
-            if (self.test_builder.output_file) |_| {
-                self.test_builder.outj.endArray() catch return;
-            }
-        }
     }
 
     /// Wrapper around alloc.create that never fails
@@ -1420,9 +1385,6 @@ pub const Gui = struct {
             .mod = win.mod,
             .keys = win.keys.slice(),
         };
-        if (ENABLE_TEST_BUILDER) {
-            self.test_builder.emit(us);
-        }
         try self.handleEvent(&us, windows);
     }
 };
