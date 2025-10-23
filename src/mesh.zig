@@ -41,8 +41,9 @@ pub const MeshVert = packed struct {
 
 pub const Mesh = struct {
     const Self = @This();
-    vertices: std.ArrayList(MeshVert),
-    indicies: std.ArrayList(u32),
+    alloc: std.mem.Allocator,
+    vertices: std.ArrayList(MeshVert) = .{},
+    indicies: std.ArrayList(u32) = .{},
 
     diffuse_texture: c_uint = 0,
 
@@ -52,8 +53,7 @@ pub const Mesh = struct {
 
     pub fn init(alloc: std.mem.Allocator, diff_texture_id: c_uint) @This() {
         var ret = Self{
-            .vertices = std.ArrayList(MeshVert).init(alloc),
-            .indicies = std.ArrayList(u32).init(alloc),
+            .alloc = alloc,
             .diffuse_texture = diff_texture_id,
         };
 
@@ -104,24 +104,24 @@ pub const Mesh = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.vertices.deinit();
-        self.indicies.deinit();
+        self.vertices.deinit(self.alloc);
+        self.indicies.deinit(self.alloc);
     }
 };
 
 /// A model is made up of multiple meshes
 pub const Model = struct {
     const Self = @This();
-    textures: std.ArrayList(graph.Texture),
-    meshes: std.ArrayList(Mesh),
+    alloc: std.mem.Allocator,
+    textures: std.ArrayList(graph.Texture) = .{},
+    meshes: std.ArrayList(Mesh) = .{},
 
     min: za.Vec3 = za.Vec3.zero(),
     max: za.Vec3 = za.Vec3.zero(),
 
     pub fn init(alloc: std.mem.Allocator) Model {
         return .{
-            .textures = std.ArrayList(graph.Texture).init(alloc),
-            .meshes = std.ArrayList(Mesh).init(alloc),
+            .alloc = alloc,
         };
     }
 
@@ -132,11 +132,11 @@ pub const Model = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.textures.deinit();
+        self.textures.deinit(self.alloc);
         for (self.meshes.items) |*mesh| {
             mesh.deinit();
         }
-        self.meshes.deinit();
+        self.meshes.deinit(self.alloc);
     }
 };
 
@@ -145,16 +145,16 @@ pub const Model = struct {
 // load the obj as normal into one big arraylist of verticies and indicies.
 // whenever encountering usemtl,
 pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, scale: f32) !Model {
-    var uvs = std.ArrayList(graph.Vec2f).init(alloc);
-    defer uvs.deinit();
+    var uvs: std.ArrayList(graph.Vec2f) = .{};
+    defer uvs.deinit(alloc);
     const Vert = struct {
         p: graph.Vec3f,
         color: u32,
     };
-    var verts = std.ArrayList(Vert).init(alloc);
-    defer verts.deinit();
-    var norms = std.ArrayList(graph.Vec3f).init(alloc);
-    defer norms.deinit();
+    var verts: std.ArrayList(Vert) = .{};
+    defer verts.deinit(alloc);
+    var norms: std.ArrayList(graph.Vec3f) = .{};
+    defer norms.deinit(alloc);
     var model = Model.init(alloc);
 
     var minx: f32 = std.math.floatMax(f32);
@@ -165,21 +165,20 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
     var maxy: f32 = std.math.floatMin(f32);
     var maxz: f32 = std.math.floatMin(f32);
 
-    var mtls = std.ArrayList(Mtl).init(alloc);
+    var mtls: std.ArrayList(Mtl) = .{};
     defer {
         for (mtls.items) |m| {
             alloc.free(m.name);
             if (m.diffuse_path) |d|
                 alloc.free(d);
         }
-        mtls.deinit();
+        mtls.deinit(alloc);
     }
     var mesh_map = std.StringHashMap(Mesh).init(alloc);
     defer mesh_map.deinit();
     var current_mesh: ?*Mesh = null;
 
-    const obj = try dir.openFile(filename, .{});
-    const sl = try obj.reader().readAllAlloc(alloc, std.math.maxInt(usize));
+    const sl = try graph.readFile(alloc, dir, filename);
     defer alloc.free(sl);
     var line_it = std.mem.splitAny(u8, sl, "\n\r");
     while (line_it.next()) |line| {
@@ -210,16 +209,16 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
             maxx = @max(maxx, x);
             maxy = @max(maxy, y);
             maxz = @max(maxz, z);
-            try verts.append(.{ .p = .{ .x = x, .y = y, .z = z }, .color = color });
+            try verts.append(alloc, .{ .p = .{ .x = x, .y = y, .z = z }, .color = color });
         } else if (eql(u8, com, "vt")) { //vertex uv
             const u = try std.fmt.parseFloat(f32, tok.next().?);
             const v = try std.fmt.parseFloat(f32, tok.next().?);
-            try uvs.append(.{ .x = u, .y = v });
+            try uvs.append(alloc, .{ .x = u, .y = v });
         } else if (eql(u8, com, "vn")) { //Vertex normal
             const x = try std.fmt.parseFloat(f32, tok.next().?);
             const y = try std.fmt.parseFloat(f32, tok.next().?);
             const z = try std.fmt.parseFloat(f32, tok.next().?);
-            try norms.append(.{ .x = x, .y = y, .z = z });
+            try norms.append(alloc, .{ .x = x, .y = y, .z = z });
         } else if (eql(u8, com, "f")) { //Face
             //Mesh
             if (current_mesh) |m| {
@@ -248,7 +247,7 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
                         }
                         break :blk graph.Vec3f{ .x = 0, .y = 1, .z = 0 };
                     };
-                    try m.vertices.append(.{
+                    try m.vertices.append(m.alloc, .{
                         .x = scale * ver.p.x,
                         .y = scale * ver.p.y,
                         .z = scale * ver.p.z,
@@ -264,7 +263,7 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
                 switch (count) {
                     0...2 => unreachable,
                     3 => {
-                        try m.indicies.appendSlice(&.{
+                        try m.indicies.appendSlice(m.alloc, &.{
                             vi, vi + 1, vi + 2,
                         });
                         const v1 = &m.vertices.items[vi];
@@ -299,7 +298,7 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
                         v3.tz += tangent.z();
                     },
                     4 => {
-                        try m.indicies.appendSlice(&.{
+                        try m.indicies.appendSlice(m.alloc, &.{
                             vi,
                             vi + 1,
                             vi + 2,
@@ -323,16 +322,16 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
         } else if (eql(u8, com, "mtllib")) {
             const mtl_filename = tok.next().?;
 
-            var file_prefix = std.ArrayList(u8).init(alloc);
-            var mtl_filename_full = std.ArrayList(u8).init(alloc);
-            defer mtl_filename_full.deinit();
-            defer file_prefix.deinit();
+            var file_prefix: std.ArrayList(u8) = .{};
+            var mtl_filename_full: std.ArrayList(u8) = .{};
+            defer mtl_filename_full.deinit(alloc);
+            defer file_prefix.deinit(alloc);
             if (std.mem.lastIndexOfScalar(u8, filename, '/')) |ind| {
-                try file_prefix.appendSlice(filename[0..ind]);
-                try file_prefix.append('/');
+                try file_prefix.appendSlice(alloc, filename[0..ind]);
+                try file_prefix.append(alloc, '/');
             }
-            try mtl_filename_full.appendSlice(file_prefix.items);
-            try mtl_filename_full.appendSlice(mtl_filename);
+            try mtl_filename_full.appendSlice(alloc, file_prefix.items);
+            try mtl_filename_full.appendSlice(alloc, mtl_filename);
 
             const old_mtl_len = mtls.items.len;
             loadMtl(alloc, dir, mtl_filename_full.items, &mtls) catch |err| switch (err) {
@@ -349,7 +348,7 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
                     continue;
                 };
 
-                try file_prefix.appendSlice(dpath);
+                try file_prefix.appendSlice(alloc, dpath);
                 //try file_prefix.appendSlice(".png");
                 defer file_prefix.shrinkRetainingCapacity(file_prefix_len);
                 const tex = graph.Texture.initFromImgFile(alloc, dir, file_prefix.items, .{}) catch |err| switch (err) {
@@ -359,7 +358,7 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
                     },
                     else => return err,
                 };
-                try model.textures.append(tex);
+                try model.textures.append(model.alloc, tex);
                 try mesh_map.put(mt.name, Mesh.init(alloc, tex.id));
             }
         } else {}
@@ -373,7 +372,7 @@ pub fn loadObj(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
             vert.tz = norm.z();
         }
         mesh.value_ptr.setData();
-        try model.meshes.append(mesh.value_ptr.*);
+        try model.meshes.append(model.alloc, mesh.value_ptr.*);
     }
     model.min = za.Vec3.new(minx, miny, minz).scale(scale);
     model.max = za.Vec3.new(maxx, maxy, maxz).scale(scale);
@@ -390,8 +389,7 @@ pub const Mtl = struct {
 
 pub fn loadMtl(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, mtl_list: *std.ArrayList(Mtl)) !void {
     const h = std.hash.Wyhash.hash;
-    const mtl_file = try dir.openFile(filename, .{});
-    const slmtl = try mtl_file.reader().readAllAlloc(alloc, std.math.maxInt(usize));
+    const slmtl = try graph.readFile(alloc, dir, filename);
     defer alloc.free(slmtl);
     var mtl_it = std.mem.splitAny(u8, slmtl, "\n\r");
     var mtl: ?Mtl = null;
@@ -401,7 +399,7 @@ pub fn loadMtl(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
         switch (h(0, com)) {
             h(0, "newmtl") => {
                 if (mtl) |m|
-                    try mtl_list.append(m);
+                    try mtl_list.append(alloc, m);
 
                 const name = tok.next().?;
                 mtl = .{ .name = try alloc.dupe(u8, name) };
@@ -427,5 +425,5 @@ pub fn loadMtl(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, 
         }
     }
     if (mtl) |m|
-        try mtl_list.append(m);
+        try mtl_list.append(alloc, m);
 }

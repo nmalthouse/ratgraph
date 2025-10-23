@@ -438,22 +438,31 @@ pub const Shader = struct {
     }
 
     pub fn loadFromFilesystem(alloc: std.mem.Allocator, dir: std.fs.Dir, stages: []const struct { path: []const u8, t: Type }) !glID {
-        var array_lists = try alloc.alloc(std.ArrayList(u8), stages.len);
+        var array_lists = try alloc.alloc([]const u8, stages.len);
         var sources = try alloc.alloc(Stage, stages.len);
         defer alloc.free(sources);
         defer {
             for (array_lists) |ar| {
-                ar.deinit();
+                alloc.free(ar);
             }
             alloc.free(array_lists);
         }
+        var buf: [1024]u8 = undefined;
         for (stages, 0..) |stage, i| {
             var file = try dir.openFile(stage.path, .{});
             defer file.close();
-            array_lists[i] = std.ArrayList(u8).init(alloc);
-            try file.reader().readAllArrayList(&array_lists[i], std.math.maxInt(usize));
-            try array_lists[i].append(0);
-            sources[i] = .{ .src = &array_lists[i].items[0], .t = stage.t };
+
+            var aw = std.Io.Writer.Allocating.init(alloc);
+            defer aw.deinit();
+
+            const wr = &aw.writer;
+
+            var rea = file.reader(&buf);
+            _ = try rea.interface.streamRemaining(wr);
+            _ = try wr.splatByteAll(0, 1);
+
+            array_lists[i] = try aw.toOwnedSlice();
+            sources[i] = .{ .src = &array_lists[i][0], .t = stage.t };
         }
 
         return advancedShader(sources);

@@ -661,32 +661,34 @@ pub const ImmediateDrawingContext = struct {
             .camera = ._3d,
             .line_point_width = @intFromFloat(@min(255, @abs(width * 4))),
         } }) catch return).color_point3D;
-        b.vertices.append(.{ .pos = .{ .x = point.x(), .y = point.y(), .z = point.z() }, .color = color }) catch return;
+        b.appendVert(.{ .pos = .{ .x = point.x(), .y = point.y(), .z = point.z() }, .color = color });
     }
 
     pub fn cubeFrame(self: *Self, pos: za.Vec3, ext: za.Vec3, color: u32) void {
         const b = &(self.getBatch(.{ .batch_kind = .color_line3D, .params = .{ .shader = colored_line3d_shader, .camera = ._3d } }) catch return).color_line3D;
-        const v = &b.vertices;
-        const i: u32 = @intCast(v.items.len);
+        const i: u32 = @intCast(b.vertices.items.len);
 
         const z1 = pos.z();
-        v.append(.{ .color = color, .pos = .{ .z = z1, .x = pos.x(), .y = pos.y() } }) catch return;
-        v.append(.{ .color = color, .pos = .{ .z = z1, .x = pos.x() + ext.x(), .y = pos.y() } }) catch return;
-        v.append(.{ .color = color, .pos = .{ .z = z1, .x = pos.x() + ext.x(), .y = pos.y() + ext.y() } }) catch return;
-        v.append(.{ .color = color, .pos = .{ .z = z1, .x = pos.x(), .y = pos.y() + ext.y() } }) catch return;
+        b.appendVerts(&.{
+            .{ .color = color, .pos = .{ .z = z1, .x = pos.x(), .y = pos.y() } },
+            .{ .color = color, .pos = .{ .z = z1, .x = pos.x() + ext.x(), .y = pos.y() } },
+            .{ .color = color, .pos = .{ .z = z1, .x = pos.x() + ext.x(), .y = pos.y() + ext.y() } },
+            .{ .color = color, .pos = .{ .z = z1, .x = pos.x(), .y = pos.y() + ext.y() } },
+        });
 
         const z2 = pos.z() + ext.z();
-        v.append(.{ .color = color, .pos = .{ .z = z2, .x = pos.x(), .y = pos.y() } }) catch return;
-        v.append(.{ .color = color, .pos = .{ .z = z2, .x = pos.x() + ext.x(), .y = pos.y() } }) catch return;
-        v.append(.{ .color = color, .pos = .{ .z = z2, .x = pos.x() + ext.x(), .y = pos.y() + ext.y() } }) catch return;
-        v.append(.{ .color = color, .pos = .{ .z = z2, .x = pos.x(), .y = pos.y() + ext.y() } }) catch return;
-        const in = &b.indicies;
+        b.appendVerts(&.{
+            .{ .color = color, .pos = .{ .z = z2, .x = pos.x(), .y = pos.y() } },
+            .{ .color = color, .pos = .{ .z = z2, .x = pos.x() + ext.x(), .y = pos.y() } },
+            .{ .color = color, .pos = .{ .z = z2, .x = pos.x() + ext.x(), .y = pos.y() + ext.y() } },
+            .{ .color = color, .pos = .{ .z = z2, .x = pos.x(), .y = pos.y() + ext.y() } },
+        });
 
-        in.appendSlice(&.{
+        b.appendIndex(&.{
             i, i + 1, i + 1, i + 2, i + 2, i + 3, i + 3, i, //bottom layer
             i, i + 4, i + 1, i + 5, i + 2, i + 6, i + 3, i + 7, //Verticals
             i + 4, i + 5, i + 5, i + 6, i + 6, i + 7, i + 7, i + 4, //top layer
-        }) catch return;
+        });
     }
 
     pub fn line3D(self: *Self, start_point: za.Vec3, end_point: za.Vec3, color: u32, width: f32) void {
@@ -696,10 +698,11 @@ pub const ImmediateDrawingContext = struct {
             .line_point_width = @intFromFloat(@min(255, @abs(width * 4))),
         } }) catch return).color_line3D;
         const i = b.vertices.items.len;
-        b.vertices.append(.{ .pos = .{ .x = start_point.x(), .y = start_point.y(), .z = start_point.z() }, .color = color }) catch return;
-        b.vertices.append(.{ .pos = .{ .x = end_point.x(), .y = end_point.y(), .z = end_point.z() }, .color = color }) catch return;
-        b.indicies.append(@intCast(i)) catch return;
-        b.indicies.append(@intCast(i + 1)) catch return;
+        b.appendVerts(&.{
+            .{ .pos = .{ .x = start_point.x(), .y = start_point.y(), .z = start_point.z() }, .color = color },
+            .{ .pos = .{ .x = end_point.x(), .y = end_point.y(), .z = end_point.z() }, .color = color },
+        });
+        b.appendIndex(&.{ @intCast(i), @intCast(i + 1) });
     }
 
     //vec3 vertexPosition_worldspace =
@@ -756,9 +759,9 @@ pub const ImmediateDrawingContext = struct {
             .camera = ._3d,
         } }) catch return).color_cube;
         const of: u32 = @intCast(b.vertices.items.len);
-        b.vertices.ensureUnusedCapacity(vs.len) catch return;
+        b.vertices.ensureUnusedCapacity(b.alloc, vs.len) catch return;
         for (vs) |v|
-            b.vertices.append(VtxFmt.color3D(v.x(), v.y(), v.z(), color)) catch return;
+            b.vertices.append(b.alloc, VtxFmt.color3D(v.x(), v.y(), v.z(), color)) catch return;
 
         for (1..vs.len - 1) |i| {
             const ii: u32 = @intCast(i);
@@ -788,13 +791,13 @@ pub const ImmediateDrawingContext = struct {
             .camera = ._3d,
         } }) catch return).color_cube;
         const of: u32 = @intCast(b.vertices.items.len);
-        b.vertices.ensureUnusedCapacity(index.len) catch return;
+        b.vertices.ensureUnusedCapacity(b.alloc, index.len) catch return;
         for (index) |i| {
             var v = vs[i];
             if (param.rot) |r|
                 v = r.mulByVec3(v);
             v = v.add(param.offset);
-            b.vertices.append(VtxFmt.color3D(v.x(), v.y(), v.z(), color)) catch return;
+            b.appendVert(VtxFmt.color3D(v.x(), v.y(), v.z(), color));
         }
 
         for (1..index.len - 1) |i| {
@@ -1148,9 +1151,15 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
         pub fn appendVerts(self: *Self, verts: []const vertex_type) void {
             self.vertices.appendSlice(self.alloc, verts) catch {};
         }
-
+        pub fn appendVert(self: *Self, vert: vertex_type) void {
+            self.vertices.append(self.alloc, vert) catch {};
+        }
         pub fn appendIndex(self: *Self, index: []const IndexType) void {
             self.indicies.appendSlice(self.alloc, index) catch {};
+        }
+
+        pub fn appendInd(self: *Self, index: IndexType) void {
+            self.indicies.append(self.alloc, index) catch {};
         }
     };
 }
@@ -1481,3 +1490,14 @@ pub const Cubes = struct {
         self.indicies.deinit();
     }
 };
+
+pub fn readFile(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8) ![]const u8 {
+    var buffer: [4096]u8 = undefined;
+
+    var in = try dir.openFile(filename, .{});
+    defer in.close();
+
+    var reader = in.reader(&buffer);
+
+    return try reader.interface.allocRemaining(alloc, .unlimited);
+}

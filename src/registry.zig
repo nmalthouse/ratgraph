@@ -18,6 +18,10 @@ pub const MapField = struct {
     } = null,
 };
 
+fn sfield(comptime name: [:0]const u8, comptime T: type) std.builtin.Type.StructField {
+    return .{ .name = name, .type = T, .default_value_ptr = null, .is_comptime = false, .alignment = @alignOf(T) };
+}
+
 pub fn Component(comptime name: [:0]const u8, comptime _type: type) MapField {
     return .{ .ftype = _type, .name = name };
 }
@@ -62,21 +66,15 @@ pub fn GenRegistryStructs(comptime fields: FieldList) struct {
 
     inline for (fields, 0..) |f, lt_i| {
         const anynull: ?f.ftype = null;
-        big_ent_type[lt_i] = .{ .name = f.name, .type = ?f.ftype, .default_value_ptr = &anynull, .is_comptime = false, .alignment = 0 };
-        reg_fields[lt_i] = .{ .name = f.name, .type = SparseSet(f.ftype, ID_TYPE), .default_value_ptr = null, .is_comptime = false, .alignment = 0 };
-        json_fields[lt_i] = .{
-            .name = f.name,
-            .type = struct {
-                pub const Entry = struct {
-                    id: ID_TYPE,
-                    data: f.ftype,
-                };
-                entries: []Entry,
-            },
-            .default_value_ptr = null,
-            .is_comptime = false,
-            .alignment = 0,
-        };
+        big_ent_type[lt_i] = .{ .name = f.name, .type = ?f.ftype, .default_value_ptr = &anynull, .is_comptime = false, .alignment = @alignOf(?f.ftype) };
+        reg_fields[lt_i] = sfield(f.name, SparseSet(f.ftype, ID_TYPE));
+        json_fields[lt_i] = sfield(f.name, struct {
+            pub const Entry = struct {
+                id: ID_TYPE,
+                data: f.ftype,
+            };
+            entries: []Entry,
+        });
         union_fields[lt_i] = .{ .name = f.name, .type = f.ftype, .alignment = @alignOf(f.ftype) };
 
         //Test if f.ftype has a field called prototype and use it instead
@@ -124,13 +122,7 @@ pub fn GenRegistryStructs(comptime fields: FieldList) struct {
             .value = lt_i,
         };
 
-        queued_fields[lt_i] = .{
-            .name = f.name,
-            .type = std.ArrayList(f.ftype),
-            .default_value_ptr = null,
-            .is_comptime = false,
-            .alignment = 0,
-        };
+        queued_fields[lt_i] = sfield(f.name, std.ArrayList(f.ftype));
     }
     const EnumType = @Type(TypeInfo{ .@"enum" = .{
         .tag_type = u32,
@@ -217,6 +209,8 @@ pub fn Registry(comptime field_names_l: FieldList) type {
         callbacks: Types.callbacks,
         data: Types.reg,
 
+        alloc: std.mem.Allocator,
+
         ///All entities have an entry in this array. The bitset represents what components are attached to this entity.
         entities: std.ArrayList(Types.component_bit_set),
         sleep_timers: std.ArrayList(SleepTimer),
@@ -255,13 +249,17 @@ pub fn Registry(comptime field_names_l: FieldList) type {
         }
 
         pub fn init(alloc: std.mem.Allocator) !Self {
-            var ret: Self = undefined;
+            var ret: Self = .{
+                .alloc = alloc,
+                .callbacks = undefined,
+                .data = undefined,
+                .entities = .{},
+                .sleep_timers = .{},
+                .slept = try SleptT.init(alloc),
+            };
             inline for (field_names_l) |comp| {
                 @field(ret.data, comp.name) = try SparseSet(comp.ftype, ID_TYPE).init(alloc);
             }
-            ret.entities = std.ArrayList(Types.component_bit_set).init(alloc);
-            ret.slept = try SleptT.init(alloc);
-            ret.sleep_timers = std.ArrayList(SleepTimer).init(alloc);
 
             return ret;
         }
@@ -280,9 +278,9 @@ pub fn Registry(comptime field_names_l: FieldList) type {
                 }
                 @field(self.data, field.name).deinit();
             }
-            self.sleep_timers.deinit();
+            self.sleep_timers.deinit(self.alloc);
             self.slept.deinit();
-            self.entities.deinit();
+            self.entities.deinit(self.alloc);
         }
 
         pub fn stringToComponent(string: []const u8) ?Components {
@@ -343,7 +341,7 @@ pub fn Registry(comptime field_names_l: FieldList) type {
         //The main concern with recycling ids is that any references to an entity are not cleared before reassignment, leading to what is essentially memory corruption.
         pub fn createEntity(self: *Self) !ID_TYPE {
             const index = @as(ID_TYPE, @intCast(self.entities.items.len));
-            try self.entities.append(Types.component_bit_set.initEmpty());
+            try self.entities.append(self.alloc, Types.component_bit_set.initEmpty());
             return index;
         }
 
@@ -377,7 +375,7 @@ pub fn Registry(comptime field_names_l: FieldList) type {
                 }
                 try @field(self.data, field.name).empty();
             }
-            try self.entities.resize(0);
+            try self.entities.resize(self.alloc, 0);
         }
 
         pub fn destroyEntity(self: *Self, index: ID_TYPE) !void {
@@ -445,7 +443,7 @@ pub fn Registry(comptime field_names_l: FieldList) type {
                 if (index >= self.entities.items.len) { //Entity outside of range, append tombstones
                     var tomb = Types.component_bit_set.initEmpty();
                     tomb.set(Types.tombstone_bit);
-                    try self.entities.appendNTimes(tomb, index - self.entities.items.len + 1);
+                    try self.entities.appendNTimes(self.alloc, tomb, index - self.entities.items.len + 1);
                 }
                 self.entities.items[index].unset(Types.tombstone_bit);
             }
@@ -615,12 +613,13 @@ pub fn Registry(comptime field_names_l: FieldList) type {
         pub fn setType(comptime components: []const Types.component_enum) type {
             var fields: [components.len]std.builtin.Type.StructField = undefined;
             inline for (components, 0..) |comp, f_i| {
+                const T = *field_names_l[@intFromEnum(comp)].ftype;
                 fields[f_i] = .{
                     .name = field_names_l[@intFromEnum(comp)].name,
-                    .type = *field_names_l[@intFromEnum(comp)].ftype,
+                    .type = T,
                     .default_value_ptr = null,
                     .is_comptime = false,
-                    .alignment = 0,
+                    .alignment = @alignOf(T),
                 };
             }
 

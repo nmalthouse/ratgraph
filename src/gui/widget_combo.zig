@@ -110,7 +110,7 @@ pub fn ComboUser(user_data: type) type {
                     for (0..total_count) |i| {
                         const name = p.opts.name_cb(p.opts.user_vt, i, gui, p.user);
                         if (searchMatch(name, self.search_string))
-                            self.search_list.append(i) catch return;
+                            self.search_list.append(gui.alloc, i) catch return;
                     }
                 }
 
@@ -137,7 +137,7 @@ pub fn ComboUser(user_data: type) type {
             pub fn deinit(vt: *iWindow, gui: *Gui) void {
                 const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
                 vt.deinit(gui);
-                self.search_list.deinit();
+                self.search_list.deinit(gui.alloc);
                 gui.alloc.destroy(self);
             }
 
@@ -217,7 +217,7 @@ pub fn ComboUser(user_data: type) type {
                     .{ .area = area },
                     &popped.vt,
                 ),
-                .search_list = std.ArrayList(usize).init(gui.alloc),
+                .search_list = .{},
                 .name = "noname",
             };
             gui.setTransientWindow(&popped.vt);

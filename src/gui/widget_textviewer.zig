@@ -38,7 +38,7 @@ pub const TextView = struct {
         self.* = .{
             .cat_string = catStrings(gui.alloc, text) catch return .failed,
             .vt = .UNINITILIZED,
-            .lines = std.ArrayList([]const u8).init(gui.alloc),
+            .lines = .{},
             .opts = opts,
         };
         parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw });
@@ -104,7 +104,7 @@ pub const TextView = struct {
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         gui.alloc.free(self.cat_string);
-        self.lines.deinit();
+        self.lines.deinit(gui.alloc);
         gui.alloc.destroy(self);
     }
 
@@ -120,17 +120,18 @@ pub const TextView = struct {
         var xwalker = font.xWalker(string, font_h);
         var current_line_w: f32 = 0;
         var start_index: usize = 0;
+        const gui = self.vt.win_ptr.gui_ptr;
         while (xwalker.next()) |n| {
             const w = n[0];
             current_line_w += w;
             if (current_line_w > max_line_w or n[1] == '\n') {
                 const end = xwalker.index();
-                try self.lines.append(string[start_index..end]);
+                try self.lines.append(gui.alloc, string[start_index..end]);
                 start_index = end;
                 current_line_w = 0;
             }
         }
-        try self.lines.append(string[start_index..]);
+        try self.lines.append(gui.alloc, string[start_index..]);
     }
 
     /// the passed in string must live for duration of self
@@ -141,6 +142,7 @@ pub const TextView = struct {
         var start_index: usize = 0;
         var last_space: ?usize = null;
         var width_at_last_space: f32 = 0;
+        const gui = self.vt.win_ptr.gui_ptr;
         while (xwalker.next()) |n| {
             const w = n[0];
             current_line_w += w;
@@ -155,18 +157,18 @@ pub const TextView = struct {
                 if (past and last_space != null) {
                     const ls = last_space.?;
                     if (start_index > ls) return;
-                    try self.lines.append(string[start_index..ls]);
+                    try self.lines.append(gui.alloc, string[start_index..ls]);
                     current_line_w = current_line_w - width_at_last_space;
                     start_index = ls;
                 } else {
                     if (start_index > end) return;
-                    try self.lines.append(string[start_index..end]);
+                    try self.lines.append(gui.alloc, string[start_index..end]);
                     start_index = end;
                     current_line_w = 0;
                 }
             }
         }
-        try self.lines.append(string[start_index..]);
+        try self.lines.append(gui.alloc, string[start_index..]);
     }
 
     fn catStrings(alloc: std.mem.Allocator, text: []const []const u8) ![]const u8 {

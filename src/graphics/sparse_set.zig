@@ -18,7 +18,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
         /// Sparse maps a global index to a 'dense' index
         sparse: ArrayList(index_type) = .{},
 
-        dense: ArrayList(child_type) = .{},
+        dense: std.array_list.Managed(child_type),
         /// dense_index_lut is parallel to dense, mapping dense indices to global indices
         dense_index_lut: ArrayList(index_type) = .{},
 
@@ -35,8 +35,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
         }
 
         pub fn init(alloc: std.mem.Allocator) !Self {
-            const ret = Self{ .alloc = alloc };
-            return ret;
+            return Self{ .alloc = alloc, .dense = std.array_list.Managed(child_type).init(alloc) };
         }
 
         pub fn fromOwnedDenseSlice(alloc: std.mem.Allocator, slice: []child_type, lut: []index_type) (error{MismatchedIndexSlice} || InvalidIndex || Allocator.Error)!Self {
@@ -64,14 +63,14 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
         pub fn deinit(self: *Self) void {
             self.sparse.deinit(self.alloc);
             self.dense_index_lut.deinit(self.alloc);
-            self.dense.deinit(self.alloc);
+            self.dense.deinit();
             self._freelist.deinit(self.alloc);
         }
 
         pub fn empty(self: *Self) Allocator.Error!void {
             try self.sparse.resize(self.alloc, 0);
             try self.dense_index_lut.resize(self.alloc, 0);
-            try self.dense.resize(self.alloc, 0);
+            try self.dense.resize(0);
             try self._freelist.resize(self.alloc, 0);
         }
 
@@ -90,7 +89,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
                 }
                 const new_size = self.dense_index_lut.items.len + 1;
                 try self.dense_index_lut.resize(self.alloc, new_size);
-                try self.dense.resize(self.alloc, new_size);
+                try self.dense.resize(new_size);
                 break :blk self.dense_index_lut.items.len - 1;
             };
 
@@ -142,7 +141,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
         }
 
         pub const Iterator = struct {
-            dense: *ArrayList(child_type),
+            dense: *std.array_list.Managed(child_type),
             dense_index_lut: *ArrayList(index_type),
             //This is an index into dense
             index: usize,
