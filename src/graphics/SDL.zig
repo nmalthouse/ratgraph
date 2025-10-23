@@ -409,6 +409,11 @@ pub const Window = struct {
         return false;
     }
 
+    /// Force next call to wait event to wait a poll length rather than wait length
+    pub fn forcePoll(self: *Self) void {
+        self.last_was_pushed = true;
+    }
+
     pub fn pumpEvents(self: *Self, mode: enum { poll, wait }) void {
         const event_fn = switch (mode) {
             .wait => &waitEvent,
