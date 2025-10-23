@@ -97,6 +97,7 @@ pub fn pushEvent(id: u32, user_code: i32, data1: ?*anyopaque, data2: ?*anyopaque
         .data1 = data1,
         .data2 = data2,
     } };
+    std.debug.print("pushing event with {d}\n", .{id});
     if (!c.SDL_PushEvent(&ev)) {
         Window.sdlLogErr();
         return error.failed;
@@ -188,7 +189,9 @@ pub const Window = struct {
     text_input_buffer: [256]u8 = undefined,
     text_input: []const u8,
 
-    user_event_cb: ?*const UserEventCb = null,
+    user_event_cbs: std.ArrayList(*const UserEventCb) = .{},
+
+    alloc: std.mem.Allocator,
 
     pub fn sdlLogErr() void {
         log.err("{s}", .{c.SDL_GetError()});
@@ -210,15 +213,19 @@ pub const Window = struct {
         }
     }
 
-    pub fn setUserEventCb(self: *Self, cb: *const UserEventCb) void {
-        self.user_event_cb = cb;
+    pub fn addUserEventCb(self: *Self, cb: *const UserEventCb) !u32 {
+        const new_id = c.SDL_RegisterEvents(1);
+        if (new_id < c.SDL_EVENT_USER) return error.Sdl_had_oopsie;
+        if (new_id - c.SDL_EVENT_USER != self.user_event_cbs.items.len) return error.invalidUserEventCbState;
+        try self.user_event_cbs.append(self.alloc, cb);
+        return new_id;
     }
 
     //pub fn screenshotGL(self: *const Self,alloc: Alloc,  )void{
 
     //}
 
-    pub fn createWindow(title: [*c]const u8, options: CreateOptions) !Self {
+    pub fn createWindow(title: [*c]const u8, options: CreateOptions, alloc: std.mem.Allocator) !Self {
         log.info("Attempting to create window: {s}", .{title});
         if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
             sdlLogErr();
@@ -293,6 +300,7 @@ pub const Window = struct {
         }
 
         var ret = Self{
+            .alloc = alloc,
             .win = win,
             .ctx = context,
             .text_input = "",
@@ -320,7 +328,8 @@ pub const Window = struct {
         return .{ .win = win };
     }
 
-    pub fn destroyWindow(self: Self) void {
+    pub fn destroyWindow(self: *Self) void {
+        self.user_event_cbs.deinit(self.alloc);
         _ = c.SDL_GL_DestroyContext(self.ctx);
         c.SDL_DestroyWindow(self.win);
         c.SDL_Quit();
@@ -514,11 +523,16 @@ pub const Window = struct {
                     self.screen_dimensions.y = y;
                     c.glViewport(0, 0, self.screen_dimensions.x, self.screen_dimensions.y);
                 },
-                c.SDL_EVENT_USER => {
-                    if (self.user_event_cb) |cb|
-                        cb(event.user);
+                else => {
+                    if (event.type >= c.SDL_EVENT_USER) {
+                        const offset = event.type - c.SDL_EVENT_USER;
+                        if (offset < self.user_event_cbs.items.len) {
+                            self.user_event_cbs.items[offset](event.user);
+                        } else {
+                            log.warn("recieved user event out of range {d}", .{event.type});
+                        }
+                    }
                 },
-                else => continue,
             }
         }
     }
