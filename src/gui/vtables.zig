@@ -348,7 +348,10 @@ pub const iWindow = struct {
     /// Returns true if this window contains the mouse
     pub fn dispatchClick(win: *iWindow, cb: MouseCbState) bool {
         if (!win.area.area.containsPoint(cb.pos)) return false;
-        for (win.click_listeners.items) |click| {
+        var i: usize = win.click_listeners.items.len;
+        //Iterate backwards so deeper widgets have priority
+        while (i > 0) : (i -= 1) {
+            const click = win.click_listeners.items[i - 1];
             if (click[0].area.containsPoint(cb.pos)) {
                 if (win.getScissorRect(click[0]._scissor_id)) |sz| {
                     if (!sz.containsPoint(cb.pos))
