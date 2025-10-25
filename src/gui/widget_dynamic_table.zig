@@ -29,6 +29,7 @@ pub const DynamicTable = struct {
         var ly = gui.dstate.vlayout(area);
         const tab_area = ly.getArea() orelse return .failed;
 
+        ly.pushRemaining();
         const table_area = ly.getArea() orelse return .failed;
 
         const self = gui.create(@This());
@@ -41,7 +42,6 @@ pub const DynamicTable = struct {
 
         _ = TableHeader.build(&self.vt, tab_area, self);
 
-        ly.pushRemaining();
         _ = self.vt.addEmpty(table_area);
         self.rebuild(gui, win);
 
