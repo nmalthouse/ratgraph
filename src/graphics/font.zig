@@ -23,8 +23,16 @@ pub const PublicFontInterface = struct {
 
         pub fn next(tw: *@This()) ?struct { f32, u21 } {
             if (tw.it.nextCodepoint()) |ch| {
-                const glyph = tw.font.getGlyph(ch);
-                return .{ (glyph.advance_x) * tw.scale, ch };
+                switch (ch) {
+                    '\t' => {
+                        const space = tw.font.getGlyph(' ');
+                        return .{ space.advance_x * tw.scale * 4, ch };
+                    },
+                    else => {
+                        const glyph = tw.font.getGlyph(ch);
+                        return .{ (glyph.advance_x) * tw.scale, ch };
+                    },
+                }
             }
             return null;
         }
@@ -74,6 +82,11 @@ pub const PublicFontInterface = struct {
                         bounds.x = x_bound;
                     x_bound = 0;
                 },
+                '\t' => {
+                    const space = self.getGlyph(' ');
+                    x_bound += space.advance_x * scale * 4;
+                },
+                '\r' => continue, //ignore these
                 else => {},
             }
 
@@ -111,6 +124,11 @@ pub const PublicFontInterface = struct {
                         bounds.x = x_bound;
                     x_bound = 0;
                 },
+                '\t' => {
+                    const space = self.getGlyph(' ');
+                    x_bound += space.advance_x * scale * 4;
+                },
+                '\r' => continue,
                 else => {
                     const x = rel_coord.x;
                     //const y = rel_coord.y;

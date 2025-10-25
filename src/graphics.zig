@@ -572,12 +572,21 @@ pub const ImmediateDrawingContext = struct {
         var vy = y * fac + ((font.ascent + font.descent) * SF);
         const z = self.zindex + 1;
         while (it.nextCodepoint()) |ch| {
-            if (ch == '\n') {
-                if (param.do_newlines) {
-                    vy += font.line_gap * SF;
-                    vx = x * fac;
-                }
-                continue;
+            switch (ch) {
+                else => {},
+                '\r' => continue,
+                '\t' => {
+                    const space = font.getGlyph(' ');
+                    vx += space.advance_x * SF * 4;
+                    continue;
+                },
+                '\n' => {
+                    if (param.do_newlines) {
+                        vy += font.line_gap * SF;
+                        vx = x * fac;
+                    }
+                    continue;
+                },
             }
 
             const g = font.getGlyph(ch);
