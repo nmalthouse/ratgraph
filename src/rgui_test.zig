@@ -271,7 +271,7 @@ pub fn main() !void {
     var win = try graph.SDL.Window.createWindow("My window", .{
         // Optional, see Window.createWindow definition for full list of options
         .window_size = .{ .x = 1000, .y = 1000 },
-    });
+    }, alloc);
     defer win.destroyWindow();
 
     var draw = graph.ImmediateDrawingContext.init(alloc);
