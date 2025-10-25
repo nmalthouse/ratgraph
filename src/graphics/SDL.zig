@@ -97,7 +97,6 @@ pub fn pushEvent(id: u32, user_code: i32, data1: ?*anyopaque, data2: ?*anyopaque
         .data1 = data1,
         .data2 = data2,
     } };
-    std.debug.print("pushing event with {d}\n", .{id});
     if (!c.SDL_PushEvent(&ev)) {
         Window.sdlLogErr();
         return error.failed;

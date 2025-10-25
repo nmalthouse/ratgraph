@@ -1368,7 +1368,7 @@ pub const Gui = struct {
             });
         }
         if (us.mouse.scroll.y != 0)
-            self.dispatchScroll(us.mouse.pos, us.mouse.scroll.y, windows);
+            self.dispatchScroll(us.mouse.pos, us.mouse.scroll.y * -1, windows);
     }
 
     pub fn handleSdlEvents(self: *Self, windows: []const *iWindow) !void {

@@ -295,7 +295,7 @@ pub const Font = struct {
                 .line_gap = @floatFromInt(options.sts.th),
             },
             .max_advance = @floatFromInt(options.sts.tw),
-            .glyphs = std.AutoHashMap(u21, Glyph).init(alloc),
+            .glyphs = .init(alloc),
         };
         for (codepoints_i, 0..) |item, i| {
             try result.glyphs.put(
@@ -347,7 +347,7 @@ pub const Font = struct {
             },
             .max_advance = 0,
             .lower_ascii = try alloc.alloc(?Glyph, 128),
-            .glyphs = std.AutoHashMap(u21, Glyph).init(alloc),
+            .glyphs = .init(alloc),
         };
         for (0..result.lower_ascii.len) |i|
             result.lower_ascii[i] = null;
@@ -468,7 +468,7 @@ pub const Font = struct {
                 .line_gap = 0,
             },
             .max_advance = 0,
-            .glyphs = std.AutoHashMap(u21, Glyph).init(alloc),
+            .glyphs = .init(alloc),
             .lower_ascii = try alloc.alloc(?Glyph, 128),
         };
         for (0..result.lower_ascii.len) |i|

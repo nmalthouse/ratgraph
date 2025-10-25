@@ -145,33 +145,12 @@ pub const SubTileset = struct {
     }
 };
 
-///A Fixed width bitmap font structure
-pub const FixedBitmapFont = struct {
-    const Self = @This();
-
-    texture: Texture,
-    sts: SubTileset,
-
-    translation_table: [128]u8 = [_]u8{127} ** 128,
-
-    // each index of this decode_string corresponds to the index of the character in subTileSet
-    pub fn init(texture: Texture, sts: SubTileset, decode_string: []const u8) Self {
-        var ret = Self{
-            .texture = texture,
-            .sts = sts,
-        };
-        for (decode_string, 0..) |ch, i| {
-            ret.translation_table[ch] = @as(u8, @intCast(i));
-        }
-
-        return ret;
-    }
-};
-
 //TODO load a font and have a draw.textFmt convenience function with args:(pos, fmt, fmt_args, size);
 pub const ImmediateDrawingContext = struct {
     const Self = @This();
     const log = std.log.scoped(.ImmediateDrawingContext);
+    pub const Line3DBatch = NewBatch(VtxFmt.Color_3D, .{ .index_buffer = true, .primitive_mode = .lines });
+    pub const Point3DBatch = NewBatch(VtxFmt.Color_3D, .{ .index_buffer = false, .primitive_mode = .points });
     pub const TextParam = struct {
         background_rect: ?u32 = null,
         color: u32,
@@ -218,8 +197,8 @@ pub const ImmediateDrawingContext = struct {
         color_tri: NewBatch(VtxFmt.Color_2D, .{ .index_buffer = true, .primitive_mode = .triangles }),
         color_tri_tex: NewBatch(VtxFmt.Color_Texture_2D, .{ .index_buffer = true, .primitive_mode = .triangles }),
         color_line: NewBatch(VtxFmt.Color_2D, .{ .index_buffer = false, .primitive_mode = .lines }),
-        color_line3D: NewBatch(VtxFmt.Color_3D, .{ .index_buffer = true, .primitive_mode = .lines }),
-        color_point3D: NewBatch(VtxFmt.Color_3D, .{ .index_buffer = false, .primitive_mode = .points }),
+        color_line3D: Line3DBatch,
+        color_point3D: Point3DBatch,
         color_cube: NewBatch(VtxFmt.Color_3D, .{ .index_buffer = true, .primitive_mode = .triangles }),
         billboard: NewBatch(VtxFmt.Textured_3D, .{ .index_buffer = true, .primitive_mode = .triangles }),
     };
@@ -288,10 +267,8 @@ pub const ImmediateDrawingContext = struct {
 
     pub fn deinit(self: *Self) void {
         for (self.batches.values()) |*b| {
-            inline for (@typeInfo(Batches).@"union".fields, 0..) |ufield, i| {
-                if (i == @intFromEnum(b.*)) {
-                    @field(b, ufield.name).deinit();
-                }
+            switch (b.*) {
+                inline else => |*bb| bb.deinit(),
             }
         }
         self.batches.deinit();
@@ -308,6 +285,7 @@ pub const ImmediateDrawingContext = struct {
         };
     }
 
+    /// returned pointer may be invalid after subsequent getBatch calls
     pub fn getBatch(self: *Self, key: MapKey) !*Batches {
         const res = try self.batches.getOrPut(key);
         if (!res.found_existing) {
@@ -322,12 +300,31 @@ pub const ImmediateDrawingContext = struct {
         return res.value_ptr;
     }
 
+    pub fn ensureBatchExists(self: *Self, key: MapKey) !void {
+        const res = try self.batches.getOrPut(key);
+        if (!res.found_existing) {
+            inline for (@typeInfo(Batches).@"union".fields, 0..) |ufield, i| {
+                if (i == @intFromEnum(key.batch_kind)) {
+                    res.value_ptr.* = @unionInit(Batches, ufield.name, ufield.type.init(self.alloc));
+                    res.key_ptr.* = key;
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Returned pointer's are valid until a call to getBatch
+    /// call ensureBatchExists before.
+    pub fn getBatchStable(self: *Self, key: MapKey) ?*Batches {
+        return self.batches.getPtr(key);
+    }
+
     pub fn clearBuffers(self: *Self) !void {
         for (self.batches.values()) |*b| {
-            inline for (@typeInfo(Batches).@"union".fields, 0..) |ufield, i| {
-                if (i == @intFromEnum(b.*)) {
-                    try @field(b, ufield.name).clear();
-                }
+            switch (b.*) {
+                inline else => |*bb| {
+                    bb.clear();
+                },
             }
         }
     }
@@ -664,6 +661,26 @@ pub const ImmediateDrawingContext = struct {
         b.appendVert(.{ .pos = .{ .x = point.x(), .y = point.y(), .z = point.z() }, .color = color });
     }
 
+    pub fn ensurePoint3DBatch(self: *Self, width: f32) !void {
+        try self.ensureBatchExists(.{ .batch_kind = .color_point3D, .params = .{
+            .shader = colored_point3d_shader,
+            .camera = ._3d,
+            .line_point_width = @intFromFloat(@min(255, @abs(width * 4))),
+        } });
+    }
+
+    pub fn point3DBatch(batch: *Point3DBatch, point: za.Vec3, color: u32) void {
+        batch.appendVert(.{ .pos = .{ .x = point.x(), .y = point.y(), .z = point.z() }, .color = color });
+    }
+
+    pub fn getPoint3DBatch(self: *Self, width: f32) ?*Point3DBatch {
+        return &(self.getBatchStable(.{ .batch_kind = .color_point3D, .params = .{
+            .shader = colored_point3d_shader,
+            .camera = ._3d,
+            .line_point_width = @intFromFloat(@min(255, @abs(width * 4))),
+        } }) orelse return null).color_point3D;
+    }
+
     pub fn cubeFrame(self: *Self, pos: za.Vec3, ext: za.Vec3, color: u32) void {
         const b = &(self.getBatch(.{ .batch_kind = .color_line3D, .params = .{ .shader = colored_line3d_shader, .camera = ._3d } }) catch return).color_line3D;
         const i: u32 = @intCast(b.vertices.items.len);
@@ -691,6 +708,14 @@ pub const ImmediateDrawingContext = struct {
         });
     }
 
+    pub fn ensureLine3DBatch(self: *Self, width: f32) !void {
+        try self.ensureBatchExists(.{ .batch_kind = .color_line3D, .params = .{
+            .shader = colored_line3d_shader,
+            .camera = ._3d,
+            .line_point_width = @intFromFloat(@min(255, @abs(width * 4))),
+        } });
+    }
+
     pub fn line3D(self: *Self, start_point: za.Vec3, end_point: za.Vec3, color: u32, width: f32) void {
         const b = &(self.getBatch(.{ .batch_kind = .color_line3D, .params = .{
             .shader = colored_line3d_shader,
@@ -703,6 +728,23 @@ pub const ImmediateDrawingContext = struct {
             .{ .pos = .{ .x = end_point.x(), .y = end_point.y(), .z = end_point.z() }, .color = color },
         });
         b.appendIndex(&.{ @intCast(i), @intCast(i + 1) });
+    }
+
+    pub fn line3DBatch(batch: *Line3DBatch, start_point: za.Vec3, end_point: za.Vec3, color: u32) void {
+        const i = batch.vertices.items.len;
+        batch.appendVerts(&.{
+            .{ .pos = .{ .x = start_point.x(), .y = start_point.y(), .z = start_point.z() }, .color = color },
+            .{ .pos = .{ .x = end_point.x(), .y = end_point.y(), .z = end_point.z() }, .color = color },
+        });
+        batch.appendIndex(&.{ @intCast(i), @intCast(i + 1) });
+    }
+
+    pub fn getLine3DBatch(self: *Self, width: f32) ?*Line3DBatch {
+        return &(self.getBatchStable(.{ .batch_kind = .color_line3D, .params = .{
+            .shader = colored_line3d_shader,
+            .camera = ._3d,
+            .line_point_width = @intFromFloat(@min(255, @abs(width * 4))),
+        } }) orelse return null).color_line3D;
     }
 
     //vec3 vertexPosition_worldspace =
@@ -876,41 +918,6 @@ pub const ImmediateDrawingContext = struct {
             .{ .pos = v2, .z = z, .color = color },
             .{ .pos = v3, .z = z, .color = color },
         });
-    }
-
-    //TODO destroy this and use a font
-    pub fn bitmapText(self: *Self, x: f32, y: f32, h: f32, str: []const u8, font: FixedBitmapFont, col: u32) void {
-        const b = &(self.getBatch(.{
-            .batch_kind = .color_tri_tex,
-            //Text should always be drawn last for best transparency
-            .params = .{ .shader = textured_tri_shader, .texture = font.texture.id, .draw_priority = 0xff },
-        }) catch return).color_tri_tex;
-        const z = self.zindex;
-        self.zindex += 1;
-
-        var i: u32 = 0;
-        for (str) |char| {
-            if (char == ' ' or char == '_') {
-                i += 1;
-                continue;
-            }
-
-            const ind = font.translation_table[std.ascii.toUpper(char)];
-            const fi = @as(f32, @floatFromInt(i));
-            const tr = font.sts.getTexRec(if (ind == 127) continue else ind);
-            const un = GL.normalizeTexRect(tr, font.texture.w, font.texture.h);
-            const r = Rec(x + fi * h, y, h, h);
-
-            b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
-            b.appendVerts(&.{
-                .{ .pos = .{ .x = r.x + r.w, .y = r.y + r.h }, .z = z, .uv = .{ .x = un.x + un.w, .y = un.y + un.h }, .color = col }, //0
-                .{ .pos = .{ .x = r.x + r.w, .y = r.y }, .z = z, .uv = .{ .x = un.x + un.w, .y = un.y }, .color = col }, //1
-                .{ .pos = .{ .x = r.x, .y = r.y }, .z = z, .uv = .{ .x = un.x, .y = un.y }, .color = col }, //2
-                .{ .pos = .{ .x = r.x, .y = r.y + r.h }, .z = z, .uv = .{ .x = un.x, .y = un.y + un.h }, .color = col }, //3
-            });
-
-            i += 1;
-        }
     }
 
     pub fn line(self: *Self, start_p: Vec2f, end_p: Vec2f, color: u32, width: f32) void {
@@ -1109,10 +1116,10 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
                 GL.bufferData(c.GL_ELEMENT_ARRAY_BUFFER, self.ebo, u32, self.indicies.items);
         }
 
-        pub fn clear(self: *Self) !void {
-            try self.vertices.resize(self.alloc, 0);
+        pub fn clear(self: *Self) void {
+            self.vertices.clearRetainingCapacity();
             if (batch_options.index_buffer)
-                try self.indicies.resize(self.alloc, 0);
+                self.indicies.clearRetainingCapacity();
         }
 
         pub fn draw(self: *Self, params: DrawParams, view: za.Mat4, model: za.Mat4) void {
