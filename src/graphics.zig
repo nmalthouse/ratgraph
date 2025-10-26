@@ -149,6 +149,7 @@ pub const SubTileset = struct {
 pub const ImmediateDrawingContext = struct {
     const Self = @This();
     const log = std.log.scoped(.ImmediateDrawingContext);
+    var heuristic_delete_after_nframes: u64 = 60 * 5;
     pub const Line3DBatch = NewBatch(VtxFmt.Color_3D, .{ .index_buffer = true, .primitive_mode = .lines });
     pub const Point3DBatch = NewBatch(VtxFmt.Color_3D, .{ .index_buffer = false, .primitive_mode = .points });
     pub const TextParam = struct {
@@ -203,7 +204,12 @@ pub const ImmediateDrawingContext = struct {
         billboard: NewBatch(VtxFmt.Textured_3D, .{ .index_buffer = true, .primitive_mode = .triangles }),
     };
 
-    const MapT = std.AutoArrayHashMap(MapKey, Batches);
+    pub const BatchWrap = struct {
+        b: Batches,
+        consecutive_empty_frame_counter: u64 = 0,
+    };
+
+    const MapT = std.AutoArrayHashMap(MapKey, BatchWrap);
     const MapKey = struct {
         batch_kind: @typeInfo(Batches).@"union".tag_type.?,
         params: DrawParams,
@@ -267,7 +273,7 @@ pub const ImmediateDrawingContext = struct {
 
     pub fn deinit(self: *Self) void {
         for (self.batches.values()) |*b| {
-            switch (b.*) {
+            switch (b.b) {
                 inline else => |*bb| bb.deinit(),
             }
         }
@@ -291,13 +297,13 @@ pub const ImmediateDrawingContext = struct {
         if (!res.found_existing) {
             inline for (@typeInfo(Batches).@"union".fields, 0..) |ufield, i| {
                 if (i == @intFromEnum(key.batch_kind)) {
-                    res.value_ptr.* = @unionInit(Batches, ufield.name, ufield.type.init(self.alloc));
+                    res.value_ptr.* = .{ .b = @unionInit(Batches, ufield.name, ufield.type.init(self.alloc)) };
                     res.key_ptr.* = key;
                     break;
                 }
             }
         }
-        return res.value_ptr;
+        return &res.value_ptr.b;
     }
 
     pub fn ensureBatchExists(self: *Self, key: MapKey) !void {
@@ -305,7 +311,7 @@ pub const ImmediateDrawingContext = struct {
         if (!res.found_existing) {
             inline for (@typeInfo(Batches).@"union".fields, 0..) |ufield, i| {
                 if (i == @intFromEnum(key.batch_kind)) {
-                    res.value_ptr.* = @unionInit(Batches, ufield.name, ufield.type.init(self.alloc));
+                    res.value_ptr.* = .{ .b = @unionInit(Batches, ufield.name, ufield.type.init(self.alloc)) };
                     res.key_ptr.* = key;
                     break;
                 }
@@ -316,15 +322,31 @@ pub const ImmediateDrawingContext = struct {
     /// Returned pointer's are valid until a call to getBatch
     /// call ensureBatchExists before.
     pub fn getBatchStable(self: *Self, key: MapKey) ?*Batches {
-        return self.batches.getPtr(key);
+        return &(self.batches.getPtr(key) orelse return null).b;
     }
 
     pub fn clearBuffers(self: *Self) !void {
+        var needs_deletion = false;
         for (self.batches.values()) |*b| {
-            switch (b.*) {
+            switch (b.b) {
                 inline else => |*bb| {
-                    bb.clear();
+                    b.consecutive_empty_frame_counter = if (bb.clear()) 0 else b.consecutive_empty_frame_counter + 1;
                 },
+            }
+            // ensure we don't have a bunch of useless batches hanging around
+            if (b.consecutive_empty_frame_counter > heuristic_delete_after_nframes)
+                needs_deletion = true;
+        }
+        if (needs_deletion) {
+            const list = self.batches.values();
+            var i: usize = list.len;
+            while (i > 0) : (i -= 1) {
+                if (list[i - 1].consecutive_empty_frame_counter > heuristic_delete_after_nframes) {
+                    switch (list[i - 1].b) {
+                        inline else => |*bb| bb.deinit(),
+                    }
+                    self.batches.swapRemoveAt(i - 1);
+                }
             }
         }
     }
@@ -977,9 +999,9 @@ pub const ImmediateDrawingContext = struct {
         var b_it = self.batches.iterator();
         while (b_it.next()) |b| {
             inline for (@typeInfo(Batches).@"union".fields, 0..) |ufield, i| {
-                if (i == @intFromEnum(b.value_ptr.*)) {
-                    @field(b.value_ptr.*, ufield.name).pushVertexData();
-                    @field(b.value_ptr.*, ufield.name).draw(b.key_ptr.params, switch (b.key_ptr.params.camera) {
+                if (i == @intFromEnum(b.value_ptr.b)) {
+                    @field(b.value_ptr.b, ufield.name).pushVertexData();
+                    @field(b.value_ptr.b, ufield.name).draw(b.key_ptr.params, switch (b.key_ptr.params.camera) {
                         ._2d => cam_2d,
                         ._3d => cam_3d,
                     }, model);
@@ -1125,10 +1147,13 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
                 GL.bufferData(c.GL_ELEMENT_ARRAY_BUFFER, self.ebo, u32, self.indicies.items);
         }
 
-        pub fn clear(self: *Self) void {
+        /// returns true iff this batch han nonzero vertices
+        pub fn clear(self: *Self) bool {
+            const nonzero = self.vertices.items.len > 0;
             self.vertices.clearRetainingCapacity();
             if (batch_options.index_buffer)
                 self.indicies.clearRetainingCapacity();
+            return nonzero;
         }
 
         pub fn draw(self: *Self, params: DrawParams, view: za.Mat4, model: za.Mat4) void {
