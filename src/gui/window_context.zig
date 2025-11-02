@@ -17,6 +17,7 @@ pub const BtnContextWindow = struct {
         []const u8, // the button text
         union(enum) {
             btn,
+            blank,
             checkbox: bool, //default value of checkbox
         },
     };
@@ -89,6 +90,7 @@ pub const BtnContextWindow = struct {
                     .user_id = btn[0],
                     .style = .check,
                 }, default),
+                .blank => {},
             };
         }
     }

@@ -382,7 +382,7 @@ pub const ImmediateDrawingContext = struct {
             const r = rpt;
             const b = &(self.getBatch(.{ .batch_kind = .color_tri, .params = .{ .shader = colored_tri_shader } }) catch |err| break :e err).color_tri;
             const z = self.zindex;
-            self.zindex += 1;
+            self.zindex +|= 1;
             b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
             b.appendVerts(&.{
                 .{ .z = z, .color = color, .pos = .{ .x = r.x + r.w, .y = r.y + r.h } },
@@ -400,7 +400,7 @@ pub const ImmediateDrawingContext = struct {
                 .shader = colored_tri_shader,
             } }) catch |err| break :e err).color_tri;
             const z = self.zindex;
-            self.zindex += 1;
+            self.zindex +|= 1;
             b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
             b.appendVerts(&.{
                 .{ .z = z, .color = vert_colors[2], .pos = .{ .x = r.x + r.w, .y = r.y + r.h } },
@@ -441,7 +441,7 @@ pub const ImmediateDrawingContext = struct {
         };
         const b = &(self.getBatch(.{ .batch_kind = .color_tri_tex, .params = .{ .shader = textured_tri_shader, .texture = texture.id } }) catch return).color_tri_tex;
         const z = self.zindex;
-        self.zindex += 1;
+        self.zindex +|= 1;
         //br, tr, tl, bl
         const i: u32 = @intCast(b.vertices.items.len);
         b.appendIndex(&.{
@@ -512,7 +512,7 @@ pub const ImmediateDrawingContext = struct {
     pub fn rectTexTintShader(self: *Self, r: Rect, tr: Rect, col: u32, texture: Texture, shader: glID) void {
         const b = &(self.getBatch(.{ .batch_kind = .color_tri_tex, .params = .{ .shader = shader, .texture = texture.id } }) catch return).color_tri_tex;
         const z = self.zindex;
-        self.zindex += 1;
+        self.zindex +|= 1;
         const un = GL.normalizeTexRect(tr, texture.w, texture.h);
 
         b.appendIndex(&genQuadIndices(@as(u32, @intCast(b.vertices.items.len))));
@@ -532,7 +532,7 @@ pub const ImmediateDrawingContext = struct {
         //FIXME support flip flags again
         const b = &(self.getBatch(.{ .batch_kind = .color_tri_tex, .params = .{ .shader = textured_tri_shader, .texture = texture.id } }) catch return).color_tri_tex;
         const z = self.zindex;
-        self.zindex += 1;
+        self.zindex +|= 1;
         const un = GL.normalizeTexRect(tr, texture.w, texture.h);
         const uvs = [4]Vec2f{
             .{ .x = un.x + un.w, .y = un.y + un.h },
@@ -592,7 +592,7 @@ pub const ImmediateDrawingContext = struct {
 
         var vx = x * fac;
         var vy = y * fac + ((font.ascent + font.descent) * SF);
-        const z = self.zindex + 1;
+        const z = self.zindex +| 1;
         while (it.nextCodepoint()) |ch| {
             switch (ch) {
                 else => {},
@@ -639,7 +639,7 @@ pub const ImmediateDrawingContext = struct {
         if (param.width_pointer) |wp| {
             wp.* = vx - pos.x;
         }
-        self.zindex += 1; //one for rz
+        self.zindex +|= 1; //one for rz
     }
 
     pub fn textFmt(self: *Self, pos: Vec2f, comptime fmt: []const u8, args: anytype, param: TextParam) void {
@@ -957,7 +957,7 @@ pub const ImmediateDrawingContext = struct {
             .line_point_width = @intFromFloat(@min(255, @abs(width * 4))),
         } }) catch return).color_line;
         const z = self.zindex;
-        self.zindex += 1;
+        self.zindex +|= 1;
         b.appendVerts(&.{
             .{ .pos = start_p, .z = z, .color = color },
             .{ .pos = end_p, .z = z, .color = color },
@@ -1041,7 +1041,7 @@ pub const MultiLineText = struct {
     starting_z: u16,
 
     pub fn start(dctx: *ImmediateDrawingContext, start_pos: Vec2f, font: *FontInterface) @This() {
-        defer dctx.zindex += 1; //Reserve a z for background rect
+        defer dctx.zindex +|= 1; //Reserve a z for background rect
         return .{
             .starting_z = dctx.zindex,
             .max_width = 0,
