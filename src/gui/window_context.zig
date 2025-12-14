@@ -19,6 +19,12 @@ pub const BtnContextWindow = struct {
             btn,
             blank,
             checkbox: bool, //default value of checkbox
+            child: struct {
+                _active: bool = false,
+                width: f32,
+                height: f32,
+                //cb funcs etc,
+            },
         },
     };
 
@@ -76,7 +82,7 @@ pub const BtnContextWindow = struct {
         vt.area.clearChildren(gui, vt);
 
         var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
-        for (self.buttons.items) |btn| {
+        for (self.buttons.items, 0..) |btn, btn_i| {
             const ar = ly.getArea();
             _ = switch (btn[2]) {
                 .btn => Widget.Button.build(&vt.area, ar, btn[1], .{
@@ -91,6 +97,14 @@ pub const BtnContextWindow = struct {
                     .style = .check,
                 }, default),
                 .blank => {},
+                .child => |child| {
+                    _ = child;
+                    _ = Widget.Button.build(&vt.area, ar, btn[1], .{
+                        .cb_vt = &self.cbhandle,
+                        .cb_fn = btn_toggle_child,
+                        .id = btn_i,
+                    });
+                },
             };
         }
     }
@@ -110,6 +124,24 @@ pub const BtnContextWindow = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
         _ = self;
         _ = d;
+    }
+
+    fn btn_toggle_child(cb: *g.CbHandle, id: g.Uid, dat: g.MouseCbState, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        switch (self.buttons.items[id][2]) {
+            else => {},
+            .child => |*child| {
+                child._active = !child._active;
+                const sign: f32 = if (child._active) 1 else -1;
+                const ar = self.vt.area.area;
+                dat.gui.updateWindowSize(win, ar.replace(
+                    null,
+                    null,
+                    ar.w + child.width * sign,
+                    ar.h + child.height * sign,
+                )) catch {};
+            },
+        }
     }
 
     fn checkbox_wrap_cb(cb: *g.CbHandle, gui: *Gui, val: bool, id: g.Uid) void {

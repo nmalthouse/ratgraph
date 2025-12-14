@@ -1227,6 +1227,9 @@ pub const Gui = struct {
         if (self.fbos.getPtr(window)) |fbo| {
             _ = try fbo.setSize(area.w, area.h);
         }
+        if (self.transient_window != null and self.transient_window.? == window) {
+            _ = try self.transient_fbo.setSize(area.w, area.h);
+        }
         window.build_fn(window, self, area);
     }
 

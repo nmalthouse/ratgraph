@@ -20,6 +20,9 @@ pub const StaticSliderOpts = struct {
     ///Not allocated
     unit: []const u8 = "",
 
+    /// allocated
+    label: ?[]const u8 = null,
+
     display_kind: enum { raw, percent, integer } = .raw,
     display_bounds_while_editing: bool = false,
     clamp_edits: bool = false,
@@ -88,6 +91,8 @@ pub const StaticSlider = struct {
             .state = .display,
             .fbs = .{ .buffer = &self.buf, .pos = 0 },
         };
+        if (self.opts.label) |l|
+            self.opts.label = gui.alloc.dupe(u8, l) catch null;
         parent.addChild(&self.vt, .{
             .area = area,
             .deinit_fn = deinit,
@@ -105,6 +110,9 @@ pub const StaticSlider = struct {
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        if (self.opts.label) |l| {
+            gui.alloc.free(l);
+        }
         gui.alloc.destroy(self);
     }
 
@@ -127,10 +135,11 @@ pub const StaticSlider = struct {
             .display => {
                 const perc = std.math.clamp((self.num.* - self.opts.min) / @abs(self.opts.max - self.opts.min), 0, 1);
                 d.ctx.rect(inset.replace(null, null, inset.w * perc, null), FILL_COLOR);
+                const label = self.opts.label orelse "";
                 switch (self.opts.display_kind) {
-                    .raw => d.ctx.textClipped(ta, "{d:.2} {s}", .{ self.num.*, self.opts.unit }, d.textP(null), .center),
-                    .percent => d.ctx.textClipped(ta, "{d:.2} % {s}", .{ perc * 100, self.opts.unit }, d.textP(null), .center),
-                    .integer => d.ctx.textClipped(ta, "{d:.0} {s}", .{ self.num.*, self.opts.unit }, d.textP(null), .center),
+                    .raw => d.ctx.textClipped(ta, "{s} {d:.2} {s}", .{ label, self.num.*, self.opts.unit }, d.textP(null), .center),
+                    .percent => d.ctx.textClipped(ta, "{s} {d:.2} % {s}", .{ label, perc * 100, self.opts.unit }, d.textP(null), .center),
+                    .integer => d.ctx.textClipped(ta, "{s} {d:.0} {s}", .{ label, self.num.*, self.opts.unit }, d.textP(null), .center),
                 }
             },
             .editing => {

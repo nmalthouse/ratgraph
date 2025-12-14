@@ -1284,6 +1284,10 @@ pub const RenderTexture = struct {
 
         if (c.glCheckFramebufferStatus(c.GL_FRAMEBUFFER) != c.GL_FRAMEBUFFER_COMPLETE) return error.framebufferCreateFailed;
 
+        c.glClearColor(0, 0, 0, 0);
+        c.glClear(c.GL_COLOR_BUFFER_BIT);
+        c.glClear(c.GL_DEPTH_BUFFER_BIT);
+
         c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
         c.glBindRenderbuffer(c.GL_RENDERBUFFER, 0);
 
