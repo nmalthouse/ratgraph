@@ -20,6 +20,7 @@ pub const AssetBake = @import("assetbake.zig");
 pub const OnlineFont = @import("graphics/online_font.zig").OnlineFont;
 pub const miniz = @import("miniz.zig");
 
+pub const StringStorage = @import("string.zig").StringStorage;
 pub const meshutil = @import("mesh.zig");
 pub const ptypes = @import("graphics/types.zig");
 pub const Rect = ptypes.Rect;
@@ -1381,6 +1382,7 @@ pub const Cubes = struct {
     const Self = @This();
     vertices: std.ArrayList(CubeVert),
     indicies: std.ArrayList(u32),
+    alloc: std.mem.Allocator,
 
     shader: glID,
     texture: Texture,
@@ -1421,8 +1423,9 @@ pub const Cubes = struct {
 
     pub fn init(alloc: Alloc, texture: Texture, shader: glID) @This() {
         var ret = Self{
-            .vertices = std.ArrayList(CubeVert).init(alloc),
-            .indicies = std.ArrayList(u32).init(alloc),
+            .alloc = alloc,
+            .vertices = .{},
+            .indicies = .{},
             .texture = texture,
             .shader = shader,
         };
@@ -1476,7 +1479,7 @@ pub const Cubes = struct {
         const tx_h = self.texture.h;
         const cc = colors orelse [_]u32{0xffffffff} ** 6;
         const un = GL.normalizeTexRect(tr, @as(i32, @intCast(tx_w)), @as(i32, @intCast(tx_h)));
-        try self.indicies.appendSlice(&GL.genCubeIndicies(@as(u32, @intCast(self.vertices.items.len))));
+        try self.indicies.appendSlice(self.alloc, &GL.genCubeIndicies(@as(u32, @intCast(self.vertices.items.len))));
         const nx = sx / tr.w * 512;
         const ny = sy / tr.h * 512;
         const nz = sz / tr.w * 512;
@@ -1485,7 +1488,7 @@ pub const Cubes = struct {
         const uyy = (un.y + un.h) * ny;
         const uzz = (un.x + un.w) * nz;
         // zig fmt: off
-    try self.vertices.appendSlice(&.{
+    try self.vertices.appendSlice(self.alloc, &.{
         // front
         cubeVert(px + sx, py + sy, pz, uxx, uyy, 0,0,-1, cc[0], 1,0,0,ti), //0
         cubeVert(px + sx, py     , pz, uxx, un.y       , 0,0,-1, cc[0], 1,0,0,ti), //1
@@ -1531,8 +1534,8 @@ pub const Cubes = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.vertices.deinit();
-        self.indicies.deinit();
+        self.vertices.deinit(self.alloc);
+        self.indicies.deinit(self.alloc);
     }
 };
 

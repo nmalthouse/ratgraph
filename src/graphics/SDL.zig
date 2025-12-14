@@ -701,9 +701,9 @@ pub fn Bind(comptime bind_list: BindList) type {
             return ret;
         }
 
-        pub fn getWithMod(self: *const @This(), scancode: keycodes.Scancode, mod: keycodes.KeymodMask) ?BindEnum {
+        pub fn getWithMod(self: *const @This(), scancode: u32, mod: keycodes.KeymodMask) ?BindEnum {
             for (self.mappings, 0..) |m, i| {
-                if (m[0] == scancode and m[1] == mod)
+                if (@intFromEnum(m[0]) == scancode and m[1] == mod)
                     return @enumFromInt(i);
             }
             return null;
