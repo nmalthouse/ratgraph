@@ -364,7 +364,7 @@ pub const Textbox = struct {
                 }
                 var should_commit = false;
                 for (kev.keys) |key| {
-                    const kb = StaticData.key_binds.getWithMod(@enumFromInt(key.key_id), mod) orelse continue;
+                    const kb = StaticData.key_binds.getWithMod(key.key_id, mod) orelse continue;
                     switch (kb) {
                         .delete, .delete_word_right, .delete_word_left, .paste, .backspace => should_commit = true,
                         else => {},

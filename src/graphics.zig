@@ -44,6 +44,8 @@ pub const Shader = GL.Shader;
 pub const gui_app = @import("gui_app.zig");
 pub const Os9Gui = gui_app.Os9Gui;
 pub const RGui = @import("gui/vtables.zig");
+pub const def_render = @import("def_render.zig");
+pub const util_3d = @import("util_3d.zig");
 
 pub const GL = @import("graphics/gl.zig");
 pub const glID = GL.glID;
