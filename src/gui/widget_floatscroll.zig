@@ -11,14 +11,6 @@ const VScroll = g.Widget.VScroll;
 const Widget = g.Widget;
 const CbHandle = g.CbHandle;
 
-/// TODO not implemeted
-/// This should be:
-/// A scroll where all elements are built and exist in
-///
-/// Problems
-/// If widgets are occluded we need to mask click events
-/// Tab Focusing a occuleded iArea should move scroll
-/// On redraw of any iArea inside floatscroll, apply scissor
 pub const BuildCb = *const fn (*CbHandle, current_area: *iArea, *Gui, *iWindow, *FloatScroll) void;
 pub const Opts = struct {
     build_cb: BuildCb,

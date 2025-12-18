@@ -486,6 +486,8 @@ pub const ScrollBar = struct {
 
     fn calculateShuttleW(count: usize, item_h: f32, area_w: f32, min_w: f32) f32 {
         const area_used = @as(f32, @floatFromInt(count)) * item_h;
+        if (true)
+            return min_w;
         const dist = area_used - area_w;
         if (dist <= 0)
             return area_w; //No scroll
