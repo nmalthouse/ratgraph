@@ -150,8 +150,6 @@ pub const Renderer = struct {
         screen_area: graph.Rect,
         screen_dim: graph.Vec2f,
         param: struct {
-            far: f32,
-            near: f32,
             fac: f32,
             pad: f32,
             index: usize,
@@ -162,7 +160,7 @@ pub const Renderer = struct {
         self.point_light_batch.pushVertexData();
         self.spot_light_batch.pushVertexData();
         self.decal_batch.pushVertexData();
-        const view1 = cam.getMatrix(screen_area.w / screen_area.h, param.near, param.far);
+        const view1 = cam.getMatrix(screen_area.w / screen_area.h);
         self.csm.pad = param.pad;
         switch (self.mode) {
             .forward => {
@@ -189,14 +187,13 @@ pub const Renderer = struct {
                 {
                     light_dir = util3d.eulerToNormal(Vec3.new(self.pitch, self.yaw + 180, 0)).scale(1);
                 }
-                const far = param.far;
                 const planes = [_]f32{
                     pl[0],
                     pl[1],
                     pl[2],
                 };
                 const last_plane = pl[3];
-                self.csm.calcMats(cam.fov, screen_area.w / screen_area.h, param.near, far, self.last_frame_view_mat, light_dir, planes);
+                self.csm.calcMats(cam.fov, screen_area.w / screen_area.h, cam.near, cam.far, self.last_frame_view_mat, light_dir, planes);
                 self.csm.draw(self);
                 self.gbuffer.updateResolution(@intFromFloat(screen_area.w * self.res_scale), @intFromFloat(screen_area.h * self.res_scale));
                 if (self.do_hdr_buffer)
@@ -220,7 +217,7 @@ pub const Renderer = struct {
                     }
                 }
                 if (self.do_decals) {
-                    self.drawDecal(cam, graph.Vec2i{ .x = self.gbuffer.scr_w, .y = self.gbuffer.scr_h }, view, .{ .x = 0, .y = 0 }, far);
+                    self.drawDecal(cam, graph.Vec2i{ .x = self.gbuffer.scr_w, .y = self.gbuffer.scr_h }, view, .{ .x = 0, .y = 0 }, cam.far);
                 }
                 const y_: i32 = @intFromFloat(screen_dim.y - (screen_area.y + screen_area.h));
                 if (self.do_hdr_buffer) {

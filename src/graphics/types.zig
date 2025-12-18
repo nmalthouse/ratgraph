@@ -467,6 +467,9 @@ pub const Camera3D = struct {
 
     up: enum { x, y, z } = .y,
 
+    near: f32 = 1,
+    far: f32 = 4096,
+
     //Good default:
     //camera.updateDebugMove(.{
     //        .down = win.keyHigh(.LSHIFT),
@@ -537,9 +540,9 @@ pub const Camera3D = struct {
         return la;
     }
 
-    pub fn getMatrix(self: Self, aspect_ratio: f32, near: f32, far: f32) za.Mat4 {
+    pub fn getMatrix(self: Self, aspect_ratio: f32) za.Mat4 {
         const la = self.getViewMatrix();
-        const perp = za.perspective(self.fov, aspect_ratio, near, far);
+        const perp = za.perspective(self.fov, aspect_ratio, self.near, self.far);
         return perp.mul(la);
     }
 };
