@@ -18,6 +18,7 @@ pub const DrawCall = struct {
     diffuse: c_uint,
 };
 const SunQuadBatch = graph.NewBatch(packed struct { pos: graph.Vec3f, uv: graph.Vec2f }, .{ .index_buffer = false, .primitive_mode = .triangles });
+const SkyBatch = graph.NewBatch(graph.ImmediateDrawingContext.VtxFmt.Textured_3D_NC, .{ .index_buffer = true, .primitive_mode = .triangles });
 
 pub const Renderer = struct {
     const Self = @This();
@@ -30,6 +31,7 @@ pub const Renderer = struct {
         sun: glID,
         decal: glID,
         hdr: glID,
+        skybox: glID,
     },
     mode: enum { forward, def } = .forward,
     gbuffer: GBuffer,
@@ -45,6 +47,7 @@ pub const Renderer = struct {
     point_light_batch: PointLightInstanceBatch,
     spot_light_batch: SpotLightInstanceBatch,
     decal_batch: DecalBatch,
+    sky_meshes: [6]SkyBatch,
 
     ambient: [4]f32 = [4]f32{ 1, 1, 1, 255 },
     ambient_scale: f32 = 1,
@@ -55,6 +58,7 @@ pub const Renderer = struct {
     sun_color: [4]f32 = [4]f32{ 1, 1, 1, 255 },
     do_lighting: bool = true,
     do_decals: bool = false,
+    do_skybox: bool = true,
     debug_light_coverage: bool = false,
     copy_depth: bool = true,
     light_render_dist: f32 = 1024 * 2,
@@ -93,6 +97,7 @@ pub const Renderer = struct {
             .{ .path = "decal.vert", .t = .vert },
             .{ .path = "decal.frag", .t = .frag },
         });
+        const sky_shad = try graph.Shader.loadFromFilesystem(alloc, shader_dir, &.{ .{ .path = "cubemap.vert", .t = .vert }, .{ .path = "cubemap.frag", .t = .frag } });
         const hdr_shad = try graph.Shader.loadFromFilesystem(alloc, shader_dir, &.{ .{ .path = "hdr.vert", .t = .vert }, .{ .path = "hdr.frag", .t = .frag } });
         var sun_batch = SunQuadBatch.init(alloc);
         _ = sun_batch.clear();
@@ -113,6 +118,7 @@ pub const Renderer = struct {
                 .decal = decal_shad,
                 .sun = def_sun_shad,
                 .hdr = hdr_shad,
+                .skybox = sky_shad,
             },
             .point_light_batch = try PointLightInstanceBatch.init(alloc, shader_dir, "icosphere.obj"),
             .spot_light_batch = try SpotLightInstanceBatch.init(alloc, shader_dir, "cone.obj"),
@@ -122,7 +128,20 @@ pub const Renderer = struct {
             .csm = Csm.createCsm(2048, Csm.CSM_COUNT, def_sun_shad),
             .gbuffer = GBuffer.create(100, 100),
             .hdrbuffer = HdrBuffer.create(100, 100),
+            .sky_meshes = initSkyboxMeshes(alloc),
         };
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.draw_calls.deinit(self.alloc);
+        self.sun_batch.deinit();
+        self.point_light_batch.deinit();
+        self.spot_light_batch.deinit();
+        self.decal_batch.deinit();
+
+        for (&self.sky_meshes) |*sk| {
+            sk.deinit();
+        }
     }
 
     pub fn beginFrame(self: *Self) void {
@@ -309,6 +328,24 @@ pub const Renderer = struct {
         self.last_frame_view_mat = cam.getViewMatrix();
     }
 
+    pub fn drawSkybox(self: *Self, cam: graph.Camera3D, screen_area: graph.Rect, textures: [6]glID) void {
+        if (self.do_skybox) { //sky stuff
+            c.glDisable(c.GL_BLEND);
+            c.glDepthMask(c.GL_FALSE);
+            c.glDepthFunc(c.GL_LEQUAL);
+            defer c.glDepthFunc(c.GL_LESS);
+            defer c.glDepthMask(c.GL_TRUE);
+
+            const za = graph.za;
+            const la = za.lookAt(Vec3.zero(), cam.front, cam.getUp());
+            const perp = za.perspective(cam.fov, screen_area.w / screen_area.h, 0, 1);
+
+            for (&self.sky_meshes, textures) |*sk, txt| {
+                sk.draw(.{ .texture = txt, .shader = self.shader.skybox }, perp.mul(la), graph.za.Mat4.identity());
+            }
+        }
+    }
+
     fn drawDecal(self: *Self, cam: graph.Camera3D, wh: anytype, view: anytype, window_offset: anytype, far_clip: f32) void {
         {
             c.glDepthMask(c.GL_FALSE);
@@ -376,14 +413,6 @@ pub const Renderer = struct {
 
             self.spot_light_batch.draw();
         }
-    }
-
-    pub fn deinit(self: *Self) void {
-        self.draw_calls.deinit(self.alloc);
-        self.sun_batch.deinit();
-        self.point_light_batch.deinit();
-        self.spot_light_batch.deinit();
-        self.decal_batch.deinit();
     }
 
     fn bindMainFramebufferAndVp(_: *Self, screen_area: graph.Rect, screen_dim: graph.Vec2f) void {
@@ -716,6 +745,64 @@ pub fn LightBatchGeneric(comptime vertT: type) type {
     };
 }
 
+fn initSkyboxMeshes(alloc: std.mem.Allocator) [6]SkyBatch {
+    var ret: [6]SkyBatch = undefined;
+    const a = 1;
+    const t = 1;
+    const b = 0.006; //Inset the uv sligtly to prevent seams from showing
+    //Maybe use clamptoedge?
+    const o = 1 - b;
+    const uvs = [4]graph.Vec2f{
+        .{ .x = b, .y = b },
+        .{ .x = o, .y = b },
+        .{ .x = o, .y = o },
+        .{ .x = b, .y = o },
+    };
+    const verts = [_]SkyBatch.VtxType{
+        .{ .uv = uvs[3], .pos = .{ .y = -a, .z = -a, .x = t } },
+        .{ .uv = uvs[2], .pos = .{ .y = a, .z = -a, .x = t } },
+        .{ .uv = uvs[1], .pos = .{ .y = a, .z = a, .x = t } },
+        .{ .uv = uvs[0], .pos = .{ .y = -a, .z = a, .x = t } },
+
+        .{ .uv = uvs[1], .pos = .{ .y = -a, .z = a, .x = -t } },
+        .{ .uv = uvs[0], .pos = .{ .y = a, .z = a, .x = -t } },
+        .{ .uv = uvs[3], .pos = .{ .y = a, .z = -a, .x = -t } },
+        .{ .uv = uvs[2], .pos = .{ .y = -a, .z = -a, .x = -t } },
+
+        .{ .uv = uvs[1], .pos = .{ .x = -a, .z = a, .y = t } },
+        .{ .uv = uvs[0], .pos = .{ .x = a, .z = a, .y = t } },
+        .{ .uv = uvs[3], .pos = .{ .x = a, .z = -a, .y = t } },
+        .{ .uv = uvs[2], .pos = .{ .x = -a, .z = -a, .y = t } },
+
+        .{ .uv = uvs[3], .pos = .{ .x = -a, .z = -a, .y = -t } },
+        .{ .uv = uvs[2], .pos = .{ .x = a, .z = -a, .y = -t } },
+        .{ .uv = uvs[1], .pos = .{ .x = a, .z = a, .y = -t } },
+        .{ .uv = uvs[0], .pos = .{ .x = -a, .z = a, .y = -t } },
+
+        //top and bottom
+        .{ .uv = uvs[3], .pos = .{ .x = -a, .y = -a, .z = t } },
+        .{ .uv = uvs[2], .pos = .{ .x = a, .y = -a, .z = t } },
+        .{ .uv = uvs[1], .pos = .{ .x = a, .y = a, .z = t } },
+        .{ .uv = uvs[0], .pos = .{ .x = -a, .y = a, .z = t } },
+
+        .{ .uv = uvs[0], .pos = .{ .x = -a, .y = a, .z = -t } },
+        .{ .uv = uvs[1], .pos = .{ .x = a, .y = a, .z = -t } },
+        .{ .uv = uvs[2], .pos = .{ .x = a, .y = -a, .z = -t } },
+        .{ .uv = uvs[3], .pos = .{ .x = -a, .y = -a, .z = -t } },
+    };
+    const ind = [_]u32{
+        2, 1, 0, 3, 2, 0,
+    };
+    for (&ret, 0..) |*sky, i| {
+        var skybatch = SkyBatch.init(alloc);
+        skybatch.appendVerts(verts[i * 4 .. i * 4 + 4]);
+        skybatch.appendIndex(&ind);
+        skybatch.pushVertexData();
+        sky.* = skybatch;
+    }
+    return ret;
+}
+
 const HdrBuffer = struct {
     fb: c_uint = 0,
     color: c_uint = 0,
@@ -793,3 +880,5 @@ pub const DecalVertex = packed struct {
 pub const PointLightInstanceBatch = LightBatchGeneric(PointLightVertex);
 pub const SpotLightInstanceBatch = LightBatchGeneric(SpotLightVertex);
 pub const DecalBatch = LightBatchGeneric(DecalVertex);
+
+pub const Skybox_name_endings = [_][]const u8{ "ft", "bk", "lf", "rt", "up", "dn" };
