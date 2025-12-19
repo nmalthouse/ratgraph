@@ -34,7 +34,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             };
         }
 
-        pub fn init(alloc: std.mem.Allocator) !Self {
+        pub fn init(alloc: std.mem.Allocator) Self {
             return Self{ .alloc = alloc, .dense = std.array_list.Managed(child_type).init(alloc) };
         }
 
@@ -43,7 +43,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
                 return error.MismatchedIndexSlice;
             var ret: Self = .{
                 .alloc = alloc,
-                .dense = (ArrayList(child_type)).fromOwnedSlice(slice),
+                .dense = (std.array_list.Managed(child_type)).fromOwnedSlice(alloc, slice),
                 .dense_index_lut = (ArrayList(index_type).fromOwnedSlice(lut)),
             };
 

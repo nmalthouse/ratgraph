@@ -255,10 +255,10 @@ pub fn Registry(comptime field_names_l: FieldList) type {
                 .data = undefined,
                 .entities = .{},
                 .sleep_timers = .{},
-                .slept = try SleptT.init(alloc),
+                .slept = SleptT.init(alloc),
             };
             inline for (field_names_l) |comp| {
-                @field(ret.data, comp.name) = try SparseSet(comp.ftype, ID_TYPE).init(alloc);
+                @field(ret.data, comp.name) = SparseSet(comp.ftype, ID_TYPE).init(alloc);
             }
 
             return ret;
