@@ -32,6 +32,7 @@ pub const MeshVert = packed struct {
     tx: f32 = 0,
     ty: f32 = 0,
     tz: f32 = 0,
+    blend: f32 = 0,
 };
 
 // Textures we are willing to support?
@@ -75,6 +76,7 @@ pub const Mesh = struct {
         GL.floatVertexAttrib(vao, vbo, 2, 3, MeshVert, "nx"); //RGBA
         GL.intVertexAttrib(vao, vbo, 3, 1, MeshVert, "color", c.GL_UNSIGNED_INT);
         GL.floatVertexAttrib(vao, vbo, 4, 3, MeshVert, "tx");
+        GL.floatVertexAttrib(vao, vbo, 5, 1, MeshVert, "blend");
     }
 
     pub fn drawSimple(b: *Self, view: za.Mat4, model: za.Mat4, shader: c_uint) void {

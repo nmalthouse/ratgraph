@@ -5,10 +5,12 @@ layout (location = 2) in vec3 in_normal;
 layout (location = 3) in vec3 in_frag_pos;
 layout (location = 4) in vec3 in_tangent;
 layout (location = 5) flat in uint tindex;
+layout (location = 6) in float blend;
 
 layout (location = 0) out vec4 FragColor;
 
 layout (binding = 0) uniform sampler2D diffuse_texture;
+layout (binding = 1) uniform sampler2D blend_texture;
 
 vec3 light_dir = vec3(1,1,1);
 vec3 ambient = vec3(190.0 / 255.0,  201.0 / 255.0, 220.0/255.0);
@@ -23,7 +25,7 @@ void main() {
 
 
     //FragColor = vec4(in_texcoord, 1,1);
-    FragColor = texture(diffuse_texture, in_texcoord) * in_color;
+    FragColor = mix(texture(diffuse_texture, in_texcoord), texture(blend_texture, in_texcoord), blend) * in_color;
     vec3 amb = ambient * ambient_strength;
     vec3 result = (ambient +  (diffuse )) * FragColor.rgb;
     FragColor.rgb = result;

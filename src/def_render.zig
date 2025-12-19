@@ -16,6 +16,7 @@ pub const DrawCall = struct {
     vao: c_uint,
     //view: *const Mat4,
     diffuse: c_uint,
+    blend: glID = 0,
 };
 const SunQuadBatch = graph.NewBatch(packed struct { pos: graph.Vec3f, uv: graph.Vec2f }, .{ .index_buffer = false, .primitive_mode = .triangles });
 const SkyBatch = graph.NewBatch(graph.ImmediateDrawingContext.VtxFmt.Textured_3D_NC, .{ .index_buffer = true, .primitive_mode = .triangles });
@@ -187,12 +188,18 @@ pub const Renderer = struct {
                 const sh = self.shader.forward;
                 c.glUseProgram(sh);
                 GL.passUniform(sh, "view", view);
+                GL.passUniform(sh, "model", Mat4.identity());
                 for (self.draw_calls.items) |dc| {
                     if (dc.diffuse != 0) {
                         const diffuse_loc = c.glGetUniformLocation(sh, "diffuse_texture");
 
                         c.glUniform1i(diffuse_loc, 0);
                         c.glBindTextureUnit(0, dc.diffuse);
+                    }
+                    if (dc.blend != 0) {
+                        const blend_loc = c.glGetUniformLocation(sh, "blend_texture");
+                        c.glUniform1i(blend_loc, 1);
+                        c.glBindTextureUnit(1, dc.blend);
                     }
                     //GL.passUniform(sh, "model", model);
                     c.glBindVertexArray(dc.vao);
