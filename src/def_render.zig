@@ -58,7 +58,7 @@ pub const Renderer = struct {
     yaw: f32 = 165,
     sun_color: [4]f32 = [4]f32{ 1, 1, 1, 255 },
     do_lighting: bool = true,
-    do_decals: bool = false,
+    do_decals: bool = true,
     do_skybox: bool = true,
     debug_light_coverage: bool = false,
     copy_depth: bool = true,
@@ -373,6 +373,7 @@ pub const Renderer = struct {
 
             graph.GL.passUniform(sh, "cam_view", cam.getViewMatrix());
             graph.GL.passUniform(sh, "view", view);
+            graph.GL.passUniform(sh, "viewInv", view.inv());
 
             self.decal_batch.draw();
         }
