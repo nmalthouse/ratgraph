@@ -22,6 +22,7 @@ pub const TextView = struct {
     pub const Opts = struct {
         mode: enum { simple, split_on_space },
         force_scroll: bool = false,
+        bg_col: ?u32 = null,
     };
     vt: iArea,
     cbhandle: CbHandle = .{},
@@ -97,7 +98,7 @@ pub const TextView = struct {
         for (self.lines.items[index..], index..) |line, i| {
             _ = i;
             //const color: u32 = if (i % 2 == 0) 0xffff_ffff else 0xff_0000_ff;
-            _ = Widget.Text.buildStatic(layout, ly.getArea(), line, gui.dstate.nstyle.color.text_bg);
+            _ = Widget.Text.buildStatic(layout, ly.getArea(), line, self.opts.bg_col orelse gui.dstate.nstyle.color.text_bg);
         }
     }
 
@@ -109,8 +110,8 @@ pub const TextView = struct {
     }
 
     pub fn draw(vt: *iArea, _: *Gui, d: *g.DrawState) void {
-        //d.ctx.nineSlice(vt.area, d.style.getRect(.basic_inset), d.style.texture, d.scale, d.tint);
-        d.ctx.rect(vt.area, d.nstyle.color.text_bg);
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        d.ctx.rect(vt.area, self.opts.bg_col orelse d.nstyle.color.text_bg);
         //d.ctx.rect(vt.area, 0xff); //Black rect
     }
 

@@ -73,6 +73,12 @@ pub const MyGlView = struct {
 };
 
 pub const MyInspector = struct {
+    const BtnId = enum(guis.Uid) {
+        add,
+        reset,
+        many,
+        bottom,
+    };
     const MyEnum = enum {
         hello,
         world,
@@ -96,6 +102,12 @@ pub const MyInspector = struct {
     my_enum: MyEnum = .hello,
     fenum: std.fs.File.Kind = .file,
     color: u32 = 0xff_ff,
+    num_scroll_items: u32 = 10,
+
+    tab_index: usize = 0,
+    scroll_index: usize = 0,
+
+    vscroll_vt: ?*iArea = null,
     //This subscribes to onScroll
     //has two child layouts,
     //the act of splitting is not the Layouts job
@@ -126,6 +138,7 @@ pub const MyInspector = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         self.vt.area.area = area;
         self.vt.area.clearChildren(gui, vt);
+        self.vscroll_vt = null;
         //self.layout.reset(gui, vt);
         //start a vlayout
         //var ly = Vert{ .area = vt.area };
@@ -152,9 +165,10 @@ pub const MyInspector = struct {
         _ = Wg.Combo.build(a, ly.getArea() orelse return, &self.my_enum, .{});
         _ = Wg.Combo.build(a, ly.getArea() orelse return, &self.fenum, .{});
 
-        _ = Wg.Button.build(a, ly.getArea(), "My button", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = 48 });
-        _ = Wg.Button.build(a, ly.getArea(), "My button 2", .{});
-        _ = Wg.Button.build(a, ly.getArea(), "My button 3", .{});
+        _ = Wg.Button.build(a, ly.getArea(), "Add item", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.add) });
+        _ = Wg.Button.build(a, ly.getArea(), "reset list", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.reset) });
+        _ = Wg.Button.build(a, ly.getArea(), "add many", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.many) });
+        _ = Wg.Button.build(a, ly.getArea(), "bottom", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.bottom) });
         _ = Wg.Colorpicker.build(a, ly.getArea() orelse return, self.color, .{});
 
         _ = Wg.Textbox.build(a, ly.getArea());
@@ -165,7 +179,7 @@ pub const MyInspector = struct {
         _ = Wg.Slider.build(a, ly.getArea(), &self.i32_n, 0, 10, .{});
 
         ly.pushRemaining();
-        _ = Wg.Tabs.build(a, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle });
+        _ = Wg.Tabs.build(a, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle, .index_ptr = &self.tab_index });
     }
 
     fn staticSliderCb(cb: *CbHandle, _: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
@@ -219,13 +233,16 @@ pub const MyInspector = struct {
         }
         if (eql(u8, tab_name, "third")) {
             ly.pushRemaining();
-            _ = Wg.VScroll.build(vt, ly.getArea(), .{
+            if (Wg.VScroll.build(vt, ly.getArea(), .{
                 .build_cb = &buildScrollItems,
                 .build_vt = &self.cbhandle,
                 .win = win,
-                .count = 10,
+                .count = self.num_scroll_items,
                 .item_h = gui.dstate.style.config.default_item_h,
-            });
+                .index_ptr = &self.scroll_index,
+            }) == .good) {
+                self.vscroll_vt = vt.getLastChild();
+            }
         }
     }
 
@@ -234,10 +251,9 @@ pub const MyInspector = struct {
 
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = gui.dstate.vlayout(vt.area);
-        for (index..10) |i| {
+        for (index..self.num_scroll_items) |i| {
             _ = Wg.Text.build(vt, ly.getArea(), "item {d}", .{i});
         }
-        _ = self;
     }
 
     pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, _: *iWindow, scr: *Wg.FloatScroll) void {
@@ -251,8 +267,21 @@ pub const MyInspector = struct {
         scr.hintBounds(ly.getUsed());
     }
 
-    pub fn btnCb(_: *CbHandle, id: usize, _: guis.MouseCbState, _: *iWindow) void {
-        std.debug.print("BUTTON CLICKED {d}\n", .{id});
+    pub fn btnCb(cb: *CbHandle, id: guis.Uid, _: guis.MouseCbState, _: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const en = std.meta.intToEnum(BtnId, id) catch return;
+        switch (en) {
+            .add => self.num_scroll_items += 1,
+            .reset => self.num_scroll_items = 10,
+            .many => self.num_scroll_items += 100,
+            .bottom => {
+                if (self.vscroll_vt) |vscr| {
+                    const scr: *Wg.VScroll = @alignCast(@fieldParentPtr("vt", vscr));
+                    scr.gotoBottom();
+                }
+            },
+        }
+        self.vt.needs_rebuild = true;
     }
 };
 

@@ -929,8 +929,11 @@ pub const Gui = struct {
                 self.clearGrab();
         }
         if (self.focused) |f| {
-            if (!self.isWindowActive(f.win))
+            if (!self.isWindowActive(f.win)) {
+                //send lost focus event to widget in non active window
+                self.dispatchFocusedEvent(.{ .focusChanged = false });
                 self.focused = null;
+            }
         }
         for (self.active_windows.items) |win| {
             win.pre_update(self);
@@ -1408,8 +1411,10 @@ pub const GuiHelp = struct {
     }
 };
 
+const DarkText = 0xeeeeee_ff;
+const DarkBg: u32 = 0x4f4f4f_ff;
 pub const Colorscheme = struct {
-    bg: u32 = 0x4f4f4fff,
+    bg: u32 = DarkBg,
     //text_fg: u32 = 0xdbe0e0_ff,
     text_fg: u32 = 0xeeeeee_ff,
     text_bg: u32 = 0x333333_ff,
@@ -1420,11 +1425,26 @@ pub const Colorscheme = struct {
 
     table_bg: u32 = 0x333333_ff,
     static_slider_bg: u32 = 0x333333_ff,
+
+    ableton_checkbox_bg: u32 = 0xdddddd_ff,
+    ableton_checkbox_fill: u32 = 0xadd8e6_ff,
+    ableton_checkbox_text: u32 = 0xff,
+    ableton_checkbox_border: u32 = 0xff,
+
+    combo_bg: u32 = 0x2d2d2d_ff,
+    combo_border: u32 = 0xff,
+    combo_arrow: u32 = 0xffffff_ff,
+
+    button_bg: u32 = 0x2d2d2d_ff,
+    button_active_bg: u32 = 0x1d1d1d_ff,
+    button_focused_bg: u32 = 0x4d4d4d_ff,
+    button_border: u32 = 0x7f7f7f_ff,
+    button_text: u32 = DarkText,
 };
 
 pub const DarkColorscheme = Colorscheme{
     .bg = 0x4f4f4fff,
-    .text_fg = 0xeeeeee_ff,
+    .text_fg = DarkText,
     .text_bg = 0x333333_ff,
     .textbox_bg = 0x333333_ff,
     .textbox_border = 0xff,
@@ -1433,6 +1453,11 @@ pub const DarkColorscheme = Colorscheme{
 
     .table_bg = 0x333333_ff,
     .static_slider_bg = 0x333333_ff,
+
+    .ableton_checkbox_bg = 0x222222_ff,
+    .ableton_checkbox_fill = 0x08538c_ff,
+    .ableton_checkbox_text = DarkText,
+    .ableton_checkbox_border = 0xff,
 };
 
 pub const LightColorscheme = Colorscheme{
@@ -1449,5 +1474,6 @@ pub const LightColorscheme = Colorscheme{
 
 pub const Style = struct {
     caret_width: f32 = 2,
+
     color: Colorscheme = LightColorscheme,
 };

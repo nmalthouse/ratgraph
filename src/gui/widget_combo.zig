@@ -181,8 +181,7 @@ pub fn ComboUser(user_data: type) type {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
             d.ctx.rect(vt.area, 0x2ffff0ff);
 
-            const cb = d.style.getRect(.combo_background);
-            d.ctx.nineSlice(vt.area, cb, d.style.texture, d.scale, d.tint);
+            d.ctx.rect(vt.area, d.nstyle.color.combo_bg);
             const texta = d.textArea(vt.area);
             d.ctx.textClipped(texta, "{s}", .{self.opts.name_cb(self.opts.user_vt, self.opts.current, gui, self.user)}, d.textP(null), .center);
             //self.gui.drawTextFmt(fmt, args, texta, self.style.config.text_h, 0xff, .{ .justify = .center }, self.font);
@@ -317,16 +316,27 @@ pub fn ComboGeneric(comptime enumT: type) type {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
             //d.ctx.rect(vt.area, 0x2ffff0ff);
 
-            const cb = d.style.getRect(.combo_background);
             const btn_a = vt.area;
-            d.ctx.nineSlice(btn_a, cb, d.style.texture, d.scale, d.tint);
+            d.ctx.rect(btn_a, d.nstyle.color.combo_bg);
             const texta = d.textArea(vt.area);
             d.ctx.textClipped(texta, "{s}", .{@tagName(self.enum_ptr.*)}, d.textP(null), .center);
             //self.gui.drawTextFmt(fmt, args, texta, self.style.config.text_h, 0xff, .{ .justify = .center }, self.font);
-            const cbb = d.style.getRect(.combo_button);
-            const da = d.style.getRect(.down_arrow);
-            const cbbr = btn_a.replace(btn_a.x + btn_a.w - cbb.w * d.scale, null, cbb.w * d.scale, null).centerR(da.w * d.scale, da.h * d.scale);
-            d.ctx.rectTex(cbbr, da, d.style.texture);
+            //const cbb = d.style.getRect(.combo_button);
+            //const da = d.style.getRect(.down_arrow);
+            //const cbbr = btn_a.replace(btn_a.x + btn_a.w - cbb.w * d.scale, null, cbb.w * d.scale, null).centerR(da.w * d.scale, da.h * d.scale);
+            //d.ctx.rectTex(cbbr, da, d.style.texture);
+
+            const thick = @ceil(d.scale);
+            const aw = d.style.config.text_h;
+            const br = btn_a.replace(btn_a.x + btn_a.w - aw, null, aw, null).centerR(aw, aw);
+            const cent = br.center();
+
+            const v = [3]graph.Vec2f{ br.topL(), cent, br.topR() };
+            const cmass = cent.sub(v[0].add(v[1].add(v[2])).scale(1.0 / 3.0));
+            d.ctx.triangle(v[0].add(cmass), v[1].add(cmass), v[2].add(cmass), d.nstyle.color.combo_arrow);
+
+            const inset = vt.area.inset(thick);
+            d.ctx.rectLine(inset, thick, d.nstyle.color.combo_border);
         }
 
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {

@@ -26,6 +26,7 @@ pub const VScroll = struct {
         build_cb: BuildCb,
         build_vt: *CbHandle,
         win: *iWindow,
+        /// The number of items to scroll
         count: usize,
         item_h: f32,
 
@@ -101,22 +102,28 @@ pub const VScroll = struct {
     }
 
     pub fn getScrollableCount(self: *@This()) usize {
-        const fitted = @trunc(self.vt.area.h / self.opts.item_h) - 2; // -1 so user can see scroll has ended
-        if (fitted > 1 and fitted < max_scroll) {
-            const fw: usize = @intFromFloat(fitted);
-            if (fw < self.opts.count)
-                return self.opts.count - fw;
+        const visible_count = @trunc(self.vt.area.h / self.opts.item_h);
+
+        if (visible_count > 1 and visible_count < max_scroll) {
+            const visible_count_i: usize = @intFromFloat(visible_count);
+            const pad_count = 2;
+            if (visible_count_i - pad_count < self.opts.count) { //We are actually scrolling something
+
+                return self.opts.count - (visible_count_i - pad_count);
+            }
         }
+
         return self.opts.count;
     }
 
     pub fn gotoBottom(self: *@This()) void {
-        const fitted = @trunc(self.vt.area.h / self.opts.item_h);
-        if (@as(f32, @floatFromInt(self.sc_count)) < fitted) {
+        const num_visible = @trunc(self.vt.area.h / self.opts.item_h) - 2;
+        if (@as(f32, @floatFromInt(self.opts.count)) < num_visible) {
             self.index_ptr.* = 0;
         } else {
-            self.index_ptr.* = self.sc_count;
+            self.index_ptr.* = self.sc_count - 1;
         }
+        self.vt.dirty();
     }
 
     pub fn updateCount(self: *@This(), new_count: usize) void {
@@ -125,6 +132,7 @@ pub const VScroll = struct {
         self.opts.count = new_count;
         self.sc_count = self.getScrollableCount();
         scr.updateCount(self.sc_count);
+        self.vt.dirty();
     }
 
     pub fn rebuild(self: *@This(), gui: *Gui, win: *iWindow) void {
@@ -258,17 +266,16 @@ pub const Checkbox = struct {
 
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const col = &d.nstyle.color;
 
-        const GRAY = 0xddddddff;
-        d.ctx.rect(vt.area, GRAY);
+        d.ctx.rect(vt.area, col.ableton_checkbox_bg);
         const ins = @ceil(d.scale);
         const inset = vt.area.inset(ins);
         const ta = d.textArea(vt.area);
-        const FILL_COLOR = 0xADD8E6ff;
         if (self.bool_ptr.*)
-            d.ctx.rect(inset, FILL_COLOR);
-        d.ctx.textClipped(ta, "{s}", .{self.name}, d.textP(null), .center);
-        d.ctx.rectLine(inset, ins, 0xff);
+            d.ctx.rect(inset, col.ableton_checkbox_fill);
+        d.ctx.textClipped(ta, "{s}", .{self.name}, d.textP(col.ableton_checkbox_text), .center);
+        d.ctx.rectLine(inset, ins, col.ableton_checkbox_border);
     }
 
     pub fn drawCheck(vt: *iArea, gui: *Gui, d: *DrawState) void {
@@ -380,19 +387,19 @@ pub const Button = struct {
 
     pub fn draw(vt: *iArea, gui: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        //d.ctx.rect(vt.area, 0x5ffff0ff);
-        const sl = if (self.is_down) d.style.getRect(.button_clicked) else d.style.getRect(.button);
+        const sl = if (self.is_down) d.nstyle.color.button_active_bg else d.nstyle.color.button_bg;
         const is_focused = gui.isFocused(vt);
-        const color = d.style.config.colors.button_text;
 
-        //const bw = 1;
-        const tint = if (!is_focused) d.tint else 0xdddd_ddff;
-        d.ctx.nineSlice(vt.area, sl, d.style.texture, d.scale, tint);
-        //if (is_focused)
-        //d.ctx.rectBorder(vt.area, bw, d.style.config.colors.selected);
+        const tint = if (!is_focused) sl else d.nstyle.color.button_focused_bg;
+        //d.ctx.nineSlice(vt.area, sl, d.style.texture, d.scale, tint);
+        d.ctx.rect(vt.area, tint);
 
         const ta = d.textArea(vt.area);
-        d.ctx.textClipped(ta, "{s}", .{self.text}, d.textP(color), .center);
+        d.ctx.textClipped(ta, "{s}", .{self.text}, d.textP(d.nstyle.color.button_text), .center);
+
+        const ins = @ceil(d.scale);
+        const inset = vt.area.inset(ins);
+        d.ctx.rectLine(inset, ins, d.nstyle.color.button_border);
     }
 
     pub fn onclick(vt: *iArea, cb: MouseCbState, win: *iWindow) void {
