@@ -9,10 +9,11 @@ layout (location = 1) in vec2 in_texcoord;
 layout (location = 2) in vec3 in_normal;
 layout (location = 3) in vec3 in_frag_pos;
 layout (location = 4) in vec3 in_tangent;
+layout (location = 5) in float blend;
 
 layout (binding = 0) uniform sampler2D diffuse_texture;
-layout (binding = 1) uniform sampler2D normal_texture;
-layout (binding = 3) uniform sampler2DArray textures;
+layout (binding = 1) uniform sampler2D blend_texture;
+layout (binding = 2) uniform sampler2D normal_texture;
 
 vec3 bumpNorm(){
     vec3 norm = normalize(in_normal);
@@ -34,7 +35,7 @@ void main(){
     //g_norm = vec4(texture(normal_texture, in_texcoord).rgb, 1);
     //g_norm = vec4(normalize(in_normal),1);
     g_norm = vec4(bumpNorm(),1);
-    g_albedo = in_color * texture(diffuse_texture, in_texcoord);
+    g_albedo = mix(texture(diffuse_texture, in_texcoord), texture(blend_texture, in_texcoord), blend) * in_color;
     if(g_albedo.a < 0.1)
         discard;
 }

@@ -4,8 +4,7 @@ layout (location = 1) in vec2 in_texcoord;
 layout (location = 2) in vec3 in_normal;
 layout (location = 3) in vec3 in_frag_pos;
 layout (location = 4) in vec3 in_tangent;
-layout (location = 5) flat in uint tindex;
-layout (location = 6) in float blend;
+layout (location = 5) in float blend;
 
 layout (location = 0) out vec4 FragColor;
 

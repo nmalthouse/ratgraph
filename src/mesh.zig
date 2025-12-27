@@ -72,10 +72,10 @@ pub const Mesh = struct {
 
     pub fn setVertexAttribs(vao: c_uint, vbo: c_uint) void {
         GL.floatVertexAttrib(vao, vbo, 0, 3, MeshVert, "x"); //XYZ
-        GL.floatVertexAttrib(vao, vbo, 1, 2, MeshVert, "u"); //RGBA
-        GL.floatVertexAttrib(vao, vbo, 2, 3, MeshVert, "nx"); //RGBA
+        GL.floatVertexAttrib(vao, vbo, 1, 2, MeshVert, "u"); //UV
+        GL.floatVertexAttrib(vao, vbo, 2, 3, MeshVert, "nx"); //norm xyz
         GL.intVertexAttrib(vao, vbo, 3, 1, MeshVert, "color", c.GL_UNSIGNED_INT);
-        GL.floatVertexAttrib(vao, vbo, 4, 3, MeshVert, "tx");
+        GL.floatVertexAttrib(vao, vbo, 4, 3, MeshVert, "tx"); //tangent xyz
         GL.floatVertexAttrib(vao, vbo, 5, 1, MeshVert, "blend");
     }
 

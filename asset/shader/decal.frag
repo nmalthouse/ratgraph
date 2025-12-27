@@ -24,13 +24,15 @@ void main(){
     vec2 uv = (gl_FragCoord.xy - the_fucking_window_offset) / screenSize;
 
     vec3 world_pos = texture(g_pos, uv).rgb;
+    vec3 normal = texture(g_norm, uv).rgb;
 
     vec4 crap = vec4(world_pos - decal_pos, 1.0);
     crap.xyz /= 32.0;
     if(crap.x > 1.0 || crap.x < -1.0 || crap.y > 1.0 || crap.y < -1.0 || crap.z < -1.0 || crap.z > 1.0)
         discard;
 
+    vec3 nn = (normal * 0.5) + 0.5;
 
-    FragColor = vec4(1,0,0,0.5);
+    FragColor = vec4(nn, 0.5);
 }
 

@@ -228,16 +228,23 @@ pub const Renderer = struct {
                 c.glViewport(0, 0, self.gbuffer.scr_w, self.gbuffer.scr_h);
                 c.glClear(c.GL_COLOR_BUFFER_BIT | c.GL_DEPTH_BUFFER_BIT);
                 { //Write to gbuffer
-                    const sh = self.shader.gbuffer;
-                    c.glUseProgram(sh);
-                    const diffuse_loc = c.glGetUniformLocation(sh, "diffuse_texture");
+                    const gbuf_sh = self.shader.gbuffer;
+                    c.glUseProgram(gbuf_sh);
+                    const diffuse_loc = c.glGetUniformLocation(gbuf_sh, "diffuse_texture");
+                    const diff_slot = 0;
+                    const blend_slot = 1;
+                    const blend_loc = c.glGetUniformLocation(gbuf_sh, "blend_texture");
 
-                    c.glUniform1i(diffuse_loc, 0);
+                    c.glUniform1i(diffuse_loc, diff_slot);
+                    c.glUniform1i(blend_loc, blend_slot);
                     c.glBindBufferBase(c.GL_UNIFORM_BUFFER, 0, self.csm.mat_ubo);
                     for (self.draw_calls.items) |dc| {
-                        c.glBindTextureUnit(0, dc.diffuse);
-                        GL.passUniform(sh, "view", view);
-                        GL.passUniform(sh, "model", Mat4.identity());
+                        c.glBindTextureUnit(diff_slot, dc.diffuse);
+                        if (dc.blend != 0) {
+                            c.glBindTextureUnit(blend_slot, dc.blend);
+                        }
+                        GL.passUniform(gbuf_sh, "view", view);
+                        GL.passUniform(gbuf_sh, "model", Mat4.identity());
                         c.glBindVertexArray(dc.vao);
                         c.glDrawElements(@intFromEnum(dc.prim), dc.num_elements, dc.element_type, null);
                     }
