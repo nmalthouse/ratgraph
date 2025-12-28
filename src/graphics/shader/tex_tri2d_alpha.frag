@@ -8,8 +8,6 @@ uniform sampler2D text;
 uniform vec3 textColor;
 
 void main() {
-    vec4 sampled = vec4(1.0, 1.0, 1.0, texture(text, texcoord).r);
-    FragColor = color * sampled;
-    //if(FragColor.a < (5.0 / 255.0))
-    //    discard;
-};
+    FragColor = color;
+    FragColor.a *= texture(text, texcoord).r * 1.0;
+}

@@ -61,6 +61,7 @@ pub const TextView = struct {
             .count = self.lines.items.len,
             .index_ptr = null,
             .force_scroll = opts.force_scroll,
+            .bg_col = gui.dstate.nstyle.color.text_bg,
         });
     }
 

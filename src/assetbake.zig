@@ -334,6 +334,8 @@ pub fn sanitizePath(buf: []u8) void {
     }
 }
 
+//TODO stop using this stupid garbage
+
 //This function walks a directory, adding png files to a single packed atlas, all other files get packed into a userdata.bin.
 //A manifest file describing the directory is created.
 //The main reason for its existence to is:

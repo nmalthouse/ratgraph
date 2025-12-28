@@ -484,11 +484,54 @@ pub const DrawState = struct {
     }
 
     pub fn vlayout(self: *const @This(), area: Rect) VerticalLayout {
-        return .{ .item_height = self.style.config.default_item_h, .bounds = area };
+        return .{
+            .item_height = self.style.config.default_item_h,
+            .bounds = area,
+            .padding = self.nstyle.vlayout_padding,
+        };
     }
 
     pub fn hlayout(_: *const @This(), area: Rect, count: usize) HorizLayout {
         return .{ .bounds = area, .count = count };
+    }
+
+    pub fn box(
+        self: *const @This(),
+        area: Rect,
+        opts: struct {
+            bg: u32 = 0,
+            inner: u32 = 0,
+            border: u32 = 0,
+            text: []const u8 = "",
+            text_fg: u32 = 0xff,
+            border_mask: u8 = 0b1111, //top right bottom left
+        },
+    ) void {
+        if (opts.bg > 0) self.ctx.rect(area, opts.bg);
+        const bw = @ceil(self.scale);
+        const inset = area.inset(bw);
+
+        if (opts.inner > 0) self.ctx.rect(inset, opts.inner);
+
+        if (opts.text.len > 0) {
+            const ta = self.textArea(area);
+            self.ctx.textClipped(ta, "{s}", .{opts.text}, self.textP(opts.text_fg), .center);
+        }
+
+        if (opts.border > 0) {
+            for (0..4) |bi| {
+                if (opts.border_mask & (@as(u8, 1) << @as(u3, @intCast(bi))) == 0) continue;
+                const col = opts.border;
+                const r = area;
+                switch (bi) {
+                    3 => self.ctx.rect(.{ .x = r.x, .y = r.y, .w = r.w, .h = bw }, col),
+                    0 => self.ctx.rect(.{ .x = r.x + r.w - bw, .y = r.y, .w = bw, .h = r.h }, col),
+                    1 => self.ctx.rect(.{ .x = r.x, .y = r.y + r.h - bw, .w = r.w, .h = bw }, col),
+                    2 => self.ctx.rect(.{ .x = r.x, .y = r.y, .w = bw, .h = r.h }, col),
+                    else => {},
+                }
+            }
+        }
     }
 };
 
@@ -1400,8 +1443,12 @@ pub const Gui = struct {
 
 pub const GuiHelp = struct {
     pub fn drawWindowFrame(d: *DrawState, area: Rect) void {
-        const _br = d.style.getRect(.window);
-        d.ctx.nineSlice(area, _br, d.style.texture, d.scale, d.tint);
+        d.box(area, .{
+            .bg = d.nstyle.color.window_bg,
+            //.border = d.nstyle.color.window_border,
+        });
+        //const _br = d.style.getRect(.window);
+        //d.ctx.nineSlice(area, _br, d.style.texture, d.scale, d.tint);
     }
 
     pub fn insetAreaForWindowFrame(gui: *Gui, area: Rect) Rect {
@@ -1411,10 +1458,38 @@ pub const GuiHelp = struct {
     }
 };
 
+fn gray(value: u8) u32 {
+    const v: u32 = value;
+    return 0xff | v << 24 | v << 16 | v << 8;
+}
+
+const shade = [_]u32{
+    gray(0),
+    gray(0x22),
+    gray(0x40),
+    gray(0x60),
+    gray(0x80),
+    gray(0xa0),
+    gray(0xc0),
+    gray(0xee),
+    gray(0xff),
+};
+const ms = shade.len - 1;
+
+const BoxScheme = struct {
+    bg: u32 = 0,
+    border: u32 = 0,
+    text: u32 = 0,
+    inner: u32 = 0,
+};
+
 const DarkText = 0xeeeeee_ff;
 const DarkBg: u32 = 0x4f4f4f_ff;
+const DarkBg2: u32 = 0x222222_ff;
 pub const Colorscheme = struct {
-    bg: u32 = DarkBg,
+    window_bg: u32 = shade[1],
+    window_border: u32 = shade[0],
+    bg: u32 = shade[1],
     //text_fg: u32 = 0xdbe0e0_ff,
     text_fg: u32 = 0xeeeeee_ff,
     text_bg: u32 = 0x333333_ff,
@@ -1423,23 +1498,56 @@ pub const Colorscheme = struct {
     drop_down_arrow: u32 = 0xe0e0e0_ff,
     caret: u32 = 0xaaaaaaff,
 
+    selection: u32 = 0x274e91ff,
+
     table_bg: u32 = 0x333333_ff,
     static_slider_bg: u32 = 0x333333_ff,
+    //static_slider_fill: u32 = 0xf7a41dff,
+    static_slider_fill: u32 = 0xb57527_ff,
 
-    ableton_checkbox_bg: u32 = 0xdddddd_ff,
-    ableton_checkbox_fill: u32 = 0xadd8e6_ff,
-    ableton_checkbox_text: u32 = 0xff,
-    ableton_checkbox_border: u32 = 0xff,
+    ableton_checkbox: struct {
+        true: BoxScheme = .{
+            .bg = shade[4],
+            .inner = 0x294677_ff,
+            .text = shade[7],
+            .border = 0x4d7dd1_ff,
+        },
+        false: BoxScheme = .{
+            .bg = shade[4],
+            .text = shade[0],
+            .border = shade[5],
+        },
+    } = .{},
 
-    combo_bg: u32 = 0x2d2d2d_ff,
-    combo_border: u32 = 0xff,
-    combo_arrow: u32 = 0xffffff_ff,
+    ableton_checkbox_bg: u32 = shade[4],
+    ableton_checkbox_fill: u32 = 0x274e91ff,
+    ableton_checkbox_text: u32 = shade[0],
+    ableton_checkbox_text_fill: u32 = shade[7],
+    ableton_checkbox_border: u32 = shade[6],
+    ableton_checkbox_border_fill: u32 = shade[7],
 
-    button_bg: u32 = 0x2d2d2d_ff,
-    button_active_bg: u32 = 0x1d1d1d_ff,
-    button_focused_bg: u32 = 0x4d4d4d_ff,
-    button_border: u32 = 0x7f7f7f_ff,
-    button_text: u32 = DarkText,
+    combo_bg: u32 = shade[2],
+    combo_border: u32 = shade[0],
+    combo_arrow: u32 = shade[6],
+    combo_text: u32 = shade[7],
+
+    button_bg: u32 = shade[2],
+    button_active_bg: u32 = shade[1],
+    button_focused_bg: u32 = shade[3],
+    button_border: u32 = shade[0],
+    button_text: u32 = shade[7],
+
+    tab_bg: u32 = shade[2],
+    tab_active_bg: u32 = shade[1],
+    tab_active_text_fg: u32 = shade[7],
+    tab_text_fg: u32 = shade[6],
+    tab_border: u32 = shade[5],
+
+    scrollbar_bg: u32 = DarkBg2,
+    scrollbar_border: u32 = 0xff,
+
+    shuttle_bg: u32 = 0x6f6f6f_ff,
+    shuttle_border: u32 = 0xff,
 };
 
 pub const DarkColorscheme = Colorscheme{
@@ -1473,7 +1581,16 @@ pub const LightColorscheme = Colorscheme{
 };
 
 pub const Style = struct {
+    vlayout_padding: graph.Padding = .{
+        .top = 1,
+        .bottom = 1,
+        .left = 0,
+        .right = 0,
+    },
+
     caret_width: f32 = 2,
 
-    color: Colorscheme = LightColorscheme,
+    tab_spacing: f32 = 20,
+
+    color: Colorscheme = .{},
 };

@@ -36,6 +36,8 @@ pub const Tabs = struct {
             return .failed;
         var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
         const tab_area = ly.getArea() orelse return .failed;
+        ly.pushHeight(gui.dstate.nstyle.tab_spacing);
+        _ = ly.getArea();
         ly.pushRemaining();
         const child_area = ly.getArea() orelse return .failed;
 
@@ -123,23 +125,30 @@ const TabHeader = struct {
 
     pub fn draw(vt: *iArea, _: *Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const col = &d.nstyle.color;
         d.ctx.rect(vt.area, d.nstyle.color.bg);
 
-        const bg = d.style.getRect(.tab_header_bg);
-        d.ctx.nineSlice(vt.area, bg, d.style.texture, d.scale, d.tint);
+        d.box(vt.area, .{
+            .bg = d.nstyle.color.bg,
+            .border = d.nstyle.color.tab_border,
+            .border_mask = 0b0010,
+        });
         const tabs = self.parent.tabs.items;
         if (tabs.len == 0)
             return;
-        const active = d.style.getRect(.tab_active);
-        const inactive = d.style.getRect(.tab_inactive);
-        var ly = g.HorizLayout{ .count = tabs.len, .bounds = vt.area };
+        var ly = g.HorizLayout{ .count = tabs.len, .bounds = vt.area.insetV(d.nstyle.tab_spacing, 0), .paddingh = d.nstyle.tab_spacing };
         for (tabs, 0..) |tab, i| {
             const a = ly.getArea() orelse continue;
-            const _9s = if (i == self.parent.opts.index_ptr.?.*) active else inactive;
+            const active = i == self.parent.opts.index_ptr.?.*;
+            const border: u8 = if (active) 0b1101 else 0b1111;
 
-            d.ctx.nineSlice(a, _9s, d.style.texture, d.scale, d.tint);
-            const tarea = a.inset(d.scale * (_9s.w / 3));
-            d.ctx.textClipped(tarea, "{s}", .{tab}, d.textP(null), .center);
+            d.box(a, .{
+                .bg = if (active) col.tab_active_bg else col.tab_bg,
+                .border = col.tab_border,
+                .text = tab,
+                .text_fg = if (active) col.tab_active_text_fg else col.tab_text_fg,
+                .border_mask = border,
+            });
         }
     }
 

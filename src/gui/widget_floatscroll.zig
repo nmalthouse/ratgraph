@@ -270,13 +270,18 @@ pub const FloatScrollBar = struct {
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         const sp = calculateShuttlePos(self.area_h, self.y_ptr.*, self.vt.area.h, self.shuttle_h);
-        d.ctx.rect(vt.area, 0x5ffff0ff);
-        //d.ctx.nineSlice(vt.area, sl, d.style.texture, d.scale, 0xffffffff);
         const ar = vt.area.replace(null, null, null, self.vt.area.h);
-        d.ctx.nineSlice(ar, d.style.getRect(.slider_box), d.style.texture, d.scale, d.tint);
         const handle = shuttleRect(ar, sp, self.shuttle_h);
 
-        d.ctx.nineSlice(handle, d.style.getRect(.slider_shuttle), d.style.texture, d.scale, d.tint);
+        d.box(ar, .{
+            .bg = d.nstyle.color.scrollbar_bg,
+            .border = d.nstyle.color.scrollbar_border,
+        });
+
+        d.box(handle, .{
+            .bg = d.nstyle.color.shuttle_bg,
+            .border = d.nstyle.color.shuttle_border,
+        });
     }
 };
 

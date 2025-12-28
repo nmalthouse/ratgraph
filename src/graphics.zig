@@ -617,8 +617,8 @@ pub const ImmediateDrawingContext = struct {
             const g = font.getGlyph(ch);
 
             const r = Rect{
-                .x = vx + (g.offset_x) * SF,
-                .y = vy - (g.offset_y) * SF,
+                .x = @trunc(vx + (g.offset_x) * SF),
+                .y = @trunc(vy - (g.offset_y) * SF),
                 .w = (g.width) * SF,
                 .h = (g.height) * SF,
             };
@@ -1218,6 +1218,7 @@ pub fn genQuadIndices(index: u32) [6]u32 {
 
 pub const Padding = struct {
     const Self = @This();
+    pub const zero: Self = .{ .top = 0, .bottom = 0, .left = 0, .right = 0 };
     top: f32 = 0,
     bottom: f32 = 0,
     left: f32 = 0,

@@ -35,6 +35,7 @@ pub const VScroll = struct {
 
         /// if set, index_ptr is recalculated to ensure this index is visible
         current_index: ?usize = null,
+        bg_col: u32 = 0,
     };
 
     vt: iArea,
@@ -155,8 +156,11 @@ pub const VScroll = struct {
 
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        d.ctx.rect(vt.area, d.nstyle.color.bg);
-        _ = self;
+        if (self.opts.bg_col > 0) {
+            d.ctx.rect(vt.area, self.opts.bg_col);
+        } else {
+            d.ctx.rect(vt.area, d.nstyle.color.bg);
+        }
     }
 
     pub fn notifyChange(vt: *iArea, gui: *Gui, win: *iWindow) void {
@@ -266,16 +270,15 @@ pub const Checkbox = struct {
 
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        const col = &d.nstyle.color;
 
-        d.ctx.rect(vt.area, col.ableton_checkbox_bg);
-        const ins = @ceil(d.scale);
-        const inset = vt.area.inset(ins);
-        const ta = d.textArea(vt.area);
-        if (self.bool_ptr.*)
-            d.ctx.rect(inset, col.ableton_checkbox_fill);
-        d.ctx.textClipped(ta, "{s}", .{self.name}, d.textP(col.ableton_checkbox_text), .center);
-        d.ctx.rectLine(inset, ins, col.ableton_checkbox_border);
+        const st = if (self.bool_ptr.*) d.nstyle.color.ableton_checkbox.true else d.nstyle.color.ableton_checkbox.false;
+        d.box(vt.area, .{
+            .inner = st.inner,
+            .bg = st.bg,
+            .border = st.border,
+            .text = self.name,
+            .text_fg = st.text,
+        });
     }
 
     pub fn drawCheck(vt: *iArea, gui: *Gui, d: *DrawState) void {
@@ -387,19 +390,15 @@ pub const Button = struct {
 
     pub fn draw(vt: *iArea, gui: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        const sl = if (self.is_down) d.nstyle.color.button_active_bg else d.nstyle.color.button_bg;
         const is_focused = gui.isFocused(vt);
-
+        const sl = if (self.is_down) d.nstyle.color.button_active_bg else d.nstyle.color.button_bg;
         const tint = if (!is_focused) sl else d.nstyle.color.button_focused_bg;
-        //d.ctx.nineSlice(vt.area, sl, d.style.texture, d.scale, tint);
-        d.ctx.rect(vt.area, tint);
-
-        const ta = d.textArea(vt.area);
-        d.ctx.textClipped(ta, "{s}", .{self.text}, d.textP(d.nstyle.color.button_text), .center);
-
-        const ins = @ceil(d.scale);
-        const inset = vt.area.inset(ins);
-        d.ctx.rectLine(inset, ins, d.nstyle.color.button_border);
+        d.box(vt.area, .{
+            .bg = tint,
+            .border = d.nstyle.color.button_border,
+            .text = self.text,
+            .text_fg = d.nstyle.color.button_text,
+        });
     }
 
     pub fn onclick(vt: *iArea, cb: MouseCbState, win: *iWindow) void {
@@ -569,10 +568,19 @@ pub const ScrollBar = struct {
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         //d.ctx.nineSlice(vt.area, sl, d.style.texture, d.scale, 0xffffffff);
         const ar = vt.area.replace(null, null, null, self.usable_h);
-        d.ctx.nineSlice(ar, d.style.getRect(.slider_box), d.style.texture, d.scale, d.tint);
+        //d.ctx.nineSlice(ar, d.style.getRect(.slider_box), d.style.texture, d.scale, d.tint);
         const handle = shuttleRect(ar, sp, self.shuttle_h);
+        d.box(ar, .{
+            .bg = d.nstyle.color.scrollbar_bg,
+            .border = d.nstyle.color.scrollbar_border,
+        });
 
-        d.ctx.nineSlice(handle, d.style.getRect(.slider_shuttle), d.style.texture, d.scale, d.tint);
+        d.box(handle, .{
+            .bg = d.nstyle.color.shuttle_bg,
+            .border = d.nstyle.color.shuttle_border,
+        });
+
+        //d.ctx.nineSlice(handle, d.style.getRect(.slider_shuttle), d.style.texture, d.scale, d.tint);
     }
 };
 

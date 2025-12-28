@@ -18,6 +18,70 @@ const Gui = guis.Gui;
 const Wg = guis.Widget;
 const CbHandle = guis.CbHandle;
 
+pub const Styler = struct {
+    vt: iWindow,
+    cbhandle: CbHandle = .{},
+
+    pub fn create(gui: *Gui) *iWindow {
+        const self = gui.create(@This());
+        self.* = .{
+            .vt = iWindow.init(build, gui, deinit, .{}, &self.vt),
+        };
+
+        return &self.vt;
+    }
+
+    fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
+
+    pub fn deinit(vt: *iWindow, gui: *Gui) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        //self.layout.deinit(gui, vt);
+        vt.deinit(gui);
+        gui.alloc.destroy(self); //second
+    }
+
+    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
+        GuiHelp.drawWindowFrame(d, vt.area);
+    }
+
+    pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        self.vt.area.area = area;
+        self.vt.area.clearChildren(gui, vt);
+        //self.layout.reset(gui, vt);
+        //start a vlayout
+        //var ly = Vert{ .area = vt.area };
+        var ly = gui.dstate.vlayout(GuiHelp.insetAreaForWindowFrame(gui, vt.area.area));
+        ly.padding.left = 10;
+        ly.padding.right = 10;
+        const a = &self.vt.area;
+
+        inline for (@typeInfo(guis.Colorscheme).@"struct".fields, 0..) |field, fi| {
+            if (guis.label(a, ly.getArea(), "{s}", .{field.name})) |ar| {
+                _ = Wg.Colorpicker.build(a, ar, @field(gui.dstate.nstyle.color, field.name), .{
+                    .user_id = fi,
+                    .commit_vt = &self.cbhandle,
+                    .commit_cb = commit_color,
+                });
+            }
+        }
+    }
+
+    fn commit_color(cb: *CbHandle, _: *Gui, color: u32, id: usize) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+
+        inline for (@typeInfo(guis.Colorscheme).@"struct".fields, 0..) |f, i| {
+            if (i == id) {
+                @field(
+                    self.vt.gui_ptr.dstate.nstyle.color,
+                    f.name,
+                ) = color;
+                return;
+            }
+        }
+    }
+};
+
 pub const MyGlView = struct {
     vt: iWindow,
     cbhandle: CbHandle = .{},
@@ -169,7 +233,6 @@ pub const MyInspector = struct {
         _ = Wg.Button.build(a, ly.getArea(), "reset list", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.reset) });
         _ = Wg.Button.build(a, ly.getArea(), "add many", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.many) });
         _ = Wg.Button.build(a, ly.getArea(), "bottom", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.bottom) });
-        _ = Wg.Colorpicker.build(a, ly.getArea() orelse return, self.color, .{});
 
         _ = Wg.Textbox.build(a, ly.getArea());
         _ = Wg.Textbox.build(a, ly.getArea());
@@ -194,6 +257,7 @@ pub const MyInspector = struct {
 
     pub fn buildTabs(cb: *CbHandle, vt: *iArea, tab_name: []const u8, gui: *Gui, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        self.vscroll_vt = null;
         const eql = std.mem.eql;
         var ly = gui.dstate.vlayout(vt.area);
         ly.padding.top = 10;
@@ -312,25 +376,28 @@ pub fn main() !void {
     var font = try graph.Font.init(alloc, std.fs.cwd(), "asset/fonts/roboto.ttf", TEXT_H, .{});
     defer font.deinit();
 
-    const sc = 2;
+    const sc = 1;
     var gui = try Gui.init(alloc, &win, cache_dir, std.fs.cwd(), &font.font, &draw);
     defer gui.deinit();
 
     gui.dstate.style.config.default_item_h = hh;
     gui.dstate.style.config.text_h = TEXT_H;
+    gui.dstate.nstyle.color = guis.DarkColorscheme;
 
-    const window_area = Rect{ .x = 100, .y = 50, .w = 1000, .h = 1000 };
+    const window_area = Rect{ .x = 0, .y = 0, .w = 1000, .h = 1000 };
 
     gui.dstate.scale = sc;
     const inspector = MyInspector.create(&gui);
-    const glview = MyGlView.create(&gui, &draw);
+    const styler = Styler.create(&gui);
+    //const glview = MyGlView.create(&gui, &draw);
     _ = try gui.addWindow(inspector, window_area, .{});
-    _ = try gui.addWindow(glview, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = false });
+    //_ = try gui.addWindow(styler, window_area, .{});
+    _ = try gui.addWindow(styler, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = true });
 
     var timer = try std.time.Timer.start();
 
     try gui.active_windows.append(gui.alloc, inspector);
-    try gui.active_windows.append(gui.alloc, glview);
+    try gui.active_windows.append(gui.alloc, styler);
     while (!win.should_exit) {
         try draw.begin(0xff, win.screen_dimensions.toF());
         win.pumpEvents(.wait);

@@ -130,11 +130,10 @@ pub const StaticSlider = struct {
         //const ta = inset.inset(@ceil(d.style.config.textbox_inset * d.scale));
         const ta = d.textArea(vt.area);
         if (self.opts.max == self.opts.min) return;
-        const FILL_COLOR = 0xf7a41dff;
         switch (self.state) {
             .display => {
                 const perc = std.math.clamp((self.num.* - self.opts.min) / @abs(self.opts.max - self.opts.min), 0, 1);
-                d.ctx.rect(inset.replace(null, null, inset.w * perc, null), FILL_COLOR);
+                d.ctx.rect(inset.replace(null, null, inset.w * perc, null), d.nstyle.color.static_slider_fill);
                 const label = self.opts.label orelse "";
                 switch (self.opts.display_kind) {
                     .raw => d.ctx.textClipped(ta, "{s} {d:.2} {s}", .{ label, self.num.*, self.opts.unit }, d.textP(null), .center),

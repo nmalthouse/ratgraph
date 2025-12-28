@@ -66,6 +66,7 @@ pub fn ComboUser(user_data: type) type {
                 vt.area.dirty();
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = gui.dstate.vlayout(area.inset(gui.dstate.scale));
+                ly.padding = .zero;
                 _ = Widget.Textbox.buildOpts(&vt.area, ly.getArea(), .{
                     .commit_cb = &textbox_cb,
                     .commit_vt = &self.cbhandle,
@@ -101,6 +102,7 @@ pub fn ComboUser(user_data: type) type {
 
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
                 var ly = gui.dstate.vlayout(area.area);
+                ly.padding = .zero;
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 const total_count = p.opts.count;
 
@@ -179,16 +181,7 @@ pub fn ComboUser(user_data: type) type {
 
         pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-            d.ctx.rect(vt.area, 0x2ffff0ff);
-
-            d.ctx.rect(vt.area, d.nstyle.color.combo_bg);
-            const texta = d.textArea(vt.area);
-            d.ctx.textClipped(texta, "{s}", .{self.opts.name_cb(self.opts.user_vt, self.opts.current, gui, self.user)}, d.textP(null), .center);
-            //self.gui.drawTextFmt(fmt, args, texta, self.style.config.text_h, 0xff, .{ .justify = .center }, self.font);
-            const cbb = d.style.getRect(.combo_button);
-            const da = d.style.getRect(.down_arrow);
-            const cbbr = vt.area.replace(vt.area.x + vt.area.w - cbb.w * d.scale, null, cbb.w * d.scale, null).centerR(da.w * d.scale, da.h * d.scale);
-            d.ctx.rectTex(cbbr, da, d.style.texture);
+            drawCommon(vt.area, d, self.opts.name_cb(self.opts.user_vt, self.opts.current, gui, self.user));
         }
 
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
@@ -259,6 +252,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = gui.dstate.vlayout(area.area);
+                ly.padding = .zero;
                 const info = @typeInfo(enumT);
                 inline for (info.@"enum".fields, 0..) |field, i| {
                     if (i >= index) {
@@ -314,29 +308,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
 
         pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-            //d.ctx.rect(vt.area, 0x2ffff0ff);
-
-            const btn_a = vt.area;
-            d.ctx.rect(btn_a, d.nstyle.color.combo_bg);
-            const texta = d.textArea(vt.area);
-            d.ctx.textClipped(texta, "{s}", .{@tagName(self.enum_ptr.*)}, d.textP(null), .center);
-            //self.gui.drawTextFmt(fmt, args, texta, self.style.config.text_h, 0xff, .{ .justify = .center }, self.font);
-            //const cbb = d.style.getRect(.combo_button);
-            //const da = d.style.getRect(.down_arrow);
-            //const cbbr = btn_a.replace(btn_a.x + btn_a.w - cbb.w * d.scale, null, cbb.w * d.scale, null).centerR(da.w * d.scale, da.h * d.scale);
-            //d.ctx.rectTex(cbbr, da, d.style.texture);
-
-            const thick = @ceil(d.scale);
-            const aw = d.style.config.text_h;
-            const br = btn_a.replace(btn_a.x + btn_a.w - aw, null, aw, null).centerR(aw, aw);
-            const cent = br.center();
-
-            const v = [3]graph.Vec2f{ br.topL(), cent, br.topR() };
-            const cmass = cent.sub(v[0].add(v[1].add(v[2])).scale(1.0 / 3.0));
-            d.ctx.triangle(v[0].add(cmass), v[1].add(cmass), v[2].add(cmass), d.nstyle.color.combo_arrow);
-
-            const inset = vt.area.inset(thick);
-            d.ctx.rectLine(inset, thick, d.nstyle.color.combo_border);
+            drawCommon(vt.area, d, @tagName(self.enum_ptr.*));
         }
 
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
@@ -370,4 +342,25 @@ pub fn ComboGeneric(comptime enumT: type) type {
             popped.vt.build_fn(&popped.vt, gui, area);
         }
     };
+}
+
+fn drawCommon(area: Rect, d: *g.DrawState, text: []const u8) void {
+    //d.ctx.rect(vt.area, 0x2ffff0ff);
+    d.box(area, .{
+        .bg = d.nstyle.color.combo_bg,
+        .border = d.nstyle.color.combo_border,
+        .text = text,
+        .text_fg = d.nstyle.color.combo_text,
+    });
+
+    const bw = 1;
+    const h = area.h;
+    const pad = (area.h - h) / 2;
+    const br = Rect.newV(.{ .x = area.x + bw, .y = area.y + pad }, .{ .x = h, .y = h }).inset(h / 4);
+
+    const cent = br.center();
+
+    const v = [3]graph.Vec2f{ br.topL(), cent, br.topR() };
+    const cmass = cent.sub(v[0].add(v[1].add(v[2])).scale(1.0 / 3.0));
+    d.ctx.triangle(v[0].add(cmass), v[1].add(cmass), v[2].add(cmass), d.nstyle.color.combo_arrow);
 }
