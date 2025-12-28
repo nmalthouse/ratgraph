@@ -102,6 +102,10 @@ pub const NumberParseFn = *const fn (*iArea, []const u8) error{invalid}!void;
 pub const TextboxOptions = struct {
     commit_cb: ?*const fn (*CbHandle, *Gui, []const u8, user_id: usize) void = null,
     commit_vt: ?*CbHandle = null,
+
+    /// If defined, all events will be passed to this, user function must pass excess events back to textbox
+    fevent_override_cb: ?*const fn (*CbHandle, g.FocusedEvent, *Textbox) void = null,
+
     user_id: usize = 0,
 
     init_string: []const u8 = "",
@@ -217,7 +221,7 @@ pub const Textbox = struct {
         }
     }
 
-    fn move_to(self: *Self, movement: SingleLineMovement) void {
+    pub fn move_to(self: *Self, movement: SingleLineMovement) void {
         self.select_to(movement);
         self.tail = self.head;
     }
@@ -281,7 +285,12 @@ pub const Textbox = struct {
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
-        fevent_err(vt, ev) catch return;
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        if (self.opts.fevent_override_cb) |cb| {
+            cb(self.opts.commit_vt orelse return, ev, self);
+        } else {
+            fevent_err(vt, ev) catch return;
+        }
     }
 
     fn calculateDrawStart(self: *@This(), text_area: Rect, text_h: f32, gui: *Gui) void {
