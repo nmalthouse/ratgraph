@@ -18,6 +18,7 @@ pub const DrawCall = struct {
     diffuse: c_uint,
     blend: glID = 0,
     bump: glID = 0,
+    model: ?Mat4 = null,
 };
 const SunQuadBatch = graph.NewBatch(packed struct { pos: graph.Vec3f, uv: graph.Vec2f }, .{ .index_buffer = false, .primitive_mode = .triangles });
 const SkyBatch = graph.NewBatch(graph.ImmediateDrawingContext.VtxFmt.Textured_3D_NC, .{ .index_buffer = true, .primitive_mode = .triangles });
@@ -64,6 +65,8 @@ pub const Renderer = struct {
     debug_light_coverage: bool = false,
     copy_depth: bool = true,
     light_render_dist: f32 = 1024 * 2,
+    /// Halfs the number of draw calls if enabled
+    omit_model_shadow: bool = true,
 
     res_scale: f32 = 1,
 
@@ -189,7 +192,6 @@ pub const Renderer = struct {
                 const sh = self.shader.forward;
                 c.glUseProgram(sh);
                 GL.passUniform(sh, "view", view);
-                GL.passUniform(sh, "model", Mat4.identity());
                 for (self.draw_calls.items) |dc| {
                     if (dc.diffuse != 0) {
                         const diffuse_loc = c.glGetUniformLocation(sh, "diffuse_texture");
@@ -202,7 +204,7 @@ pub const Renderer = struct {
                         c.glUniform1i(blend_loc, 1);
                         c.glBindTextureUnit(1, dc.blend);
                     }
-                    //GL.passUniform(sh, "model", model);
+                    GL.passUniform(sh, "model", if (dc.model) |mod| mod else Mat4.identity());
                     c.glBindVertexArray(dc.vao);
                     c.glDrawElements(@intFromEnum(dc.prim), dc.num_elements, dc.element_type, null);
                 }
@@ -251,7 +253,8 @@ pub const Renderer = struct {
                         c.glBindTextureUnit(norm_slot, dc.bump);
                         GL.passUniform(gbuf_sh, "do_normal", dc.bump != 0);
                         GL.passUniform(gbuf_sh, "view", view);
-                        GL.passUniform(gbuf_sh, "model", Mat4.identity());
+                        //GL.passUniform(gbuf_sh, "model", Mat4.identity());
+                        GL.passUniform(gbuf_sh, "model", if (dc.model) |mod| mod else Mat4.identity());
                         c.glBindVertexArray(dc.vao);
                         c.glDrawElements(@intFromEnum(dc.prim), dc.num_elements, dc.element_type, null);
                     }
@@ -605,6 +608,8 @@ const Csm = struct {
         const sh = rend.shader.csm;
         c.glUseProgram(sh);
         for (rend.draw_calls.items) |dc| {
+            if (rend.omit_model_shadow and dc.model != null) continue;
+            GL.passUniform(sh, "model", if (dc.model) |mod| mod else Mat4.identity());
             c.glBindVertexArray(dc.vao);
             c.glDrawElements(@intFromEnum(dc.prim), dc.num_elements, dc.element_type, null);
         }

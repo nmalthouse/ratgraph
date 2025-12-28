@@ -8,7 +8,7 @@ layout (location = 0) in vec4 in_color;
 layout (location = 1) in vec2 in_texcoord;
 layout (location = 2) in vec3 in_normal;
 layout (location = 3) in vec3 in_frag_pos;
-layout (location = 4) in vec3 in_tangent;
+layout (location = 6) in mat3 in_tbn;
 layout (location = 5) in float blend;
 
 layout (binding = 0) uniform sampler2D diffuse_texture;
@@ -20,16 +20,8 @@ uniform bool do_normal = false;
 vec3 bumpNorm(){
     if(do_normal == false)
         return in_normal;
-    vec3 bitangent = -cross(in_tangent, in_normal);
-    mat3 TBN = mat3(in_tangent, bitangent, in_normal);
-
     vec3 norm = texture(normal_texture, in_texcoord).xyz * 2.0 - 1.0;
-    return  normalize(TBN * norm);
-
-
-    //tangent = normalize(tangent - dot(tangent, norm) * norm);
-    //vec3 bitangent = cross(tangent, norm);
-    //vec3 bump_norm = normalize(texture(normal_texture, in_texcoord ).xyz * 2.0 - 1.0);
+    return  normalize(in_tbn * norm);
 }
 
 

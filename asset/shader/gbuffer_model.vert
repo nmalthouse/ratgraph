@@ -10,11 +10,23 @@ layout (location = 0) out vec4 out_color;
 layout (location = 1) out vec2 out_texcoord;
 layout (location = 2) out vec3 out_normal;
 layout (location = 3) out vec3 frag_pos;
-layout (location = 4) out vec3 out_tangent;
+//layout (location = 4) out vec3 out_tangent;
 layout (location = 5) out float out_blend;
+layout (location = 6) out mat3 out_tbn;
 
 uniform mat4 model = mat4(1.0f);
 uniform mat4 view = mat4(1.0f);
+
+
+mat3 getTbn() {
+    vec3 norm = normalize((model * vec4(normal,0.0)).xyz);
+    vec3 tang = normalize((model * vec4(tangent, 0.0)).xyz);
+
+
+    vec3 bitangent = -cross(tang, norm);
+    mat3 TBN = mat3(tang, bitangent, norm);
+    return TBN;
+}
 
 void main() {
     vec4 world_pos = model * vec4(aPos,1.0);
@@ -23,6 +35,7 @@ void main() {
     out_texcoord = texcoord;
     out_normal = normalize((model * vec4(normal,0.0)).xyz);
     gl_Position =   view * world_pos;
-    out_tangent = normalize((model * vec4(tangent, 0.0)).xyz);
+    out_tbn = getTbn();
+    //out_tangent = normalize((model * vec4(tangent, 0.0)).xyz);
     out_blend = blend;
 };
