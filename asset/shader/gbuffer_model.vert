@@ -21,8 +21,8 @@ void main() {
     frag_pos = world_pos.xyz;
     out_color = unpackUnorm4x8(color).abgr;
     out_texcoord = texcoord;
-    out_normal = (model * vec4(normal,0.0)).xyz;
+    out_normal = normalize((model * vec4(normal,0.0)).xyz);
     gl_Position =   view * world_pos;
-    out_tangent = (model * vec4(tangent, 0.0)).xyz;
+    out_tangent = normalize((model * vec4(tangent, 0.0)).xyz);
     out_blend = blend;
 };

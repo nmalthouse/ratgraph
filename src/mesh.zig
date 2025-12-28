@@ -88,6 +88,8 @@ pub const Mesh = struct {
 
             c.glUniform1i(diffuse_loc, 0);
             c.glBindTextureUnit(0, b.diffuse_texture);
+            c.glBindTextureUnit(1, 0);
+            c.glBindTextureUnit(2, 0);
         }
 
         c.glBindVertexArray(b.vao);

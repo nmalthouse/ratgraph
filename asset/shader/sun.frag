@@ -90,6 +90,8 @@ void main(){
 
 
     FragColor = vec4(result, 1.0);
+    //FragColor = vec4(normal, 1.0);
+
     //vec3 mapped = vec3(1.0) - exp(-result * exposure);
     //mapped = pow(mapped, vec3(1.0/gamma));
     //FragColor = vec4(mapped, 1.0);

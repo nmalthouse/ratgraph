@@ -15,18 +15,21 @@ layout (binding = 0) uniform sampler2D diffuse_texture;
 layout (binding = 1) uniform sampler2D blend_texture;
 layout (binding = 2) uniform sampler2D normal_texture;
 
+uniform bool do_normal = false;
+
 vec3 bumpNorm(){
-    vec3 norm = normalize(in_normal);
-    return norm;
-    vec3 tangent = normalize(in_tangent);
-    tangent = normalize(tangent - dot(tangent, norm) * norm);
-    vec3 bitangent = cross(tangent, norm);
-    //return tangent;
-    vec3 bump_norm = normalize(texture(normal_texture, in_texcoord ).xyz * 2.0 - 1.0);
-    vec3 new_norm;
-    mat3 TBN = mat3(tangent, bitangent, norm);
-    new_norm = normalize(TBN * bump_norm);
-    return new_norm;
+    if(do_normal == false)
+        return in_normal;
+    vec3 bitangent = -cross(in_tangent, in_normal);
+    mat3 TBN = mat3(in_tangent, bitangent, in_normal);
+
+    vec3 norm = texture(normal_texture, in_texcoord).xyz * 2.0 - 1.0;
+    return  normalize(TBN * norm);
+
+
+    //tangent = normalize(tangent - dot(tangent, norm) * norm);
+    //vec3 bitangent = cross(tangent, norm);
+    //vec3 bump_norm = normalize(texture(normal_texture, in_texcoord ).xyz * 2.0 - 1.0);
 }
 
 
@@ -35,7 +38,11 @@ void main(){
     //g_norm = vec4(texture(normal_texture, in_texcoord).rgb, 1);
     //g_norm = vec4(normalize(in_normal),1);
     g_norm = vec4(bumpNorm(),1);
+    //g_norm = texture(normal_texture, in_texcoord);
+   
     g_albedo = mix(texture(diffuse_texture, in_texcoord), texture(blend_texture, in_texcoord), blend) * in_color;
+   
+    //g_albedo = vec4(0.2,0.2,0.2,1.0);
     if(g_albedo.a < 0.1)
         discard;
 }
