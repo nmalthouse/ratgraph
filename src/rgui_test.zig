@@ -58,11 +58,12 @@ pub const Styler = struct {
 
         inline for (@typeInfo(guis.Colorscheme).@"struct".fields, 0..) |field, fi| {
             if (guis.label(a, ly.getArea(), "{s}", .{field.name})) |ar| {
-                _ = Wg.Colorpicker.build(a, ar, @field(gui.dstate.nstyle.color, field.name), .{
-                    .user_id = fi,
-                    .commit_vt = &self.cbhandle,
-                    .commit_cb = commit_color,
-                });
+                if (@typeInfo(field.type) == .int)
+                    _ = Wg.Colorpicker.build(a, ar, @field(gui.dstate.nstyle.color, field.name), .{
+                        .user_id = fi,
+                        .commit_vt = &self.cbhandle,
+                        .commit_cb = commit_color,
+                    });
             }
         }
     }
@@ -71,7 +72,7 @@ pub const Styler = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
 
         inline for (@typeInfo(guis.Colorscheme).@"struct".fields, 0..) |f, i| {
-            if (i == id) {
+            if (i == id and @typeInfo(f.type) == .int) {
                 @field(
                     self.vt.gui_ptr.dstate.nstyle.color,
                     f.name,

@@ -6,13 +6,12 @@ fn getSrcDir() []const u8 {
 const srcdir = getSrcDir();
 
 const USE_SYSTEM_FREETYPE = false;
-
 pub const ToLink = enum {
     freetype,
     lua,
     openal,
 };
-pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink) void {
+pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink) !void {
     const cdir = "c_libs";
 
     const include_paths = [_][]const u8{
@@ -56,6 +55,7 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
             "-DMINIZ_NO_TIME=",
         } });
     }
+    try freetype(b, mod);
     mod.link_libc = true;
     if (mod.resolved_target) |rt| {
         if (rt.result.os.tag == .windows) {
@@ -63,8 +63,8 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
                 mod.addSystemIncludePath(.{ .cwd_relative = "/mingw64/include/freetype2" });
                 mod.linkSystemLibrary("freetype.dll", .{});
             } else {
-                mod.addIncludePath(b.path(cdir ++ "/freetype_build/buildwin"));
-                mod.addObjectFile(b.path(cdir ++ "/freetype_build/buildwin/libfreetype.a"));
+                //mod.addIncludePath(b.path(cdir ++ "/freetype_build/buildwin"));
+                //mod.addObjectFile(b.path(cdir ++ "/freetype_build/buildwin/libfreetype.a"));
             }
 
             mod.addObjectFile(b.path(cdir ++ "/libepoxy/buildwin/src/libepoxy.a"));
@@ -99,7 +99,7 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
                     .openal => "openal",
                 };
                 if (tl == .freetype and !USE_SYSTEM_FREETYPE) {
-                    mod.addObjectFile(b.path(cdir ++ "/freetype_build/build/libfreetype.a"));
+                    //mod.addObjectFile(b.path(cdir ++ "/freetype_build/build/libfreetype.a"));
                     continue;
                 }
                 mod.linkSystemLibrary(str, .{ .preferred_link_mode = .static });
@@ -109,7 +109,7 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
     }
 }
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
 
     const mode = b.standardOptimizeOption(.{});
@@ -125,7 +125,7 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(bake);
     const to_link = [_]ToLink{ .freetype, .openal, .lua };
-    linkLibrary(b, bake.root_module, &to_link);
+    try linkLibrary(b, bake.root_module, &to_link);
 
     const exe = b.addExecutable(.{
         .name = "the_engine",
@@ -138,9 +138,9 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
-    linkLibrary(b, exe.root_module, &to_link);
+    try linkLibrary(b, exe.root_module, &to_link);
     const m = b.addModule("ratgraph", .{ .root_source_file = b.path("src/graphics.zig"), .target = target });
-    linkLibrary(b, m, &.{.freetype});
+    try linkLibrary(b, m, &.{.freetype});
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
@@ -160,7 +160,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     unit_tests.setExecCmd(&[_]?[]const u8{ "kcov", "kcov-output", null });
-    linkLibrary(b, unit_tests.root_module, &to_link);
+    try linkLibrary(b, unit_tests.root_module, &to_link);
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
@@ -195,4 +195,91 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
+}
+
+fn freetype(b: *std.Build, mod: *std.Build.Module) !void {
+    // adapted from allyourcodebase/freetype
+    const srcs: []const []const u8 = &.{
+        "autofit/autofit.c",
+        "base/ftbase.c",
+        "base/ftbbox.c",
+        "base/ftbdf.c",
+        "base/ftbitmap.c",
+        "base/ftcid.c",
+        "base/ftfstype.c",
+        "base/ftgasp.c",
+        "base/ftglyph.c",
+        "base/ftgxval.c",
+        "base/ftinit.c",
+        "base/ftmm.c",
+        "base/ftotval.c",
+        "base/ftpatent.c",
+        "base/ftpfr.c",
+        "base/ftstroke.c",
+        "base/ftsynth.c",
+        "base/fttype1.c",
+        "base/ftwinfnt.c",
+        "bdf/bdf.c",
+        "bzip2/ftbzip2.c",
+        "cache/ftcache.c",
+        "cff/cff.c",
+        "cid/type1cid.c",
+        "gzip/ftgzip.c",
+        "lzw/ftlzw.c",
+        "pcf/pcf.c",
+        "pfr/pfr.c",
+        "psaux/psaux.c",
+        "pshinter/pshinter.c",
+        "psnames/psnames.c",
+        "raster/raster.c",
+        "sdf/sdf.c",
+        "sfnt/sfnt.c",
+        "smooth/smooth.c",
+        "svg/svg.c",
+        "truetype/truetype.c",
+        "type1/type1.c",
+        "type42/type42.c",
+        "winfonts/winfnt.c",
+    };
+
+    var flags: std.ArrayList([]const u8) = .empty;
+    defer flags.deinit(b.allocator);
+
+    try flags.appendSlice(b.allocator, &.{
+        "-DFT2_BUILD_LIBRARY",
+        "-DHAVE_UNISTD_H",
+        "-DHAVE_FCNTL_H",
+        "-fno-sanitize=undefined",
+    });
+
+    mod.addCSourceFiles(.{
+        .root = b.path("c_libs/freetype_build/src"),
+        .files = srcs,
+        .flags = flags.items,
+    });
+
+    if (mod.resolved_target) |rt| {
+        switch (rt.result.os.tag) {
+            .windows => {
+                mod.addCSourceFile(.{
+                    .file = b.path("c_libs/freetype_build/builds/windows/ftsystem.c"),
+                    .flags = flags.items,
+                });
+            },
+            .linux => mod.addCSourceFile(.{ .file = b.path("c_libs/freetype_build/builds/unix/ftsystem.c"), .flags = flags.items }),
+            else => mod.addCSourceFile(.{ .file = b.path("c_libs/freetype_build/src/base/ftsystem.c"), .flags = flags.items }),
+        }
+        switch (rt.result.os.tag) {
+            else => mod.addCSourceFile(.{ .file = b.path("c_libs/freetype_build/src/base/ftdebug.c"), .flags = flags.items }),
+            .windows => {
+                mod.addCSourceFile(.{
+                    .file = b.path("c_libs/freetype_build/builds/windows/ftdebug.c"),
+                    .flags = flags.items,
+                });
+                mod.addWin32ResourceFile(.{
+                    .file = b.path("c_libs/freetype_build/src/base/ftver.rc"),
+                });
+            },
+        }
+    }
 }
