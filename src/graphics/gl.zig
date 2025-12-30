@@ -1,7 +1,8 @@
 const c = @import("c.zig").c;
 pub const za = @import("zalgebra");
 const std = @import("std");
-pub const glID = c.GLuint;
+const gl = @import("gl");
+pub const glID = gl.uint;
 const ptypes = @import("types.zig");
 const Vec2f = ptypes.Vec2f;
 const Vec2i = ptypes.Vec2i;
@@ -16,31 +17,31 @@ pub const Vertex = packed struct { x: f32, y: f32, z: f32, r: f32, g: f32, b: f3
 
 const log = std.log.scoped(.GL);
 pub const PrimitiveMode = enum(u32) {
-    points = c.GL_POINTS,
-    line_strip = c.GL_LINE_STRIP,
-    line_loop = c.GL_LINE_LOOP,
-    lines = c.GL_LINES,
-    line_strip_adjacency = c.GL_LINE_STRIP_ADJACENCY,
-    lines_adjacency = c.GL_LINES_ADJACENCY,
-    triangle_strip = c.GL_TRIANGLE_STRIP,
-    triangle_fan = c.GL_TRIANGLE_FAN,
-    triangles = c.GL_TRIANGLES,
-    triangle_strip_adjacency = c.GL_TRIANGLE_STRIP_ADJACENCY,
-    triangles_adjacency = c.GL_TRIANGLES_ADJACENCY,
-    patches = c.GL_PATCHES,
+    points = gl.POINTS,
+    line_strip = gl.LINE_STRIP,
+    line_loop = gl.LINE_LOOP,
+    lines = gl.LINES,
+    line_strip_adjacency = gl.LINE_STRIP_ADJACENCY,
+    lines_adjacency = gl.LINES_ADJACENCY,
+    triangle_strip = gl.TRIANGLE_STRIP,
+    triangle_fan = gl.TRIANGLE_FAN,
+    triangles = gl.TRIANGLES,
+    triangle_strip_adjacency = gl.TRIANGLE_STRIP_ADJACENCY,
+    triangles_adjacency = gl.TRIANGLES_ADJACENCY,
+    patches = gl.PATCHES,
 };
 
 pub fn checkError() void {
-    var err = c.glGetError();
-    while (err != c.GL_NO_ERROR) : (err = c.glGetError()) {
+    var err = gl.GetError();
+    while (err != gl.NO_ERROR) : (err = gl.GetError()) {
         const str = switch (err) {
-            c.GL_INVALID_ENUM => "An unacceptable value is specified for an enumerated argument. The offending command is ignored and has no other side effect than to set the error flag.",
-            c.GL_INVALID_VALUE => "A numeric argument is out of range. The offending command is ignored and has no other side effect than to set the error flag.",
-            c.GL_INVALID_OPERATION => "The specified operation is not allowed in the current state. The offending command is ignored and has no other side effect than to set the error flag.",
-            c.GL_INVALID_FRAMEBUFFER_OPERATION => "The framebuffer object is not complete. The offending command is ignored and has no other side effect than to set the error flag.",
-            c.GL_OUT_OF_MEMORY => "There is not enough memory left to execute the command. The state of the GL is undefined, except for the state of the error flags, after this error is recorded.",
-            c.GL_STACK_UNDERFLOW => "An attempt has been made to perform an operation that would cause an internal stack to underflow.",
-            c.GL_STACK_OVERFLOW => "An attempt has been made to perform an operation that would cause an internal stack to overflow.",
+            gl.INVALID_ENUM => "An unacceptable value is specified for an enumerated argument. The offending command is ignored and has no other side effect than to set the error flag.",
+            gl.INVALID_VALUE => "A numeric argument is out of range. The offending command is ignored and has no other side effect than to set the error flag.",
+            gl.INVALID_OPERATION => "The specified operation is not allowed in the current state. The offending command is ignored and has no other side effect than to set the error flag.",
+            gl.INVALID_FRAMEBUFFER_OPERATION => "The framebuffer object is not complete. The offending command is ignored and has no other side effect than to set the error flag.",
+            gl.OUT_OF_MEMORY => "There is not enough memory left to execute the command. The state of the GL is undefined, except for the state of the error flags, after this error is recorded.",
+            gl.STACK_UNDERFLOW => "An attempt has been made to perform an operation that would cause an internal stack to underflow.",
+            gl.STACK_OVERFLOW => "An attempt has been made to perform an operation that would cause an internal stack to overflow.",
             else => "Unknown gl error, Something is corrupt",
         };
         log.warn("glGetError: {s}", .{str});
@@ -48,39 +49,39 @@ pub fn checkError() void {
 }
 
 pub const DebugSource = enum(u32) {
-    api = c.GL_DEBUG_SOURCE_API,
-    window_system = c.GL_DEBUG_SOURCE_WINDOW_SYSTEM,
-    shader_compiler = c.GL_DEBUG_SOURCE_SHADER_COMPILER,
-    third_party = c.GL_DEBUG_SOURCE_THIRD_PARTY,
-    application = c.GL_DEBUG_SOURCE_APPLICATION,
-    other = c.GL_DEBUG_SOURCE_OTHER,
-    dont_care = c.GL_DONT_CARE,
+    api = gl.DEBUG_SOURCE_API,
+    window_system = gl.DEBUG_SOURCE_WINDOW_SYSTEM,
+    shader_compiler = gl.DEBUG_SOURCE_SHADER_COMPILER,
+    third_party = gl.DEBUG_SOURCE_THIRD_PARTY,
+    application = gl.DEBUG_SOURCE_APPLICATION,
+    other = gl.DEBUG_SOURCE_OTHER,
+    dont_care = gl.DONT_CARE,
 };
 
 pub const DebugType = enum(u32) {
-    Error = c.GL_DEBUG_TYPE_ERROR,
-    deprecated_behavior = c.GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR,
-    undefined_behavior = c.GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR,
-    portablity = c.GL_DEBUG_TYPE_PORTABILITY,
-    performance = c.GL_DEBUG_TYPE_PERFORMANCE,
-    marker = c.GL_DEBUG_TYPE_MARKER,
-    push_group = c.GL_DEBUG_TYPE_PUSH_GROUP,
-    pop_group = c.GL_DEBUG_TYPE_POP_GROUP,
-    other = c.GL_DEBUG_TYPE_OTHER,
-    dont_care = c.GL_DONT_CARE,
+    Error = gl.DEBUG_TYPE_ERROR,
+    deprecated_behavior = gl.DEBUG_TYPE_DEPRECATED_BEHAVIOR,
+    undefined_behavior = gl.DEBUG_TYPE_UNDEFINED_BEHAVIOR,
+    portablity = gl.DEBUG_TYPE_PORTABILITY,
+    performance = gl.DEBUG_TYPE_PERFORMANCE,
+    marker = gl.DEBUG_TYPE_MARKER,
+    push_group = gl.DEBUG_TYPE_PUSH_GROUP,
+    pop_group = gl.DEBUG_TYPE_POP_GROUP,
+    other = gl.DEBUG_TYPE_OTHER,
+    dont_care = gl.DONT_CARE,
 };
 
 pub const DebugSeverity = enum(u32) {
-    low = c.GL_DEBUG_SEVERITY_LOW,
-    medium = c.GL_DEBUG_SEVERITY_MEDIUM,
-    high = c.GL_DEBUG_SEVERITY_HIGH,
-    notification = c.GL_DEBUG_SEVERITY_NOTIFICATION,
-    dont_care = c.GL_DONT_CARE,
+    low = gl.DEBUG_SEVERITY_LOW,
+    medium = gl.DEBUG_SEVERITY_MEDIUM,
+    high = gl.DEBUG_SEVERITY_HIGH,
+    notification = gl.DEBUG_SEVERITY_NOTIFICATION,
+    dont_care = gl.DONT_CARE,
 };
 
 //'*const fn (c_uint, c_uint, c_uint, c_uint, c_int, [*c]const u8, ?*const anyopaque) callconv(.C) void', found '*const fn (c_uint, c_uint, c_uint, c_uint, c_int, *u8, *anyopaque) callconv(.C) void'
 
-pub export fn messageCallback(src: c.GLenum, Type: c.GLenum, id: c.GLuint, severity: c.GLenum, length: c.GLsizei, msg: [*c]const u8, user_params: ?*const anyopaque) void {
+pub export fn messageCallback(src: gl.@"enum", Type: gl.@"enum", id: gl.uint, severity: gl.@"enum", length: gl.sizei, msg: [*c]const u8, user_params: ?*const anyopaque) void {
     _ = user_params;
     const fmt = "{s}, {s}, {s}, {d}: {s}";
     const args = .{
@@ -100,27 +101,27 @@ pub export fn messageCallback(src: c.GLenum, Type: c.GLenum, id: c.GLuint, sever
 }
 
 pub fn passUniform(shader: c_uint, uniform_name: [*c]const u8, data: anytype) void {
-    const uniform_location = c.glGetUniformLocation(shader, uniform_name);
+    const uniform_location = gl.GetUniformLocation(shader, uniform_name);
     switch (@TypeOf(data)) {
-        za.Mat4 => c.glUniformMatrix4fv(uniform_location, 1, c.GL_FALSE, &data.data[0][0]),
-        za.Vec3 => c.glUniform3f(uniform_location, data.data[0], data.data[1], data.data[2]),
-        f32 => c.glUniform1f(uniform_location, data),
-        bool => c.glUniform1i(uniform_location, if (data) 1 else 0),
-        Color => c.glUniform4f(uniform_location, data[0], data[1], data[2], data[3]),
-        ptypes.Vec2i => c.glUniform2f(uniform_location, @floatFromInt(data.x), @floatFromInt(data.y)),
+        za.Mat4 => gl.UniformMatrix4fv(uniform_location, 1, gl.FALSE, @ptrCast(&data.data[0][0])),
+        za.Vec3 => gl.Uniform3f(uniform_location, data.data[0], data.data[1], data.data[2]),
+        f32 => gl.Uniform1f(uniform_location, data),
+        bool => gl.Uniform1i(uniform_location, if (data) 1 else 0),
+        Color => gl.Uniform4f(uniform_location, data[0], data[1], data[2], data[3]),
+        ptypes.Vec2i => gl.Uniform2f(uniform_location, @floatFromInt(data.x), @floatFromInt(data.y)),
         else => @compileError("GL.passUniform type not implemented: " ++ @typeName(@TypeOf(data))),
     }
 }
 
 pub fn bufferData(buffer_type: glID, handle: glID, comptime item: type, slice: []item) void {
-    c.glBindBuffer(buffer_type, handle);
-    c.glBufferData(
+    gl.BindBuffer(buffer_type, handle);
+    gl.BufferData(
         buffer_type,
         @as(c_long, @intCast(slice.len)) * @sizeOf(item),
         slice.ptr,
-        c.GL_STATIC_DRAW,
+        gl.STATIC_DRAW,
     );
-    c.glBindBuffer(c.GL_ARRAY_BUFFER, 0);
+    gl.BindBuffer(gl.ARRAY_BUFFER, 0);
 }
 
 pub fn generateVertexAttributes(vao: c_uint, vbo: c_uint, comptime T: anytype) void {
@@ -139,8 +140,8 @@ pub fn generateVertexAttributesEx(vao: c_uint, vbo: c_uint, comptime T: anytype,
                     f32 => floatVertexAttrib(vao, vbo, f_i, 1, T, field.name),
                     Vec2f => floatVertexAttrib(vao, vbo, f_i, 2, T, field.name),
                     Vec3f => floatVertexAttrib(vao, vbo, f_i, 3, T, field.name),
-                    u16 => intVertexAttrib(vao, vbo, f_i, 1, T, field.name, c.GL_UNSIGNED_SHORT),
-                    u32 => intVertexAttrib(vao, vbo, f_i, 1, T, field.name, c.GL_UNSIGNED_INT),
+                    u16 => intVertexAttrib(vao, vbo, f_i, 1, T, field.name, gl.UNSIGNED_SHORT),
+                    u32 => intVertexAttrib(vao, vbo, f_i, 1, T, field.name, gl.UNSIGNED_INT),
                     else => @compileError("generateVertexAttributes struct field type not supported: " ++ @typeName(field.field_type) ++ " " ++ field.name),
                 }
             }
@@ -150,67 +151,65 @@ pub fn generateVertexAttributesEx(vao: c_uint, vbo: c_uint, comptime T: anytype,
 }
 
 pub fn bufferSubData(buffer_type: glID, handle: glID, offset: usize, len: usize, comptime item: type, slice: []item) void {
-    c.glBindBuffer(buffer_type, handle);
-    c.glBufferSubData(
+    gl.BindBuffer(buffer_type, handle);
+    gl.BufferSubData(
         buffer_type,
         @as(c_long, @intCast(offset)) * @sizeOf(item),
         @as(c_long, @intCast(len)) * @sizeOf(item),
         &slice[offset],
     );
 
-    c.glBindBuffer(c.GL_ARRAY_BUFFER, 0);
+    gl.BindBuffer(gl.ARRAY_BUFFER, 0);
 }
 
-pub fn intVertexAttrib(vao: glID, vbo: glID, index: u32, num_elem: u32, comptime item: type, comptime starting_field: []const u8, int_type: c.GLenum) void {
-    c.glBindVertexArray(vao);
-    c.glBindBuffer(c.GL_ARRAY_BUFFER, vbo);
-    defer c.glBindVertexArray(0);
-    defer c.glBindBuffer(c.GL_ARRAY_BUFFER, 0);
+pub fn intVertexAttrib(vao: glID, vbo: glID, index: u32, num_elem: u32, comptime item: type, comptime starting_field: []const u8, int_type: gl.@"enum") void {
+    gl.BindVertexArray(vao);
+    gl.BindBuffer(gl.ARRAY_BUFFER, vbo);
+    defer gl.BindVertexArray(0);
+    defer gl.BindBuffer(gl.ARRAY_BUFFER, 0);
 
-    const byte_offset = @offsetOf(item, starting_field);
-    c.glVertexAttribIPointer(
+    gl.VertexAttribIPointer(
         index,
         @as(c_int, @intCast(num_elem)),
         int_type,
         @sizeOf(item),
-        if (byte_offset != 0) @as(*const anyopaque, @ptrFromInt(byte_offset)) else null,
+        @offsetOf(item, starting_field),
     );
-    c.glEnableVertexAttribArray(index);
+    gl.EnableVertexAttribArray(index);
 }
 
 pub fn floatVertexAttrib(vao: glID, vbo: glID, index: u32, size: u32, comptime item: type, comptime starting_field: []const u8) void {
-    c.glBindVertexArray(vao);
-    c.glBindBuffer(c.GL_ARRAY_BUFFER, vbo);
-    defer c.glBindVertexArray(0);
-    defer c.glBindBuffer(c.GL_ARRAY_BUFFER, 0);
+    gl.BindVertexArray(vao);
+    gl.BindBuffer(gl.ARRAY_BUFFER, vbo);
+    defer gl.BindVertexArray(0);
+    defer gl.BindBuffer(gl.ARRAY_BUFFER, 0);
 
-    const byte_offset = @offsetOf(item, starting_field);
-    c.glVertexAttribPointer(
+    gl.VertexAttribPointer(
         index,
         @as(c_int, @intCast(size)),
-        c.GL_FLOAT,
-        c.GL_FALSE,
+        gl.FLOAT,
+        gl.FALSE,
         @sizeOf(item),
-        if (byte_offset != 0) @as(*const anyopaque, @ptrFromInt(byte_offset)) else null,
+        @offsetOf(item, starting_field),
     );
-    c.glEnableVertexAttribArray(index);
+    gl.EnableVertexAttribArray(index);
 }
 
 pub fn simpleDrawBatch(view: za.Mat4, model: za.Mat4, batch: anytype, has_ebo: bool) void {
-    c.glUseProgram(batch.shader);
-    c.glBindVertexArray(batch.vao);
+    gl.UseProgram(batch.shader);
+    gl.BindVertexArray(batch.vao);
 
-    bufferData(c.GL_ARRAY_BUFFER, batch.vbo, Vertex, batch.vertices.items);
+    bufferData(gl.ARRAY_BUFFER, batch.vbo, Vertex, batch.vertices.items);
     if (has_ebo)
-        bufferData(c.GL_ELEMENT_ARRAY_BUFFER, batch.ebo, u32, batch.indicies.items);
+        bufferData(gl.ELEMENT_ARRAY_BUFFER, batch.ebo, u32, batch.indicies.items);
 
-    c.glBindTexture(c.GL_TEXTURE_2D, 0);
+    gl.BindTexture(gl.TEXTURE_2D, 0);
 
     passUniform(batch.shader, "view", view);
     passUniform(batch.shader, "model", model);
 
-    c.glDrawElements(c.GL_TRIANGLES, @as(c_int, @intCast(batch.indicies.items.len)), c.GL_UNSIGNED_INT, null);
-    //c.glBindVertexArray(0);
+    gl.DrawElements(gl.TRIANGLES, @as(c_int, @intCast(batch.indicies.items.len)), gl._UNSIGNED_INT, 0);
+    //gl.BindVertexArray(0);
 
 }
 
@@ -393,27 +392,27 @@ pub fn vertexTextured(x: f32, y: f32, z: f32, u: f32, v: f32, col: Color) Vertex
 }
 
 pub const Shader = struct {
-    pub const Type = enum(@TypeOf(c.GL_COMPUTE_SHADER)) {
-        comp = c.GL_COMPUTE_SHADER,
-        vert = c.GL_VERTEX_SHADER,
-        tesc = c.GL_TESS_CONTROL_SHADER,
-        tese = c.GL_TESS_EVALUATION_SHADER,
-        geom = c.GL_GEOMETRY_SHADER,
-        frag = c.GL_FRAGMENT_SHADER,
+    pub const Type = enum(gl.@"enum") {
+        comp = gl.COMPUTE_SHADER,
+        vert = gl.VERTEX_SHADER,
+        tesc = gl.TESS_CONTROL_SHADER,
+        tese = gl.TESS_EVALUATION_SHADER,
+        geom = gl.GEOMETRY_SHADER,
+        frag = gl.FRAGMENT_SHADER,
     };
 
     pub const Stage = struct {
-        src: [*c]const u8,
+        src: [*]const u8,
         t: Type,
     };
 
     fn checkShaderErr(shader: glID, comporlink: c_uint) void {
         var success: c_int = undefined;
         var infoLog: [512]u8 = undefined;
-        c.glGetShaderiv(shader, comporlink, &success);
+        gl.GetShaderiv(shader, comporlink, @ptrCast(&success));
         if (success == 0) {
             var len: c_int = 0;
-            c.glGetShaderInfoLog(shader, 512, &len, &infoLog);
+            gl.GetShaderInfoLog(shader, 512, &len, &infoLog);
             std.debug.panic("ERROR::SHADER::\n{s}\n", .{infoLog[0..@as(usize, @intCast(len))]});
         }
     }
@@ -421,19 +420,19 @@ pub const Shader = struct {
     fn checkLinkErr(shader: glID) void {
         var params: c_int = undefined;
         var infoLog: [512]u8 = undefined;
-        c.glGetProgramiv(shader, c.GL_LINK_STATUS, &params);
-        if (params == c.GL_FALSE) {
+        gl.GetProgramiv(shader, gl.LINK_STATUS, @ptrCast(&params));
+        if (params == gl.FALSE) {
             var len: c_int = 0;
-            c.glGetProgramInfoLog(shader, 512, &len, &infoLog);
+            gl.GetProgramInfoLog(shader, 512, &len, &infoLog);
             std.debug.panic("ERROR::SHADER_PROGRAM::\n{s}\n", .{infoLog[0..@as(usize, @intCast(len))]});
         }
     }
 
-    fn compShader(src: [*c]const [*c]const u8, s_type: c_uint) glID {
-        const vert = c.glCreateShader(s_type);
-        c.glShaderSource(vert, 1, src, null);
-        c.glCompileShader(vert);
-        checkShaderErr(vert, c.GL_COMPILE_STATUS);
+    fn compShader(src: [*]const [*]const u8, s_type: c_uint) glID {
+        const vert = gl.CreateShader(s_type);
+        gl.ShaderSource(vert, 1, src, null);
+        gl.CompileShader(vert);
+        checkShaderErr(vert, gl.COMPILE_STATUS);
         return vert;
     }
 
@@ -462,43 +461,43 @@ pub const Shader = struct {
             _ = try wr.splatByteAll(0, 1);
 
             array_lists[i] = try aw.toOwnedSlice();
-            sources[i] = .{ .src = &array_lists[i][0], .t = stage.t };
+            sources[i] = .{ .src = @ptrCast(array_lists[i]), .t = stage.t };
         }
 
         return advancedShader(sources);
     }
 
-    pub fn simpleShader(vert_src: [*c]const u8, frag_src: [*c]const u8) glID {
-        const vert = compShader(&vert_src, c.GL_VERTEX_SHADER);
-        defer c.glDeleteShader(vert);
+    pub fn simpleShader(vert_src: [*]const u8, frag_src: [*]const u8) glID {
+        const vert = compShader(@ptrCast(&vert_src), gl.VERTEX_SHADER);
+        defer gl.DeleteShader(vert);
 
-        const frag = compShader(&frag_src, c.GL_FRAGMENT_SHADER);
-        defer c.glDeleteShader(frag);
+        const frag = compShader(@ptrCast(&frag_src), gl.FRAGMENT_SHADER);
+        defer gl.DeleteShader(frag);
 
-        const shader = c.glCreateProgram();
-        c.glAttachShader(shader, vert);
-        c.glAttachShader(shader, frag);
-        c.glLinkProgram(shader);
+        const shader = gl.CreateProgram();
+        gl.AttachShader(shader, vert);
+        gl.AttachShader(shader, frag);
+        gl.LinkProgram(shader);
         checkLinkErr(shader);
 
         return shader;
     }
 
     pub fn advancedShader(stages: []const Stage) glID {
-        const shader = c.glCreateProgram();
+        const shader = gl.CreateProgram();
         var stage_del: [@typeInfo(Type).@"enum".fields.len]c_uint = undefined;
         var i: usize = 0;
         for (stages) |stage| {
-            const st = compShader(&stage.src, @as(c_uint, @intCast(@intFromEnum(stage.t))));
+            const st = compShader(@ptrCast(&stage.src), @as(c_uint, @intCast(@intFromEnum(stage.t))));
             stage_del[i] = st;
             i += 1;
-            c.glAttachShader(shader, st);
+            gl.AttachShader(shader, st);
         }
 
-        c.glLinkProgram(shader);
+        gl.LinkProgram(shader);
         checkLinkErr(shader);
         for (0..i) |ii| {
-            c.glDeleteShader(stage_del[ii]);
+            gl.DeleteShader(stage_del[ii]);
         }
         return shader;
     }
@@ -516,13 +515,13 @@ pub const Shader = struct {
     }
 };
 
-pub const Capability = enum(c.GLenum) {
-    blend = c.GL_BLEND,
-    depth_test = c.GL_DEPTH_TEST,
-    scissor_test = c.GL_SCISSOR_TEST,
-    stencil_test = c.GL_STENCIL_TEST,
-    debug_output = c.GL_DEBUG_OUTPUT,
-    debug_output_synchronous = c.GL_DEBUG_OUTPUT_SYNCHRONOUS,
+pub const Capability = enum(gl.@"enum") {
+    blend = gl.BLEND,
+    depth_test = gl.DEPTH_TEST,
+    scissor_test = gl.SCISSOR_TEST,
+    stencil_test = gl.STENCIL_TEST,
+    debug_output = gl.DEBUG_OUTPUT,
+    debug_output_synchronous = gl.DEBUG_OUTPUT_SYNCHRONOUS,
     _,
 };
 
@@ -536,10 +535,22 @@ pub fn logState(comptime fmt: []const u8, args: anytype) void {
 
 pub fn enable(cap: Capability) void {
     logState("enable {s}", .{@tagName(cap)});
-    c.glEnable(@intFromEnum(cap));
+    gl.Enable(@intFromEnum(cap));
 }
 
 pub fn disable(cap: Capability) void {
     logState("disable {s}", .{@tagName(cap)});
-    c.glDisable(@intFromEnum(cap));
+    gl.Disable(@intFromEnum(cap));
+}
+
+pub fn genVertexArray() c_uint {
+    var ret: c_uint = 0;
+    gl.GenVertexArrays(1, @ptrCast(&ret));
+    return ret;
+}
+
+pub fn genBuffer() c_uint {
+    var ret: c_uint = 0;
+    gl.GenBuffers(1, @ptrCast(&ret));
+    return ret;
 }

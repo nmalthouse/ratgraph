@@ -13,10 +13,6 @@
 	path = c_libs/miniz
 	url = https://github.com/richgel999/miniz.git
     branch = c883286
-[submodule "c_libs/libepoxy"]
-	path = c_libs/libepoxy
-	url = https://github.com/anholt/libepoxy.git
-    branch = bb7ddbc
 [submodule "c_libs/freetype_build"]
 	path = c_libs/freetype_build
 	url = https://gitlab.freedesktop.org/freetype/freetype

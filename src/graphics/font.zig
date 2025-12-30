@@ -12,6 +12,7 @@ const lcast = std.math.lossyCast;
 const intToColor = ptypes.intToColor;
 const glID = GL.glID;
 const Rec = Rect.NewAny;
+const gl = @import("gl");
 
 /// Any font type must implement the following methods or fields
 pub const PublicFontInterface = struct {
@@ -326,7 +327,7 @@ pub const Font = struct {
                 },
             );
         }
-        result.font.texture = Texture.initFromBitmap(bmp, .{ .mag_filter = c.GL_NEAREST });
+        result.font.texture = Texture.initFromBitmap(bmp, .{ .mag_filter = gl.NEAREST });
         return result;
     }
 
@@ -446,11 +447,11 @@ pub const Font = struct {
         //try out_bmp.writeToPngFile(std.fs.cwd(), "crass.png");
         result.font.texture = Texture.initFromBitmap(out_bmp, .{
             .pixel_store_alignment = 1,
-            .internal_format = c.GL_RED,
-            .pixel_format = c.GL_RED,
-            .min_filter = c.GL_NEAREST,
-            .mag_filter = c.GL_NEAREST,
-            //c.GL_LINEAR_MIPMAP_LINEAR,
+            .internal_format = gl.RED,
+            .pixel_format = gl.RED,
+            .min_filter = gl.NEAREST,
+            .mag_filter = gl.NEAREST,
+            //gl.LINEAR_MIPMAP_LINEAR,
         });
         return result;
     }
@@ -746,10 +747,10 @@ pub const Font = struct {
 
         result.font.texture = Texture.initFromBitmap(texture_bitmap, .{
             .pixel_store_alignment = 1,
-            .internal_format = c.GL_RED,
-            .pixel_format = c.GL_RED,
-            .min_filter = c.GL_LINEAR,
-            .mag_filter = c.GL_NEAREST,
+            .internal_format = gl.RED,
+            .pixel_format = gl.RED,
+            .min_filter = gl.LINEAR,
+            .mag_filter = gl.NEAREST,
         });
         if (log.writer) |*wr| {
             try wr.interface.flush();
@@ -897,12 +898,12 @@ pub const Bitmap = struct {
             };
         }
 
-        pub fn toGLFormat(self: ImageFormat) c.GLenum {
+        pub fn toGLFormat(self: ImageFormat) gl.@"enum" {
             return switch (self) {
-                .rgba_8 => c.GL_RGBA,
-                .g_8 => c.GL_RED,
-                .rgb_8 => c.GL_RGB,
-                .ga_8 => c.GL_RG,
+                .rgba_8 => gl.RGBA,
+                .g_8 => gl.RED,
+                .rgb_8 => gl.RGB,
+                .ga_8 => gl.RG,
             };
         }
 
@@ -915,9 +916,9 @@ pub const Bitmap = struct {
             };
         }
 
-        pub fn toGLType(self: ImageFormat) c.GLenum {
+        pub fn toGLType(self: ImageFormat) gl.@"enum" {
             return switch (self) {
-                else => c.GL_UNSIGNED_BYTE,
+                else => gl.UNSIGNED_BYTE,
             };
         }
     };
@@ -1151,18 +1152,18 @@ pub const Texture = struct {
     }
 
     pub const Options = struct {
-        internal_format: c.GLint = c.GL_RGBA,
-        pixel_format: c.GLenum = c.GL_RGBA,
-        pixel_type: c.GLenum = c.GL_UNSIGNED_BYTE,
-        pixel_store_alignment: c.GLint = 4,
-        target: c.GLenum = c.GL_TEXTURE_2D,
+        internal_format: gl.int = gl.RGBA,
+        pixel_format: gl.@"enum" = gl.RGBA,
+        pixel_type: gl.@"enum" = gl.UNSIGNED_BYTE,
+        pixel_store_alignment: gl.int = 4,
+        target: gl.@"enum" = gl.TEXTURE_2D,
 
-        wrap_u: c.GLint = c.GL_REPEAT,
-        wrap_v: c.GLint = c.GL_REPEAT,
+        wrap_u: gl.int = gl.REPEAT,
+        wrap_v: gl.int = gl.REPEAT,
 
         generate_mipmaps: bool = true,
-        min_filter: c.GLint = c.GL_LINEAR_MIPMAP_LINEAR,
-        mag_filter: c.GLint = c.GL_LINEAR,
+        min_filter: gl.int = gl.LINEAR_MIPMAP_LINEAR,
+        mag_filter: gl.int = gl.LINEAR,
         border_color: [4]f32 = .{ 0, 0, 0, 1.0 },
         is_compressed: bool = false,
     };
@@ -1189,11 +1190,11 @@ pub const Texture = struct {
 
     pub fn initFromBuffer(buffer: ?[]const u8, w: i32, h: i32, o: Options) Texture {
         var tex_id: glID = 0;
-        c.glPixelStorei(c.GL_UNPACK_ALIGNMENT, o.pixel_store_alignment);
-        c.glGenTextures(1, &tex_id);
-        c.glBindTexture(o.target, tex_id);
+        gl.PixelStorei(gl.UNPACK_ALIGNMENT, o.pixel_store_alignment);
+        gl.GenTextures(1, @ptrCast(&tex_id));
+        gl.BindTexture(o.target, tex_id);
         if (o.is_compressed) {
-            c.glCompressedTexImage2D(
+            gl.CompressedTexImage2D(
                 o.target,
                 0,
                 o.pixel_format,
@@ -1204,7 +1205,7 @@ pub const Texture = struct {
                 if (buffer) |bmp| &bmp[0] else null,
             );
         } else {
-            c.glTexImage2D(
+            gl.TexImage2D(
                 o.target,
                 0, //Level of detail number
                 o.internal_format,
@@ -1217,46 +1218,46 @@ pub const Texture = struct {
             );
         }
         if (o.generate_mipmaps)
-            c.glGenerateMipmap(o.target);
+            gl.GenerateMipmap(o.target);
 
-        c.glTexParameteri(o.target, c.GL_TEXTURE_WRAP_S, o.wrap_u);
-        c.glTexParameteri(o.target, c.GL_TEXTURE_WRAP_T, o.wrap_v);
+        gl.TexParameteri(o.target, gl.TEXTURE_WRAP_S, o.wrap_u);
+        gl.TexParameteri(o.target, gl.TEXTURE_WRAP_T, o.wrap_v);
 
-        //c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MAG_FILTER, c.GL_NEAREST_MIPMAP_NEAREST);
-        c.glTexParameteri(o.target, c.GL_TEXTURE_MIN_FILTER, o.min_filter);
-        c.glTexParameteri(o.target, c.GL_TEXTURE_MAG_FILTER, o.mag_filter);
+        //gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST_MIPMAP_NEAREST);
+        gl.TexParameteri(o.target, gl.TEXTURE_MIN_FILTER, o.min_filter);
+        gl.TexParameteri(o.target, gl.TEXTURE_MAG_FILTER, o.mag_filter);
 
-        c.glTexParameterfv(o.target, c.GL_TEXTURE_BORDER_COLOR, &o.border_color);
+        gl.TexParameterfv(o.target, gl.TEXTURE_BORDER_COLOR, &o.border_color);
 
         GL.enable(.blend);
-        c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
-        c.glBlendEquation(c.GL_FUNC_ADD);
+        gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.BlendEquation(gl.FUNC_ADD);
 
-        c.glBindTexture(c.GL_TEXTURE_2D, 0);
+        gl.BindTexture(gl.TEXTURE_2D, 0);
         return Texture{ .w = w, .h = h, .id = tex_id };
     }
 
     pub fn initMipped(w: i32, h: i32, o: Options) Texture {
         var tex_id: glID = 0;
-        c.glPixelStorei(c.GL_UNPACK_ALIGNMENT, o.pixel_store_alignment);
-        c.glGenTextures(1, &tex_id);
-        c.glBindTexture(o.target, tex_id);
-        c.glTexParameteri(o.target, c.GL_TEXTURE_WRAP_S, o.wrap_u);
-        c.glTexParameteri(o.target, c.GL_TEXTURE_WRAP_T, o.wrap_v);
+        gl.PixelStorei(gl.UNPACK_ALIGNMENT, o.pixel_store_alignment);
+        gl.GenTextures(1, @ptrCast(&tex_id));
+        gl.BindTexture(o.target, tex_id);
+        gl.TexParameteri(o.target, gl.TEXTURE_WRAP_S, o.wrap_u);
+        gl.TexParameteri(o.target, gl.TEXTURE_WRAP_T, o.wrap_v);
 
-        //c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MAG_FILTER, c.GL_NEAREST_MIPMAP_NEAREST);
-        c.glTexParameteri(o.target, c.GL_TEXTURE_MIN_FILTER, o.min_filter);
-        c.glTexParameteri(o.target, c.GL_TEXTURE_MAG_FILTER, o.mag_filter);
+        //gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST_MIPMAP_NEAREST);
+        gl.TexParameteri(o.target, gl.TEXTURE_MIN_FILTER, o.min_filter);
+        gl.TexParameteri(o.target, gl.TEXTURE_MAG_FILTER, o.mag_filter);
 
-        c.glTexParameterfv(o.target, c.GL_TEXTURE_BORDER_COLOR, &o.border_color);
-        c.glBindTexture(c.GL_TEXTURE_2D, 0);
+        gl.TexParameterfv(o.target, gl.TEXTURE_BORDER_COLOR, &o.border_color);
+        gl.BindTexture(gl.TEXTURE_2D, 0);
         return Texture{ .w = w, .h = h, .id = tex_id };
     }
 
-    pub fn setMipLevel(self: *const Texture, w: i32, h: i32, buffer: ?[]const u8, o: Options, level: c.GLint) void {
-        c.glBindTexture(o.target, self.id);
+    pub fn setMipLevel(self: *const Texture, w: i32, h: i32, buffer: ?[]const u8, o: Options, level: gl.int) void {
+        gl.BindTexture(o.target, self.id);
         if (o.is_compressed) {
-            c.glCompressedTexImage2D(
+            gl.CompressedTexImage2D(
                 o.target,
                 level,
                 o.pixel_format,
@@ -1267,7 +1268,7 @@ pub const Texture = struct {
                 if (buffer) |bmp| &bmp[0] else null,
             );
         } else {
-            c.glTexImage2D(
+            gl.TexImage2D(
                 o.target,
                 level, //Level of detail number
                 o.internal_format,
@@ -1279,7 +1280,7 @@ pub const Texture = struct {
                 if (buffer) |bmp| &bmp[0] else null,
             );
         }
-        c.glBindTexture(c.GL_TEXTURE_2D, 0);
+        gl.BindTexture(gl.TEXTURE_2D, 0);
     }
 
     pub fn initFromBitmap(bitmap: Bitmap, o: Options) Texture {
@@ -1294,6 +1295,6 @@ pub const Texture = struct {
     }
 
     pub fn deinit(self: *Texture) void {
-        c.glDeleteTextures(1, &self.id);
+        gl.DeleteTextures(1, &self.id);
     }
 };

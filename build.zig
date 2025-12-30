@@ -15,8 +15,6 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
     const cdir = "c_libs";
 
     const include_paths = [_][]const u8{
-        cdir ++ "/libepoxy/include",
-        cdir ++ "/libepoxy/build/include",
         cdir ++ "/miniz/build",
         cdir ++ "/miniz",
         cdir ++ "/freetype",
@@ -67,8 +65,6 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
                 //mod.addObjectFile(b.path(cdir ++ "/freetype_build/buildwin/libfreetype.a"));
             }
 
-            mod.addObjectFile(b.path(cdir ++ "/libepoxy/buildwin/src/libepoxy.a"));
-
             //These all come from sdl/buildwin/sdl3.pc
             mod.linkSystemLibrary("m", .{});
             mod.linkSystemLibrary("kernel32", .{});
@@ -104,9 +100,17 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
                 }
                 mod.linkSystemLibrary(str, .{ .preferred_link_mode = .static });
             }
-            mod.addObjectFile(b.path(cdir ++ "/libepoxy/build/src/libepoxy.a"));
         }
     }
+
+    const gl_bindings = @import("zigglgen").generateBindingsModule(b, .{
+        .api = .gl,
+        .version = .@"4.5",
+        .profile = .core,
+        .extensions = &.{ .ARB_clip_control, .NV_scissor_exclusive, .EXT_texture_compression_s3tc },
+    });
+
+    mod.addImport("gl", gl_bindings);
 }
 
 pub fn build(b: *std.Build) !void {

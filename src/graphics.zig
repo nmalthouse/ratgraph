@@ -47,6 +47,7 @@ pub const RGui = @import("gui/vtables.zig");
 pub const def_render = @import("def_render.zig");
 pub const util_3d = @import("util_3d.zig");
 
+pub const gl = @import("gl");
 pub const GL = @import("graphics/gl.zig");
 pub const glID = GL.glID;
 
@@ -357,7 +358,7 @@ pub const ImmediateDrawingContext = struct {
     pub fn beginNoClear(self: *Self, screen_dim: Vec2f) !void {
         self.screen_dimensions = screen_dim;
         try self.clearBuffers();
-        //c.glClear(c.GL_DEPTH_BUFFER_BIT);
+        //gl.Clear(gl.DEPTH_BUFFER_BIT);
         self.zindex = 1;
     }
 
@@ -368,8 +369,8 @@ pub const ImmediateDrawingContext = struct {
         self.zindex = 1;
 
         const color = ptypes.intToColorF(bg_color);
-        c.glClearColor(color[0], color[1], color[2], color[3]);
-        c.glClear(c.GL_COLOR_BUFFER_BIT | c.GL_DEPTH_BUFFER_BIT);
+        gl.ClearColor(color[0], color[1], color[2], color[3]);
+        gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     }
 
     pub fn rectPt(self: *Self, rpt: Rect, color: u32) void {
@@ -970,7 +971,7 @@ pub const ImmediateDrawingContext = struct {
     pub fn setViewport(self: *Self, vo: ?Rect) void {
         const sb = self.screen_dimensions;
         if (vo) |v| {
-            c.glViewport(
+            gl.Viewport(
                 @as(i32, @intFromFloat(v.x)),
                 @as(i32, @intFromFloat(sb.y - (v.y + v.h))),
                 @as(i32, @intFromFloat(v.w)),
@@ -985,8 +986,8 @@ pub const ImmediateDrawingContext = struct {
         if (self.preflush_cb) |cb|
             cb();
         GL.enable(.blend);
-        c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
-        c.glBlendEquation(c.GL_FUNC_ADD);
+        gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.BlendEquation(gl.FUNC_ADD);
         defer GL.disable(.blend);
         //const view_3d = if (camera_3d) |c3| c3.getMatrix(
         //    self.screen_dimensions.x / self.screen_dimensions.y,
@@ -1121,9 +1122,9 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
                 .vbo = 0,
             };
 
-            c.glGenVertexArrays(1, &ret.vao);
-            c.glGenBuffers(1, &ret.vbo);
-            if (batch_options.index_buffer) c.glGenBuffers(1, &ret.ebo);
+            gl.GenVertexArrays(1, @ptrCast(&ret.vao));
+            gl.GenBuffers(1, @ptrCast(&ret.vbo));
+            if (batch_options.index_buffer) gl.GenBuffers(1, @ptrCast(&ret.ebo));
 
             GL.generateVertexAttributes(ret.vao, ret.vbo, vertex_type);
 
@@ -1141,10 +1142,10 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
         }
 
         pub fn pushVertexData(self: *Self) void {
-            c.glBindVertexArray(self.vao);
-            GL.bufferData(c.GL_ARRAY_BUFFER, self.vbo, vertex_type, self.vertices.items);
+            gl.BindVertexArray(self.vao);
+            GL.bufferData(gl.ARRAY_BUFFER, self.vbo, vertex_type, self.vertices.items);
             if (batch_options.index_buffer)
-                GL.bufferData(c.GL_ELEMENT_ARRAY_BUFFER, self.ebo, u32, self.indicies.items);
+                GL.bufferData(gl.ELEMENT_ARRAY_BUFFER, self.ebo, u32, self.indicies.items);
         }
 
         /// returns true iff this batch han nonzero vertices
@@ -1164,12 +1165,12 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
             if (self.vertices.items.len == 0)
                 return;
             if (!params.write_depth)
-                c.glDepthMask(c.GL_FALSE);
-            defer c.glDepthMask(c.GL_TRUE);
-            c.glUseProgram(params.shader);
-            c.glBindVertexArray(self.vao);
+                gl.DepthMask(gl.FALSE);
+            defer gl.DepthMask(gl.TRUE);
+            gl.UseProgram(params.shader);
+            gl.BindVertexArray(self.vao);
             if (params.texture) |texture| {
-                c.glBindTextureUnit(0, texture);
+                gl.BindTextureUnit(0, texture);
             }
             GL.passUniform(params.shader, "view", view);
             GL.passUniform(params.shader, "model", model);
@@ -1178,14 +1179,14 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
                     .float => |f| GL.passUniform(params.shader, uni.name, f),
                 }
             }
-            c.glLineWidth(@as(f32, @floatFromInt(params.line_point_width)) / 4);
-            c.glPointSize(@as(f32, @floatFromInt(params.line_point_width)) / 4);
+            gl.LineWidth(@as(f32, @floatFromInt(params.line_point_width)) / 4);
+            gl.PointSize(@as(f32, @floatFromInt(params.line_point_width)) / 4);
 
             const prim: u32 = @intFromEnum(self.primitive_mode);
             if (batch_options.index_buffer) {
-                c.glDrawElements(prim, @as(c_int, @intCast(self.indicies.items.len)), c.GL_UNSIGNED_INT, null);
+                gl.DrawElements(prim, @as(c_int, @intCast(self.indicies.items.len)), gl.UNSIGNED_INT, 0);
             } else {
-                c.glDrawArrays(prim, 0, @as(c_int, @intCast(self.vertices.items.len)));
+                gl.DrawArrays(prim, 0, @as(c_int, @intCast(self.vertices.items.len)));
             }
         }
 
@@ -1260,37 +1261,37 @@ pub const RenderTexture = struct {
             .depth_rb = 0,
             .stencil_rb = 0,
             .texture = Texture.initFromBuffer(null, w, h, .{
-                .min_filter = c.GL_LINEAR,
-                .mag_filter = c.GL_NEAREST,
+                .min_filter = gl.LINEAR,
+                .mag_filter = gl.NEAREST,
                 .generate_mipmaps = false,
             }),
             //.texture = Texture.
         };
-        c.glGenFramebuffers(1, &ret.fb);
-        c.glBindFramebuffer(c.GL_FRAMEBUFFER, ret.fb);
+        gl.GenFramebuffers(1, @ptrCast(&ret.fb));
+        gl.BindFramebuffer(gl.FRAMEBUFFER, ret.fb);
 
-        //c.glGenRenderbuffers(1, &ret.depth_rb);
-        //c.glBindRenderbuffer(c.GL_RENDERBUFFER, ret.depth_rb);
-        //c.glRenderbufferStorage(c.GL_RENDERBUFFER, c.GL_DEPTH_COMPONENT, w, h);
-        //c.glFramebufferRenderbuffer(c.GL_FRAMEBUFFER, c.GL_DEPTH_ATTACHMENT, c.GL_RENDERBUFFER, ret.depth_rb);
+        //gl.GenRenderbuffers(1, &ret.depth_rb);
+        //gl.BindRenderbuffer(gl.RENDERBUFFER, ret.depth_rb);
+        //gl.RenderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT, w, h);
+        //gl.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, ret.depth_rb);
 
-        c.glGenRenderbuffers(1, &ret.stencil_rb);
-        c.glBindRenderbuffer(c.GL_RENDERBUFFER, ret.stencil_rb);
-        c.glRenderbufferStorage(c.GL_RENDERBUFFER, c.GL_DEPTH_STENCIL, w, h);
-        c.glFramebufferRenderbuffer(c.GL_FRAMEBUFFER, c.GL_DEPTH_STENCIL_ATTACHMENT, c.GL_RENDERBUFFER, ret.stencil_rb);
+        gl.GenRenderbuffers(1, @ptrCast(&ret.stencil_rb));
+        gl.BindRenderbuffer(gl.RENDERBUFFER, ret.stencil_rb);
+        gl.RenderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL, w, h);
+        gl.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, ret.stencil_rb);
 
-        c.glFramebufferTexture(c.GL_FRAMEBUFFER, c.GL_COLOR_ATTACHMENT0, ret.texture.id, 0);
-        const draw_buffers = [_]c.GLenum{c.GL_COLOR_ATTACHMENT0};
-        c.glDrawBuffers(draw_buffers.len, &draw_buffers[0]);
+        gl.FramebufferTexture(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, ret.texture.id, 0);
+        const draw_buffers = [_]gl.@"enum"{gl.COLOR_ATTACHMENT0};
+        gl.DrawBuffers(draw_buffers.len, &draw_buffers);
 
-        if (c.glCheckFramebufferStatus(c.GL_FRAMEBUFFER) != c.GL_FRAMEBUFFER_COMPLETE) return error.framebufferCreateFailed;
+        if (gl.CheckFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) return error.framebufferCreateFailed;
 
-        c.glClearColor(0, 0, 0, 0);
-        c.glClear(c.GL_COLOR_BUFFER_BIT);
-        c.glClear(c.GL_DEPTH_BUFFER_BIT);
+        gl.ClearColor(0, 0, 0, 0);
+        gl.Clear(gl.COLOR_BUFFER_BIT);
+        gl.Clear(gl.DEPTH_BUFFER_BIT);
 
-        c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
-        c.glBindRenderbuffer(c.GL_RENDERBUFFER, 0);
+        gl.BindFramebuffer(gl.FRAMEBUFFER, 0);
+        gl.BindRenderbuffer(gl.RENDERBUFFER, 0);
 
         return ret;
     }
@@ -1312,20 +1313,20 @@ pub const RenderTexture = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        c.glDeleteFramebuffers(1, &self.fb);
-        c.glDeleteRenderbuffers(1, &self.depth_rb);
-        c.glDeleteRenderbuffers(1, &self.stencil_rb);
-        c.glDeleteTextures(1, &self.texture.id);
+        gl.DeleteFramebuffers(1, @ptrCast(&self.fb));
+        gl.DeleteRenderbuffers(1, @ptrCast(&self.depth_rb));
+        gl.DeleteRenderbuffers(1, @ptrCast(&self.stencil_rb));
+        gl.DeleteTextures(1, @ptrCast(&self.texture.id));
     }
 
     pub fn bind(self: *Self, clear: bool) void {
-        c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.fb);
-        c.glViewport(0, 0, self.w, self.h);
+        gl.BindFramebuffer(gl.FRAMEBUFFER, self.fb);
+        gl.Viewport(0, 0, self.w, self.h);
         if (clear) {
-            c.glClearColor(1, 1, 1, 1);
-            c.glClear(c.GL_COLOR_BUFFER_BIT);
+            gl.ClearColor(1, 1, 1, 1);
+            gl.Clear(gl.COLOR_BUFFER_BIT);
         }
-        c.glClear(c.GL_DEPTH_BUFFER_BIT);
+        gl.Clear(gl.DEPTH_BUFFER_BIT);
     }
 };
 
@@ -1391,34 +1392,34 @@ pub const Cubes = struct {
     ebo: c_uint = undefined,
 
     pub fn setData(self: *Self) void {
-        c.glBindVertexArray(self.vao);
-        GL.bufferData(c.GL_ARRAY_BUFFER, self.vbo, CubeVert, self.vertices.items);
-        GL.bufferData(c.GL_ELEMENT_ARRAY_BUFFER, self.ebo, u32, self.indicies.items);
+        gl.BindVertexArray(self.vao);
+        GL.bufferData(gl.ARRAY_BUFFER, self.vbo, CubeVert, self.vertices.items);
+        GL.bufferData(gl.ELEMENT_ARRAY_BUFFER, self.ebo, u32, self.indicies.items);
     }
 
     pub fn drawSimple(b: *Self, view: za.Mat4, model: za.Mat4, shader: glID) void {
-        c.glUseProgram(shader);
+        gl.UseProgram(shader);
         GL.passUniform(b.shader, "view", view);
         GL.passUniform(b.shader, "model", model);
 
-        c.glBindVertexArray(b.vao);
-        c.glDrawElements(c.GL_TRIANGLES, @as(c_int, @intCast(b.indicies.items.len)), c.GL_UNSIGNED_INT, null);
+        gl.BindVertexArray(b.vao);
+        gl.DrawElements(gl.TRIANGLES, @as(c_int, @intCast(b.indicies.items.len)), gl.UNSIGNED_INT, 0);
     }
 
     pub fn draw(b: *Self, view: za.Mat4, model: za.Mat4) void {
-        c.glUseProgram(b.shader);
-        const diffuse_loc = c.glGetUniformLocation(b.shader, "diffuse_texture");
+        gl.UseProgram(b.shader);
+        const diffuse_loc = gl.GetUniformLocation(b.shader, "diffuse_texture");
 
-        c.glUniform1i(diffuse_loc, 0);
-        c.glActiveTexture(c.GL_TEXTURE0 + 0);
-        c.glBindTexture(c.GL_TEXTURE_2D, b.texture.id);
+        gl.Uniform1i(diffuse_loc, 0);
+        gl.ActiveTexture(gl.TEXTURE0 + 0);
+        gl.BindTexture(gl.TEXTURE_2D, b.texture.id);
 
         GL.passUniform(b.shader, "view", view);
         GL.passUniform(b.shader, "model", model);
 
-        c.glBindVertexArray(b.vao);
-        c.glDrawElements(c.GL_TRIANGLES, @as(c_int, @intCast(b.indicies.items.len)), c.GL_UNSIGNED_INT, null);
-        c.glActiveTexture(c.GL_TEXTURE0);
+        gl.BindVertexArray(b.vao);
+        gl.DrawElements(gl.TRIANGLES, @as(c_int, @intCast(b.indicies.items.len)), gl.UNSIGNED_INT, 0);
+        gl.ActiveTexture(gl.TEXTURE0);
     }
 
     pub fn init(alloc: Alloc, texture: Texture, shader: glID) @This() {
@@ -1430,20 +1431,20 @@ pub const Cubes = struct {
             .shader = shader,
         };
 
-        c.glGenVertexArrays(1, &ret.vao);
-        c.glGenBuffers(1, &ret.vbo);
-        c.glGenBuffers(1, &ret.ebo);
+        gl.GenVertexArrays(1, @ptrCast(&ret.vao));
+        gl.GenBuffers(1, @ptrCast(&ret.vbo));
+        gl.GenBuffers(1, @ptrCast(&ret.ebo));
 
         GL.floatVertexAttrib(ret.vao, ret.vbo, 0, 3, CubeVert, "x"); //XYZ
         GL.floatVertexAttrib(ret.vao, ret.vbo, 1, 2, CubeVert, "u"); //RGBA
         GL.floatVertexAttrib(ret.vao, ret.vbo, 2, 3, CubeVert, "nx"); //RGBA
-        GL.intVertexAttrib(ret.vao, ret.vbo, 3, 1, CubeVert, "color", c.GL_UNSIGNED_INT);
+        GL.intVertexAttrib(ret.vao, ret.vbo, 3, 1, CubeVert, "color", gl.UNSIGNED_INT);
         GL.floatVertexAttrib(ret.vao, ret.vbo, 4, 3, CubeVert, "tx");
-        GL.intVertexAttrib(ret.vao, ret.vbo, 5, 1, CubeVert, "ti", c.GL_UNSIGNED_SHORT);
+        GL.intVertexAttrib(ret.vao, ret.vbo, 5, 1, CubeVert, "ti", gl.UNSIGNED_SHORT);
 
-        c.glBindVertexArray(ret.vao);
-        GL.bufferData(c.GL_ARRAY_BUFFER, ret.vbo, CubeVert, ret.vertices.items);
-        GL.bufferData(c.GL_ELEMENT_ARRAY_BUFFER, ret.ebo, u32, ret.indicies.items);
+        gl.BindVertexArray(ret.vao);
+        GL.bufferData(gl.ARRAY_BUFFER, ret.vbo, CubeVert, ret.vertices.items);
+        GL.bufferData(gl.ELEMENT_ARRAY_BUFFER, ret.ebo, u32, ret.indicies.items);
         return ret;
     }
 

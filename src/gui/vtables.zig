@@ -272,7 +272,7 @@ pub const iWindow = struct {
                 const new_x = sz.x - wa.x;
                 const new_y = wa.h - (sz.y - wa.y + sz.h);
                 gl.enable(.scissor_test);
-                graph.c.glScissor(
+                graph.gl.Scissor(
                     @as(i32, @intFromFloat(new_x)),
                     @as(i32, @intFromFloat(new_y)),
                     @as(i32, @intFromFloat(sz.w)),
@@ -1295,15 +1295,15 @@ pub const Gui = struct {
     pub fn draw(self: *Self, force_redraw: bool) !void {
         const dctx = &self.dstate;
         defer {
-            graph.c.glBindFramebuffer(graph.c.GL_FRAMEBUFFER, 0);
-            graph.c.glViewport(0, 0, @intFromFloat(dctx.ctx.screen_dimensions.x), @intFromFloat(dctx.ctx.screen_dimensions.y));
+            graph.gl.BindFramebuffer(graph.gl.FRAMEBUFFER, 0);
+            graph.gl.Viewport(0, 0, @intFromFloat(dctx.ctx.screen_dimensions.x), @intFromFloat(dctx.ctx.screen_dimensions.y));
             gl.disable(.scissor_test);
         }
         try dctx.ctx.flush(null, null);
         gl.enable(.depth_test);
         gl.enable(.blend);
-        graph.c.glBlendFunc(graph.c.GL_SRC_ALPHA, graph.c.GL_ONE_MINUS_SRC_ALPHA);
-        graph.c.glBlendEquation(graph.c.GL_FUNC_ADD);
+        graph.gl.BlendFunc(graph.gl.SRC_ALPHA, graph.gl.ONE_MINUS_SRC_ALPHA);
+        graph.gl.BlendEquation(graph.gl.FUNC_ADD);
         for (self.active_windows.items) |win| {
             const fbo = self.fbos.getPtr(win) orelse continue;
             try self.drawWindow(win, dctx, force_redraw, fbo);

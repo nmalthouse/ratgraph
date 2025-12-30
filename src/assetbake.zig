@@ -214,8 +214,8 @@ pub const AssetMap = struct {
         defer alloc.free(atlas_filename);
 
         return try graph.Texture.initFromImgFile(alloc, dir, atlas_filename, .{
-            .mag_filter = graph.c.GL_NEAREST,
-            //.min_filter = graph.c.GL_NEAREST,
+            .mag_filter = graph.gl.NEAREST,
+            //.min_filter = graph.gl.NEAREST,
         });
     }
 

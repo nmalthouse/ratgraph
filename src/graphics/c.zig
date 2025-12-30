@@ -1,6 +1,6 @@
 pub const c = @cImport({
     @cInclude("SDL3/SDL.h");
-    @cInclude("epoxy/gl.h");
+    //@cInclude("epoxy/gl.h");
     @cInclude("freetype_init.h");
 
     @cDefine("SPNG_USE_MINIZ", "");

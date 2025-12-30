@@ -3,6 +3,7 @@ const c = @import("graphics/c.zig").c;
 pub const GL = @import("graphics/gl.zig");
 pub const graph = @import("graphics.zig");
 pub const za = @import("zalgebra");
+const gl = graph.gl;
 
 const log = std.log.scoped(.mesh_import);
 
@@ -53,20 +54,19 @@ pub const Mesh = struct {
     ebo: c_uint = undefined,
 
     pub fn init(alloc: std.mem.Allocator, diff_texture_id: c_uint) @This() {
-        var ret = Self{
+        const ret = Self{
             .alloc = alloc,
             .diffuse_texture = diff_texture_id,
+            .vao = GL.genVertexArray(),
+            .vbo = GL.genBuffer(),
+            .ebo = GL.genBuffer(),
         };
-
-        c.glGenVertexArrays(1, &ret.vao);
-        c.glGenBuffers(1, &ret.vbo);
-        c.glGenBuffers(1, &ret.ebo);
 
         setVertexAttribs(ret.vao, ret.vbo);
 
-        c.glBindVertexArray(ret.vao);
-        GL.bufferData(c.GL_ARRAY_BUFFER, ret.vbo, MeshVert, ret.vertices.items);
-        GL.bufferData(c.GL_ELEMENT_ARRAY_BUFFER, ret.ebo, u32, ret.indicies.items);
+        gl.BindVertexArray(ret.vao);
+        GL.bufferData(gl.ARRAY_BUFFER, ret.vbo, MeshVert, ret.vertices.items);
+        GL.bufferData(gl.ELEMENT_ARRAY_BUFFER, ret.ebo, u32, ret.indicies.items);
         return ret;
     }
 
@@ -74,32 +74,32 @@ pub const Mesh = struct {
         GL.floatVertexAttrib(vao, vbo, 0, 3, MeshVert, "x"); //XYZ
         GL.floatVertexAttrib(vao, vbo, 1, 2, MeshVert, "u"); //UV
         GL.floatVertexAttrib(vao, vbo, 2, 3, MeshVert, "nx"); //norm xyz
-        GL.intVertexAttrib(vao, vbo, 3, 1, MeshVert, "color", c.GL_UNSIGNED_INT);
+        GL.intVertexAttrib(vao, vbo, 3, 1, MeshVert, "color", gl.UNSIGNED_INT);
         GL.floatVertexAttrib(vao, vbo, 4, 3, MeshVert, "tx"); //tangent xyz
         GL.floatVertexAttrib(vao, vbo, 5, 1, MeshVert, "blend");
     }
 
     pub fn drawSimple(b: *Self, view: za.Mat4, model: za.Mat4, shader: c_uint) void {
-        c.glUseProgram(shader);
+        gl.UseProgram(shader);
         GL.passUniform(shader, "view", view);
         GL.passUniform(shader, "model", model);
         if (b.diffuse_texture != 0) {
-            const diffuse_loc = c.glGetUniformLocation(shader, "diffuse_texture");
+            const diffuse_loc = gl.GetUniformLocation(shader, "diffuse_texture");
 
-            c.glUniform1i(diffuse_loc, 0);
-            c.glBindTextureUnit(0, b.diffuse_texture);
-            c.glBindTextureUnit(1, 0);
-            c.glBindTextureUnit(2, 0);
+            gl.Uniform1i(diffuse_loc, 0);
+            gl.BindTextureUnit(0, b.diffuse_texture);
+            gl.BindTextureUnit(1, 0);
+            gl.BindTextureUnit(2, 0);
         }
 
-        c.glBindVertexArray(b.vao);
-        c.glDrawElements(c.GL_TRIANGLES, @as(c_int, @intCast(b.indicies.items.len)), c.GL_UNSIGNED_INT, null);
+        gl.BindVertexArray(b.vao);
+        gl.DrawElements(gl.TRIANGLES, @as(c_int, @intCast(b.indicies.items.len)), gl.UNSIGNED_INT, 0);
     }
 
     pub fn setData(self: *Self) void {
-        c.glBindVertexArray(self.vao);
-        GL.bufferData(c.GL_ARRAY_BUFFER, self.vbo, MeshVert, self.vertices.items);
-        GL.bufferData(c.GL_ELEMENT_ARRAY_BUFFER, self.ebo, u32, self.indicies.items);
+        gl.BindVertexArray(self.vao);
+        GL.bufferData(gl.ARRAY_BUFFER, self.vbo, MeshVert, self.vertices.items);
+        GL.bufferData(gl.ELEMENT_ARRAY_BUFFER, self.ebo, u32, self.indicies.items);
     }
 
     pub fn clearRetainingCapacity(self: *Self) void {

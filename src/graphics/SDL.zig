@@ -3,9 +3,10 @@ const ptypes = @import("types.zig");
 const Vec2f = ptypes.Vec2f;
 const Vec2i = ptypes.Vec2i;
 const c = @import("c.zig").c;
-pub const glID = c.GLuint;
+pub const glID = gl.uint;
 pub const keycodes = @import("keycodes.zig");
 const GL = @import("gl.zig");
+const gl = @import("gl");
 
 fn reduceU32Mask(items: []const u32) u32 {
     var result: u32 = 0;
@@ -161,6 +162,7 @@ pub const Window = struct {
         }
     };
 
+    procs: *gl.ProcTable,
     win: *c.SDL_Window,
     ctx: c.SDL_GLContext,
 
@@ -265,10 +267,17 @@ pub const Window = struct {
         };
         errdefer _ = c.SDL_GL_DestroyContext(context);
 
-        log.info("gl renderer: {s}", .{c.glGetString(c.GL_RENDERER)});
-        log.info("gl vendor: {s}", .{c.glGetString(c.GL_VENDOR)});
-        log.info("gl version: {s}", .{c.glGetString(c.GL_VERSION)});
-        log.info("gl shader version: {s}", .{c.glGetString(c.GL_SHADING_LANGUAGE_VERSION)});
+        const procs = try alloc.create(gl.ProcTable);
+        errdefer alloc.destroy(procs);
+
+        if (!procs.init(sdl_gl_getProcAddress)) return error.InitFailed;
+
+        gl.makeProcTableCurrent(procs);
+
+        log.info("gl renderer: {s}", .{gl.GetString(gl.RENDERER) orelse "failed"});
+        log.info("gl vendor: {s}", .{gl.GetString(gl.VENDOR) orelse "failed"});
+        log.info("gl version: {s}", .{gl.GetString(gl.VERSION) orelse "failed"});
+        log.info("gl shader version: {s}", .{gl.GetString(gl.SHADING_LANGUAGE_VERSION) orelse "failed"});
 
         if (!c.SDL_GL_SetSwapInterval(@intFromEnum(options.frame_sync))) {
             sdlLogErr();
@@ -294,8 +303,8 @@ pub const Window = struct {
         if (options.enable_debug) {
             GL.enable(.debug_output);
             GL.enable(.debug_output_synchronous);
-            c.glDebugMessageControl(c.GL_DONT_CARE, c.GL_DONT_CARE, c.GL_DEBUG_SEVERITY_NOTIFICATION, 0, null, c.GL_FALSE);
-            c.glDebugMessageCallback(GL.messageCallback, null);
+            gl.DebugMessageControl(gl.DONT_CARE, gl.DONT_CARE, gl.DEBUG_SEVERITY_NOTIFICATION, 0, null, gl.FALSE);
+            gl.DebugMessageCallback(GL.messageCallback, null);
         }
 
         var ret = Self{
@@ -305,6 +314,7 @@ pub const Window = struct {
             .text_input = "",
             .frame_time = try std.time.Timer.start(),
             .target_frame_len_ns = options.target_frame_len_ns,
+            .procs = procs,
         };
         ret.pumpEvents(.poll);
         return ret;
@@ -329,6 +339,7 @@ pub const Window = struct {
 
     pub fn destroyWindow(self: *Self) void {
         self.user_event_cbs.deinit(self.alloc);
+        self.alloc.destroy(self.procs);
         _ = c.SDL_GL_DestroyContext(self.ctx);
         c.SDL_DestroyWindow(self.win);
         c.SDL_Quit();
@@ -336,18 +347,18 @@ pub const Window = struct {
 
     pub fn logGlExtensions() void {
         var num_ext: i64 = 0;
-        c.glGetInteger64v(c.GL_NUM_EXTENSIONS, &num_ext);
+        gl.GetInteger64v(gl.NUM_EXTENSIONS, @ptrCast(&num_ext));
         for (0..@intCast(num_ext)) |i| {
-            log.info("ext: {s}", .{c.glGetStringi(c.GL_EXTENSIONS, @intCast(i))});
+            log.info("ext: {s}", .{gl.GetStringi(gl.EXTENSIONS, @intCast(i))});
         }
     }
 
     pub fn glHasExtension(name: []const u8) bool {
         var num_ext: i64 = 0;
-        c.glGetInteger64v(c.GL_NUM_EXTENSIONS, &num_ext);
+        gl.GetInteger64v(gl.NUM_EXTENSIONS, @ptrCast(&num_ext));
         for (0..@intCast(num_ext)) |i| {
-            const str = std.mem.span(c.glGetStringi(c.GL_EXTENSIONS, @intCast(i)));
-            if (std.mem.eql(u8, name, str))
+            const str = std.mem.span(gl.GetStringi(gl.EXTENSIONS, @intCast(i)));
+            if (std.mem.eql(u8, name, str orelse continue))
                 return true;
         }
         return false;
@@ -520,7 +531,7 @@ pub const Window = struct {
                     _ = c.SDL_GetWindowSize(self.win, &x, &y);
                     self.screen_dimensions.x = x;
                     self.screen_dimensions.y = y;
-                    c.glViewport(0, 0, self.screen_dimensions.x, self.screen_dimensions.y);
+                    gl.Viewport(0, 0, self.screen_dimensions.x, self.screen_dimensions.y);
                 },
                 else => {
                     if (event.type >= c.SDL_EVENT_USER) {
@@ -546,12 +557,12 @@ pub const Window = struct {
 
     pub fn glScissor(self: *Self, x: i32, y: i32, w: i32, h: i32) void {
         _ = self;
-        c.glScissor(x, h - y, w, h);
+        gl.Scissor(x, h - y, w, h);
     }
 
     pub fn bindScreenFramebuffer(self: *Self) void {
-        c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
-        c.glViewport(0, 0, self.screen_dimensions.x, self.screen_dimensions.y);
+        gl.BindFramebuffer(gl.FRAMEBUFFER, 0);
+        gl.Viewport(0, 0, self.screen_dimensions.x, self.screen_dimensions.y);
     }
 
     pub fn startTextInput(self: *const Self, ime_rect: ?ptypes.Rect) void {
@@ -713,4 +724,8 @@ pub fn Bind(comptime bind_list: BindList) type {
             return self.scancode_table[@intFromEnum(scancode)].binding;
         }
     };
+}
+
+fn sdl_gl_getProcAddress(prefixed_name: [*:0]const u8) ?gl.PROC {
+    return @ptrCast(@alignCast(c.SDL_GL_GetProcAddress(prefixed_name)));
 }
