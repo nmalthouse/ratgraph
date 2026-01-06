@@ -110,6 +110,7 @@ pub fn ComboUser(user_data: type) type {
                     .item_h = gui.dstate.nstyle.item_h,
                     .count = p.opts.count,
                     .index_ptr = &p.index,
+                    .bg_col = gui.dstate.nstyle.color.bg,
                 }) != .good) return;
                 self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vt.area.getLastChild() orelse return));
             }
@@ -287,6 +288,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                     .win = vt,
                     .count = info.@"enum".fields.len,
                     .item_h = gui.dstate.nstyle.item_h,
+                    .bg_col = gui.dstate.nstyle.color.bg,
                 });
             }
 

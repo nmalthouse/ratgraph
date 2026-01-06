@@ -45,29 +45,6 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module) !void {
     }
     try freetype(b, mod);
     mod.link_libc = true;
-    if (mod.resolved_target) |rt| {
-        if (rt.result.os.tag == .windows) {
-            //TODO on wine, all is well without linking these, verify this is true on actual Windows
-
-            //These all come from sdl/buildwin/sdl3.pc
-            // mod.linkSystemLibrary("m", .{});
-            // mod.linkSystemLibrary("kernel32", .{});
-            // mod.linkSystemLibrary("user32", .{});
-            // mod.linkSystemLibrary("gdi32", .{});
-            // mod.linkSystemLibrary("winmm", .{});
-            // mod.linkSystemLibrary("imm32", .{});
-            // mod.linkSystemLibrary("ole32", .{});
-            // mod.linkSystemLibrary("oleaut32", .{});
-            // mod.linkSystemLibrary("version", .{});
-            // mod.linkSystemLibrary("uuid", .{});
-            // mod.linkSystemLibrary("advapi32", .{});
-            // mod.linkSystemLibrary("setupapi", .{});
-            // mod.linkSystemLibrary("shell32", .{});
-            // mod.linkSystemLibrary("dinput", .{});
-        } else {
-            //mod.addIncludePath(b.path(cdir ++ "/freetype_build/build"));
-        }
-    }
 }
 
 pub fn build(b: *std.Build) !void {

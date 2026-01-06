@@ -591,9 +591,9 @@ pub fn assetBake(
         //var cout = try std.compress.gzip.compressor(uout, .{});
         //const wr = cout.writer();
         try wr.writeInt(u32, @intCast(jf.path.len), .big);
-        _ = try wr.write(jf.path);
+        try wr.writeAll(jf.path);
         try wr.writeInt(u32, @intCast(s.len), .big);
-        _ = try wr.write(s);
+        try wr.writeAll(s);
     }
     std.sort.heap(IdRect, id_rects.items, {}, IdRect.sortAscById);
 

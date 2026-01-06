@@ -183,7 +183,7 @@ fn stbi_write_func(ctx: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.c
     const wr: *std.io.Writer = @ptrCast(@alignCast(ctx orelse return));
 
     const dat: [*]u8 = @ptrCast(@alignCast(data orelse return));
-    _ = wr.write(dat[0..@intCast(size)]) catch return;
+    wr.writeAll(dat[0..@intCast(size)]) catch return;
 }
 
 pub fn writeToPngFile(self: *Bitmap, dir: std.fs.Dir, sub_path: []const u8) !void {
@@ -218,7 +218,7 @@ pub fn writeToPngFile(self: *Bitmap, dir: std.fs.Dir, sub_path: []const u8) !voi
     try spngError(err);
     if (data) |d| {
         const sl = @as([*]u8, @ptrCast(d));
-        _ = try out_wr.interface.write(sl[0..png_size]);
+        try out_wr.interface.writeAll(sl[0..png_size]);
         var c_alloc = std.heap.raw_c_allocator;
         c_alloc.free(sl[0..png_size]);
     } else {
