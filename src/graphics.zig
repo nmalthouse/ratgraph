@@ -596,19 +596,21 @@ pub const ImmediateDrawingContext = struct {
 
         var vx = x * fac;
         var vy = y * fac + ((font.ascent + font.descent) * SF);
+        var max_vx = vx;
         const z = self.zindex +| 1;
+        const space = font.getGlyph(' ');
         while (it.nextCodepoint()) |ch| {
             switch (ch) {
                 else => {},
                 '\r' => continue,
                 '\t' => {
-                    const space = font.getGlyph(' ');
                     vx += space.advance_x * SF * 4;
                     continue;
                 },
                 '\n' => {
                     if (param.do_newlines) {
                         vy += font.line_gap * SF;
+                        max_vx = @max(vx + space.advance_x * SF, max_vx);
                         vx = x * fac;
                     }
                     continue;
@@ -637,11 +639,12 @@ pub const ImmediateDrawingContext = struct {
 
             vx += (g.advance_x) * SF;
         }
+        max_vx = @max(max_vx, vx);
         if (param.background_rect) |bg_col| {
-            self.rect(Rec(pos.x, pos.y, vx - pos.x, vy - pos.y), bg_col);
+            self.rect(Rec(pos.x, pos.y, max_vx - pos.x, vy - pos.y), bg_col);
         }
         if (param.width_pointer) |wp| {
-            wp.* = vx - pos.x;
+            wp.* = max_vx - pos.x;
         }
         self.zindex +|= 1; //one for rz
     }

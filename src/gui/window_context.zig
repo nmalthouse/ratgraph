@@ -18,6 +18,7 @@ pub const BtnContextWindow = struct {
         union(enum) {
             btn,
             blank,
+            textbox,
             checkbox: bool, //default value of checkbox
             child: struct {
                 _active: bool = false,
@@ -57,12 +58,18 @@ pub const BtnContextWindow = struct {
         const self = gui.create(@This());
         var max_w: f32 = 0;
         for (opts.buttons) |btn| {
-            const dim = gui.dstate.font.textBounds(btn[1], gui.dstate.style.config.text_h);
+            var dim = gui.dstate.font.textBounds(btn[1], gui.dstate.style.config.text_h);
+            switch (btn[2]) {
+                else => {},
+                .textbox => {
+                    dim.x *= 2.2;
+                },
+            }
             max_w = @max(max_w, dim.x);
         }
         const item_h = gui.dstate.style.config.default_item_h;
 
-        const rec = graph.Rec(pos.x, pos.y, max_w + item_h, item_h * @as(f32, @floatFromInt(opts.buttons.len)));
+        const rec = if (opts.buttons.len == 0) graph.Rec(pos.x, pos.y, 100, 100) else graph.Rec(pos.x, pos.y, max_w + item_h, item_h * @as(f32, @floatFromInt(opts.buttons.len)));
         self.* = .{
             .vt = iWindow.init(build, gui, deinit, .{ .area = rec }, &self.vt),
             .opts = opts,
@@ -90,6 +97,10 @@ pub const BtnContextWindow = struct {
                     .cb_fn = btn_wrap_cb,
                     .id = btn[0],
                 }),
+                .textbox => {
+                    if (g.label(&vt.area, ar, "{s}", .{btn[1]})) |tr|
+                        _ = Widget.Textbox.build(&vt.area, tr);
+                },
                 .checkbox => |default| Widget.Checkbox.build(&vt.area, ar, btn[1], .{
                     .cb_vt = &self.cbhandle,
                     .cb_fn = checkbox_wrap_cb,
