@@ -1060,13 +1060,29 @@ pub const Bitmap = struct {
         }
     }
 
-    pub fn writeToBmpFile(self: *Self, alloc: Alloc, dir: Dir, file_name: []const u8) !void {
-        if (self.format != .rgba_8) return error.unsupportedFormat;
-        var path = std.ArrayList(u8).fromOwnedSlice(alloc, try dir.realpathAlloc(alloc, file_name));
-        defer path.deinit();
-        try path.append(0);
+    //assumes ctx is a *io.writer
+    fn stbi_write_func(ctx: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.c) void {
+        const wr: *std.io.Writer = @ptrCast(@alignCast(ctx orelse return));
 
-        _ = c.stbi_write_bmp(@as([*c]const u8, @ptrCast(path.items)), @as(c_int, @intCast(self.w)), @as(c_int, @intCast(self.h)), 4, @as([*c]u8, @ptrCast(self.data.items[0..self.data.items.len])));
+        const dat: [*]u8 = @ptrCast(@alignCast(data orelse return));
+        _ = wr.write(dat[0..@intCast(size)]) catch return;
+    }
+
+    pub fn writeToBmpFile(self: *Self, dir: Dir, file_name: []const u8) !void {
+        const out = try dir.createFile(file_name, .{});
+        defer out.close();
+        var write_buf: [4096]u8 = undefined;
+        var wr = out.writer(&write_buf);
+
+        _ = c.stbi_write_tga_to_func(
+            &stbi_write_func,
+            @ptrCast(&wr.interface),
+            @as(c_int, @intCast(self.w)),
+            @as(c_int, @intCast(self.h)),
+            self.format.toChannelCount(),
+            @as([*c]u8, @ptrCast(self.data.items[0..self.data.items.len])),
+        );
+        try wr.interface.flush();
     }
 
     pub fn writeToPngFile(self: *Self, dir: Dir, sub_path: []const u8) !void {

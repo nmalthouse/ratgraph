@@ -11,7 +11,12 @@ const VScroll = g.Widget.VScroll;
 const Widget = g.Widget;
 
 const CbHandle = g.CbHandle;
-pub const ComboOpts = struct {};
+
+pub const ComboOpts = struct {
+    commit_cb: ?*const fn (*CbHandle, index: usize, user_id: g.Uid) void = null,
+    commit_vt: ?*CbHandle = null,
+    user_id: g.Uid = 0,
+};
 
 pub const Combo = struct {
     pub fn build(parent: *iArea, area_o: ?Rect, enum_ptr: anytype, opts: ComboOpts) g.WgStatus {
@@ -339,6 +344,10 @@ pub fn ComboGeneric(comptime enumT: type) type {
             const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
             self.vt.dirty();
             self.enum_ptr.* = @enumFromInt(id);
+            if (self.opts.commit_vt) |cvt| {
+                if (self.opts.commit_cb) |cbfn|
+                    cbfn(cvt, id, self.opts.user_id);
+            }
             dat.gui.deferTransientClose();
         }
 
