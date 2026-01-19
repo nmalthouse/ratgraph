@@ -40,6 +40,7 @@ pub const Widget = struct {
     const co = @import("widget_combo.zig");
     pub const ComboOpts = co.ComboOpts;
     pub const Combo = co.Combo;
+    pub const ComboItem = co.ComboItem;
     pub const ComboUser = co.ComboUser;
     pub const ComboGeneric = co.ComboGeneric;
 
@@ -1536,6 +1537,7 @@ pub const Colorscheme = struct {
     button_focused_bg: u32 = shade[3],
     button_border: u32 = shade[0],
     button_text: u32 = shade[7],
+    button_text_disable: u32 = shade[5],
 
     tab_bg: u32 = shade[2],
     tab_active_bg: u32 = shade[1],

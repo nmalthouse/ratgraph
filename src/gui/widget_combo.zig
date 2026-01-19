@@ -31,12 +31,23 @@ fn searchMatch(string: []const u8, query: []const u8) bool {
     return std.ascii.indexOfIgnoreCase(string, query) != null;
 }
 
-//TODO is this used
+pub const ComboItem = struct {
+    pub fn broken() @This() {
+        return .{
+            .name = "broken",
+            .enabled = false,
+        };
+    }
+    name: []const u8,
+    enabled: bool = true,
+    color: ?u32 = null,
+};
+
 pub fn ComboUser(user_data: type) type {
     return struct {
         pub const ComboVt = struct {
             //build_cb: *const fn (user_vt: *iArea, widget_vt: *iArea, index: usize, *Gui, *iWindow) void,
-            name_cb: *const fn (*CbHandle, index: usize, *Gui, ud: user_data) []const u8,
+            name_cb: *const fn (*CbHandle, index: usize, *Gui, ud: user_data) ComboItem,
             commit_cb: *const fn (*CbHandle, index: usize, ud: user_data) void,
             count: usize,
             current: usize,
@@ -111,7 +122,7 @@ pub fn ComboUser(user_data: type) type {
                     self.search_list.clearRetainingCapacity();
                     for (0..total_count) |i| {
                         const name = p.opts.name_cb(p.opts.user_vt, i, gui, p.user);
-                        if (searchMatch(name, self.search_string))
+                        if (searchMatch(name.name, self.search_string))
                             self.search_list.append(gui.alloc, i) catch return;
                     }
                 }
@@ -130,8 +141,14 @@ pub fn ComboUser(user_data: type) type {
                     _ = Widget.Button.build(
                         area,
                         ly.getArea(),
-                        name,
-                        .{ .cb_vt = &p.cbhandle, .cb_fn = &ParentT.buttonCb, .id = i, .tab_focus = true },
+                        name.name,
+                        .{
+                            .cb_vt = &p.cbhandle,
+                            .cb_fn = &ParentT.buttonCb,
+                            .id = i,
+                            .tab_focus = true,
+                            .disable = !name.enabled,
+                        },
                     );
                 }
             }
@@ -181,7 +198,7 @@ pub fn ComboUser(user_data: type) type {
 
         pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-            drawCommon(vt.area, d, self.opts.name_cb(self.opts.user_vt, self.opts.current, gui, self.user));
+            drawCommon(vt.area, d, self.opts.name_cb(self.opts.user_vt, self.opts.current, gui, self.user).name);
         }
 
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {

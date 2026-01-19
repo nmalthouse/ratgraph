@@ -339,6 +339,7 @@ pub const Button = struct {
     pub const Opts = struct {
         cb_vt: ?*CbHandle = null,
         cb_fn: ?ButtonCallbackT = null,
+        disable: bool = false,
         id: g.Uid = 0,
         custom_draw: ?iArea.DrawFn = null,
         tab_focus: bool = false,
@@ -397,12 +398,13 @@ pub const Button = struct {
             .bg = tint,
             .border = d.nstyle.color.button_border,
             .text = self.text,
-            .text_fg = d.nstyle.color.button_text,
+            .text_fg = if (self.opts.disable) d.nstyle.color.button_text_disable else d.nstyle.color.button_text,
         });
     }
 
     pub fn onclick(vt: *iArea, cb: MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        if (self.opts.disable) return;
         vt.dirty();
         self.is_down = true;
         cb.gui.grabMouse(&@This().mouseGrabbed, vt, win, cb.btn);
@@ -417,6 +419,7 @@ pub const Button = struct {
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        if (self.opts.disable) return;
         switch (ev.event) {
             .focusChanged => vt.dirty(),
             .text_input => {},
