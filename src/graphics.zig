@@ -832,6 +832,20 @@ pub const ImmediateDrawingContext = struct {
         });
     }
 
+    pub fn triangle3DTex(self: *Self, vs: []const za.Vec3, uv: []const za.Vec2, color: u32) void {
+        const b = &(self.getBatch(.{ .batch_kind = .billboard, .params = .{
+            .shader = billboard_shader,
+            .camera = ._3d,
+        } }) catch return).billboard;
+        const of: u32 = @intCast(b.vertices.items.len);
+        b.appendIndex(&.{ of, of + 1, of + 2 });
+        b.appendVerts(&.{
+            VtxFmt.textured3D(vs[2].x(), vs[2].y(), vs[2].z(), uv[2].x(), uv[2].y(), color),
+            VtxFmt.textured3D(vs[1].x(), vs[1].y(), vs[1].z(), uv[1].x(), uv[1].y(), color),
+            VtxFmt.textured3D(vs[0].x(), vs[0].y(), vs[0].z(), uv[0].x(), uv[1].y(), color),
+        });
+    }
+
     /// Draw a convex polygon, 'vs' is ordered winding. direction is unimportant as both sides are drawn
     pub fn convexPoly(self: *Self, vs: []const za.Vec3, color: u32) void {
         const b = &(self.getBatch(.{ .batch_kind = .color_cube, .params = .{
@@ -842,6 +856,31 @@ pub const ImmediateDrawingContext = struct {
         b.vertices.ensureUnusedCapacity(b.alloc, vs.len) catch return;
         for (vs) |v|
             b.vertices.append(b.alloc, VtxFmt.color3D(v.x(), v.y(), v.z(), color)) catch return;
+
+        for (1..vs.len - 1) |i| {
+            const ii: u32 = @intCast(i);
+            b.appendIndex(&.{
+                (0 + of),
+                (ii + 1 + of),
+                (ii + of),
+                (ii + of), //Back face too
+                (ii + 1 + of),
+                (0 + of),
+            });
+        }
+    }
+
+    /// Draw a convex polygon, 'vs' is ordered winding. direction is unimportant as both sides are drawn
+    pub fn convexPolyTex(self: *Self, vs: []const za.Vec3, uv: []const za.Vec2, color: u32, tex: Texture) void {
+        const b = &(self.getBatch(.{ .batch_kind = .billboard, .params = .{
+            .shader = billboard_shader,
+            .texture = tex.id,
+            .camera = ._3d,
+        } }) catch return).billboard;
+        const of: u32 = @intCast(b.vertices.items.len);
+        b.vertices.ensureUnusedCapacity(b.alloc, vs.len) catch return;
+        for (vs, 0..) |v, i|
+            b.vertices.append(b.alloc, VtxFmt.textured3D(v.x(), v.y(), v.z(), uv[i].x(), uv[i].y(), color)) catch return;
 
         for (1..vs.len - 1) |i| {
             const ii: u32 = @intCast(i);
