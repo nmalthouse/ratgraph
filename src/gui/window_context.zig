@@ -19,6 +19,8 @@ pub const BtnContextWindow = struct {
             btn,
             blank,
             textbox,
+            textbox_number: f32,
+            vector: graph.za.Vec3,
             checkbox: bool, //default value of checkbox
             child: struct {
                 _active: bool = false,
@@ -61,8 +63,12 @@ pub const BtnContextWindow = struct {
             var dim = gui.dstate.font.textBounds(btn[1], gui.dstate.style.config.text_h);
             switch (btn[2]) {
                 else => {},
-                .textbox => {
+                .textbox, .textbox_number => {
                     dim.x *= 2.2;
+                },
+                .vector => {
+                    const vd = gui.dstate.font.textBounds("___________", gui.dstate.style.config.text_h);
+                    dim.x += vd.x * 3;
                 },
             }
             max_w = @max(max_w, dim.x);
@@ -100,6 +106,19 @@ pub const BtnContextWindow = struct {
                 .textbox => {
                     if (g.label(&vt.area, ar, "{s}", .{btn[1]})) |tr|
                         _ = Widget.Textbox.build(&vt.area, tr);
+                },
+                .textbox_number => |default| {
+                    if (g.label(&vt.area, ar, "{s}", .{btn[1]})) |tr|
+                        _ = Widget.TextboxNumber.build(&vt.area, tr, default, .{});
+                },
+                .vector => |default| {
+                    if (g.label(&vt.area, ar, "{s}", .{btn[1]})) |tr| {
+                        var hl = gui.dstate.hlayout(tr, 3);
+                        hl.paddingh = 0;
+                        _ = Widget.TextboxNumber.build(&vt.area, hl.getArea(), default.x(), .{});
+                        _ = Widget.TextboxNumber.build(&vt.area, hl.getArea(), default.y(), .{});
+                        _ = Widget.TextboxNumber.build(&vt.area, hl.getArea(), default.z(), .{});
+                    }
                 },
                 .checkbox => |default| Widget.Checkbox.build(&vt.area, ar, btn[1], .{
                     .cb_vt = &self.cbhandle,
