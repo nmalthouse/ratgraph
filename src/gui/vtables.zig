@@ -496,6 +496,14 @@ pub const DrawState = struct {
         return .{ .bounds = area, .count = count };
     }
 
+    pub fn tlayout(self: *const @This(), area: Rect, count: u32) TableLayout {
+        return .{
+            .item_height = self.style.config.default_item_h,
+            .bounds = area,
+            .columns = count,
+        };
+    }
+
     pub fn box(
         self: *const @This(),
         area: Rect,
