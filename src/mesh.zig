@@ -34,6 +34,10 @@ pub const MeshVert = packed struct {
     ty: f32 = 0,
     tz: f32 = 0,
     blend: f32 = 0,
+
+    pub fn posZa(self: @This()) za.Vec3 {
+        return .new(self.x, self.y, self.z);
+    }
 };
 
 // Textures we are willing to support?
