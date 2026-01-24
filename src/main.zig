@@ -1156,6 +1156,7 @@ pub fn game_main() !void {
 
     var arg_it = try std.process.argsWithAllocator(alloc);
     defer arg_it.deinit();
+    _ = arg_it.next(); //discard exe
 
     const Arg = graph.ArgGen.Arg;
     const args = try graph.ArgGen.parseArgs(&.{

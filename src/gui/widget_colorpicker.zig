@@ -173,15 +173,15 @@ const ColorpickerTransient = struct {
         });
     }
 
-    pub fn pastedTextboxCb(cb: *CbHandle, gui: *Gui, slice: []const u8, _: usize) void {
+    pub fn pastedTextboxCb(cb: *CbHandle, p: Widget.Textbox.CommitParam) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
-        if (slice.len > 0) {
+        if (p.string.len > 0) {
             _ = blk: {
-                const newcolor = ((std.fmt.parseInt(u32, slice, 0) catch |err| switch (err) {
+                const newcolor = ((std.fmt.parseInt(u32, p.string, 0) catch |err| switch (err) {
                     else => break :blk,
                 } << 8) | 0xff);
 
-                self.parent_ptr.commitColor(gui, newcolor);
+                self.parent_ptr.commitColor(p.gui, newcolor);
                 self.parent_ptr.color_hsv = graph.ptypes.Hsva.fromInt(newcolor);
                 self.parent_ptr.vt.dirty();
                 self.vt.area.dirty();

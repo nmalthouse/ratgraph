@@ -48,18 +48,28 @@ pub const ComboItem = struct {
     color: ?u32 = null,
 };
 
+pub const CommitParam = struct {
+    pub const invalid_index = std.math.maxInt(usize);
+    index: usize,
+    /// User must copy if used
+    search_string: []const u8 = "",
+};
 pub fn ComboUser(user_data: type) type {
     return struct {
         pub const ComboVt = struct {
+
             //build_cb: *const fn (user_vt: *iArea, widget_vt: *iArea, index: usize, *Gui, *iWindow) void,
             name_cb: *const fn (*CbHandle, index: usize, *Gui, ud: user_data) ComboItem,
-            commit_cb: *const fn (*CbHandle, index: usize, ud: user_data) void,
+            commit_cb: *const fn (*CbHandle, user_data, CommitParam) void,
             count: usize,
             current: usize,
 
             user_id: usize = 0,
 
             user_vt: *CbHandle,
+
+            // send a bogus index to commit and the current search string
+            commit_invalid: bool = false,
         };
         const ParentT = @This();
         pub const PoppedWindow = struct {
@@ -103,13 +113,23 @@ pub fn ComboUser(user_data: type) type {
                 self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vt.area.getLastChild() orelse return));
             }
 
-            pub fn textbox_cb(pop_vt: *CbHandle, gui: *Gui, str: []const u8, _: usize) void {
+            pub fn textbox_cb(pop_vt: *CbHandle, p: Widget.Textbox.CommitParam) void {
                 const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", pop_vt));
-                self.search_string = str;
+                const parent: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
+                if (parent.opts.commit_invalid and p.forced) {
+                    parent.opts.commit_cb(parent.opts.user_vt, parent.user, .{
+                        .index = CommitParam.invalid_index,
+                        .search_string = p.string,
+                    });
+                    p.gui.deferTransientClose();
+                    return;
+                }
+
+                self.search_string = p.string;
                 if (self.vscroll_vt) |v| {
                     //This will call build_scroll_cb
                     v.index_ptr.* = 0;
-                    v.rebuild(gui, &self.vt);
+                    v.rebuild(p.gui, &self.vt);
                 }
             }
 
@@ -216,7 +236,7 @@ pub fn ComboUser(user_data: type) type {
             const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
             self.vt.dirty();
             self.opts.current = id;
-            self.opts.commit_cb(self.opts.user_vt, id, self.user);
+            self.opts.commit_cb(self.opts.user_vt, self.user, .{ .index = id });
             dat.gui.deferTransientClose();
         }
 

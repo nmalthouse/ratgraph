@@ -47,6 +47,7 @@ fn generateArgStruct(comptime arg_list: []const ArgItem) type {
     return @Type(Type{ .@"struct" = .{ .layout = .auto, .fields = &fields, .decls = &.{}, .is_tuple = false } });
 }
 
+/// User must discard executable name before calling
 pub fn parseArgs(comptime arg_list: []const ArgItem, arg_it: anytype) !generateArgStruct(arg_list) {
     var parsed: generateArgStruct(arg_list) = undefined;
     inline for (arg_list) |field| {
@@ -54,8 +55,6 @@ pub fn parseArgs(comptime arg_list: []const ArgItem, arg_it: anytype) !generateA
     }
     const eql = std.mem.eql;
     const pf = std.fmt.parseFloat;
-    const exe_name = arg_it.next() orelse return error.invalidArgIt;
-    _ = exe_name;
 
     while (arg_it.next()) |arg| {
         var matched_arg: bool = false;

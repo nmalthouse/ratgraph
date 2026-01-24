@@ -42,6 +42,8 @@ pub const Widget = struct {
     pub const Combo = co.Combo;
     pub const ComboItem = co.ComboItem;
     pub const ComboUser = co.ComboUser;
+    pub const ComboVoid = co.ComboUser(void);
+    pub const ComboCommitParam = co.CommitParam;
     pub const ComboGeneric = co.ComboGeneric;
 
     pub const Colorpicker = @import("widget_colorpicker.zig").Colorpicker;

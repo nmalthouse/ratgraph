@@ -100,7 +100,7 @@ pub const NumberPrintFn = *const fn (*iArea, *std.ArrayList(u8)) void;
 pub const NumberParseFn = *const fn (*iArea, []const u8) error{invalid}!void;
 
 pub const TextboxOptions = struct {
-    commit_cb: ?*const fn (*CbHandle, *Gui, []const u8, user_id: usize) void = null,
+    commit_cb: ?*const fn (*CbHandle, Textbox.CommitParam) void = null,
     commit_vt: ?*CbHandle = null,
 
     /// If defined, all events will be passed to this, user function must pass excess events back to textbox
@@ -121,6 +121,12 @@ pub const TextboxOptions = struct {
 //onFocus, needs to call printNumber
 const utf8 = @import("../utf8.zig");
 pub const Textbox = struct {
+    pub const CommitParam = struct {
+        gui: *Gui,
+        string: []const u8,
+        user_id: usize,
+        forced: bool, //User pressed enter
+    };
     const Utf8It = utf8.BiDirectionalUtf8Iterator;
     const Self = @This();
     const uni = std.unicode;
@@ -333,13 +339,13 @@ pub const Textbox = struct {
 
     fn commitChange(self: *@This(), ev: g.FocusedEvent) void {
         if (self.opts.commit_when == .on_change) {
-            self.sendCommit(ev.gui);
+            self.sendCommit(ev.gui, false);
         }
     }
 
-    fn sendCommit(self: *@This(), gui: *Gui) void {
+    fn sendCommit(self: *@This(), gui: *Gui, forced: bool) void {
         if (self.opts.commit_vt) |cvt|
-            self.opts.commit_cb.?(cvt, gui, self.codepoints.items, self.opts.user_id);
+            self.opts.commit_cb.?(cvt, .{ .gui = gui, .string = self.codepoints.items, .user_id = self.opts.user_id, .forced = forced });
         if (self.opts.clear_on_commit)
             self.reset("") catch return;
         self.changed = false;
@@ -382,7 +388,7 @@ pub const Textbox = struct {
                         .commit => {
                             self.commitNumber();
                             if (self.opts.commit_when != .never)
-                                self.sendCommit(ev.gui);
+                                self.sendCommit(ev.gui, true);
                             //if (self.opts.commit_vt) |cvt| {
                             //    if (self.opts.commit_when != .never)
                             //        self.opts.commit_cb.?(cvt, ev.gui, self.codepoints.items, self.opts.user_id);
