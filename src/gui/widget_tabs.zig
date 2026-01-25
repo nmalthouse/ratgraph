@@ -17,7 +17,7 @@ const Tab = []const u8;
 //on draw, draw those, then we have a buildCB(tab_name, area)
 //cool thats it.
 pub const Tabs = struct {
-    pub const BuildTabCb = *const fn (*CbHandle, area_vt: *iArea, tab_name: []const u8, *Gui, *iWindow) void;
+    pub const BuildTabCb = *const fn (*CbHandle, area_vt: *iArea, tab_name: []const u8, index: usize, *Gui, *iWindow) void;
     pub const Opts = struct {
         build_cb: BuildTabCb,
         cb_vt: *CbHandle,
@@ -76,7 +76,7 @@ pub const Tabs = struct {
         self.vt.dirty();
         const child = self.vt.children.items[1];
         child.clearChildren(gui, win);
-        self.opts.build_cb(self.opts.cb_vt, child, self.tabs.items[index], gui, win);
+        self.opts.build_cb(self.opts.cb_vt, child, self.tabs.items[index], index, gui, win);
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {

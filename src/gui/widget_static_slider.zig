@@ -26,6 +26,7 @@ pub const StaticSliderOpts = struct {
     display_kind: enum { raw, percent, integer } = .raw,
     display_bounds_while_editing: bool = false,
     clamp_edits: bool = false,
+    truncate: bool = false,
     slide: Slide = .{},
 
     commit_cb: ?*const fn (*CbHandle, *Gui, f32, user_id: usize) void = null,
@@ -240,6 +241,9 @@ pub const StaticSlider = struct {
         self.num.* = std.fmt.parseFloat(f32, self.fbs.getWritten()) catch self.num.*;
         if (self.opts.clamp_edits)
             self.clamp();
+        if (self.opts.truncate) {
+            self.num.* = @trunc(self.num.*);
+        }
         self.commitCb(gui);
         self.vt.dirty();
     }
