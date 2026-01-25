@@ -146,7 +146,7 @@ const ColorpickerTransient = struct {
             fn valueGroup(cb: *CbHandle, a1: anytype, layout: anytype, ptr: *f32, name: []const u8, min: f32, max: f32, nudge: f32) void {
                 const hue_s = layout.getArea() orelse return;
                 var vy2 = g.HorizLayout{ .count = 2, .bounds = hue_s };
-                _ = Widget.Text.build(a1, vy2.getArea(), "{s}", .{name});
+                _ = Widget.Text.build(a1, vy2.getArea(), "{s}", .{name}, .{});
 
                 _ = Widget.StaticSlider.build(a1, vy2.getArea(), ptr, .{
                     .display_bounds_while_editing = false,

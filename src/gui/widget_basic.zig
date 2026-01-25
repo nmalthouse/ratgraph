@@ -588,14 +588,19 @@ pub const ScrollBar = struct {
 };
 
 pub const Text = struct {
+    pub const Opts = struct {
+        bg_col: ?u32 = null,
+        col: ?u32 = null,
+    };
+
     vt: iArea,
 
     is_alloced: bool,
     text: []const u8,
-    bg_col: u32,
+    opts: Opts = .{},
 
     /// The passed in string is not copied or freed.
-    pub fn buildStatic(parent: *iArea, area_o: ?Rect, owned_string: []const u8, bg_col: ?u32) WgStatus {
+    pub fn buildStatic(parent: *iArea, area_o: ?Rect, owned_string: []const u8, opts: Opts) WgStatus {
         const area = area_o orelse return .failed;
         const gui = parent.win_ptr.gui_ptr;
 
@@ -603,7 +608,7 @@ pub const Text = struct {
         self.* = .{
             .vt = .UNINITILIZED,
             .is_alloced = false,
-            .bg_col = bg_col orelse gui.dstate.nstyle.color.bg,
+            .opts = opts,
             .text = owned_string,
         };
         parent.addChild(
@@ -613,7 +618,7 @@ pub const Text = struct {
         return .good;
     }
 
-    pub fn build(parent: *iArea, area_o: ?Rect, comptime fmt: []const u8, args: anytype) WgStatus {
+    pub fn build(parent: *iArea, area_o: ?Rect, comptime fmt: []const u8, args: anytype, opts: Opts) WgStatus {
         const gui = parent.win_ptr.gui_ptr;
 
         const area = area_o orelse return .failed;
@@ -627,7 +632,7 @@ pub const Text = struct {
 
         self.* = .{
             .vt = .UNINITILIZED,
-            .bg_col = gui.dstate.nstyle.color.bg,
+            .opts = opts,
             .is_alloced = true,
             .text = vec.toOwnedSlice(gui.alloc) catch return .failed,
         };
@@ -642,12 +647,14 @@ pub const Text = struct {
         gui.alloc.destroy(self);
     }
 
-    pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
+    pub fn draw(vt: *iArea, gui: *Gui, d: *DrawState) void {
+        _ = gui;
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         //d.ctx.rect(vt.area, 0x5ffff0ff);
-        d.ctx.rect(vt.area, self.bg_col);
+        if (self.opts.bg_col) |bg|
+            d.ctx.rect(vt.area, bg);
         const texta = d.textArea(vt.area);
-        d.ctx.textClipped(texta, "{s}", .{self.text}, d.textP(null), .left);
+        d.ctx.textClipped(texta, "{s}", .{self.text}, d.textP(self.opts.col), .left);
     }
 };
 

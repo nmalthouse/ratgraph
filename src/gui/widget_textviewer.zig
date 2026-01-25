@@ -99,7 +99,7 @@ pub const TextView = struct {
         for (self.lines.items[index..], index..) |line, i| {
             _ = i;
             //const color: u32 = if (i % 2 == 0) 0xffff_ffff else 0xff_0000_ff;
-            _ = Widget.Text.buildStatic(layout, ly.getArea(), line, self.opts.bg_col orelse gui.dstate.nstyle.color.text_bg);
+            _ = Widget.Text.buildStatic(layout, ly.getArea(), line, .{ .bg_col = self.opts.bg_col });
         }
     }
 

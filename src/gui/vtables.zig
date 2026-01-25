@@ -223,7 +223,7 @@ pub const ScissorId = enum(u8) { none = std.math.maxInt(u8), _ };
 pub fn label(lay: *iArea, area_o: ?Rect, comptime fmt: []const u8, args: anytype) ?Rect {
     const area = area_o orelse return null;
     const sp = area.split(.vertical, area.w / 2);
-    _ = Widget.Text.build(lay, sp[0], fmt, args);
+    _ = Widget.Text.build(lay, sp[0], fmt, args, .{});
     return sp[1];
 }
 
@@ -1501,9 +1501,11 @@ pub const Colorscheme = struct {
     window_bg: u32 = shade[1],
     window_border: u32 = shade[0],
     bg: u32 = shade[1],
+    bg2: u32 = shade[2],
     //text_fg: u32 = 0xdbe0e0_ff,
     text_fg: u32 = 0xeeeeee_ff,
     text_bg: u32 = 0x333333_ff,
+    text_disabled: u32 = shade[5],
     textbox_bg: u32 = 0x333333_ff,
     textbox_border: u32 = 0xff,
     drop_down_arrow: u32 = 0xe0e0e0_ff,
