@@ -2,6 +2,7 @@ const std = @import("std");
 const font = @import("font.zig");
 const sdl = @import("SDL.zig");
 const c = @import("c.zig").c;
+const gl = @import("gl");
 const Glyph = font.Glyph;
 const PROFILE = true;
 
@@ -27,12 +28,13 @@ pub const OnlineFont = struct {
 
     bitmap_dirty: bool = true,
 
-    ftlib: c.FT_Library,
-    face: c.FT_Face,
+    ftlib: c.FT_Library = undefined,
+    face: c.FT_Face = undefined,
 
     SF: f32 = 0,
 
-    file_slice: ?std.ArrayList(u8) = null,
+    alloc: std.mem.Allocator,
+    file_slice: std.ArrayList(u8) = .{},
     param: InitParams,
 
     pub fn deinit(self: *Self) void {
@@ -40,15 +42,16 @@ pub const OnlineFont = struct {
         self.scratch_bmp.deinit();
         self.bitmap.deinit();
         self.font.texture.deinit();
-        if (self.file_slice) |fs|
-            fs.deinit();
+        self.file_slice.deinit(self.alloc);
     }
 
     pub fn init(alloc: std.mem.Allocator, dir: std.fs.Dir, filename: []const u8, pixel_size: f32, params: InitParams) !Self {
         const infile = try dir.openFile(filename, .{});
         defer infile.close();
-        var slice_list = std.ArrayList(u8).init(alloc);
-        try infile.reader().readAllArrayList(&slice_list, std.math.maxInt(usize));
+        var slice_list: std.ArrayList(u8) = .{};
+        var read_buf: [4096]u8 = undefined;
+        var re = infile.reader(&read_buf);
+        try re.interface.appendRemaining(alloc, &slice_list, .unlimited);
 
         var ret = try initFromBuffer(alloc, slice_list.items, pixel_size, params);
         ret.file_slice = slice_list;
@@ -67,11 +70,10 @@ pub const OnlineFont = struct {
         params: InitParams,
     ) !Self {
         const ww = params.cell_count_w;
-        var finfo: c.stbtt_fontinfo = undefined;
-        _ = c.stbtt_InitFont(&finfo, @as([*c]const u8, @ptrCast(buf)), c.stbtt_GetFontOffsetForIndex(&buf[0], 0));
 
-        const SF = c.stbtt_ScaleForPixelHeight(&finfo, pixel_size);
+        const SF = 1.0;
         var result = OnlineFont{
+            .alloc = alloc,
             .font = .{
                 .getGlyphFn = &OnlineFont.getGlyph,
                 .height = 0,
@@ -86,45 +88,53 @@ pub const OnlineFont = struct {
             .cell_width = 0,
             .cell_height = 0,
             .SF = SF,
-            .finfo = finfo,
             .scratch_bmp = try font.Bitmap.initBlank(alloc, 10, 10, .g_8),
             .bitmap = undefined,
         };
-        if (PROFILE) {
-            result.timer = try std.time.Timer.start();
-            result.time = 0;
-        }
+
+        _ = c.FT_Init_FreeType(&result.ftlib);
+
+        const open_args = c.FT_Open_Args{
+            .flags = c.FT_OPEN_MEMORY,
+            .memory_base = &buf[0],
+            .memory_size = @intCast(buf.len),
+            .pathname = null,
+            .stream = null,
+            .driver = null,
+            .num_params = 0,
+            .params = null,
+        };
+        _ = c.FT_Open_Face(result.ftlib, &open_args, 0, &result.face);
+
+        var Req = c.FT_Size_RequestRec{
+            .type = c.FT_SIZE_REQUEST_TYPE_NOMINAL,
+            .width = 0,
+            .height = @as(i32, @intFromFloat(pixel_size * 64)),
+            .horiResolution = 0,
+            .vertResolution = 0,
+        };
+        _ = c.FT_Request_Size(result.face, &Req);
 
         {
-            var x0: c_int = 0;
-            var y0: c_int = 0;
-            var x1: c_int = 0;
-            var y1: c_int = 0;
-            c.stbtt_GetFontBoundingBox(&finfo, &x0, &y0, &x1, &y1);
-
-            result.cell_width = @intFromFloat(@abs(@ceil(@as(f32, @floatFromInt(x1)) * SF) - @ceil(@as(f32, @floatFromInt(x0)) * SF)));
-            result.cell_height = @intFromFloat(@abs(@ceil(@as(f32, @floatFromInt(y1)) * SF) - @ceil(@as(f32, @floatFromInt(y0)) * SF)));
+            const fr = result.face.*;
+            result.font.ascent = @as(f32, @floatFromInt(fr.size.*.metrics.ascender)) / 64;
+            result.font.descent = @as(f32, @floatFromInt(fr.size.*.metrics.descender)) / 64;
+            const max_advance = @as(f32, @floatFromInt(fr.size.*.metrics.max_advance)) / 64;
+            result.font.line_gap = @as(f32, @floatFromInt(fr.size.*.metrics.height)) / 64;
+            result.font.height = result.font.ascent - result.font.descent;
+            result.cell_width = @intFromFloat(max_advance);
+            result.cell_height = @intFromFloat(result.font.height);
         }
+
         result.font.texture = font.Texture.initFromBuffer(null, result.cell_width * ww, result.cell_height * ww, .{
             .pixel_store_alignment = 1,
-            .internal_format = c.GL_RED,
-            .pixel_format = c.GL_RED,
-            .min_filter = c.GL_LINEAR,
-            .mag_filter = c.GL_LINEAR_MIPMAP_LINEAR,
+            .internal_format = gl.RED,
+            .pixel_format = gl.RED,
+            .min_filter = gl.LINEAR,
+            .mag_filter = gl.LINEAR_MIPMAP_LINEAR,
         });
         result.bitmap = try font.Bitmap.initBlank(alloc, result.cell_width * ww, result.cell_height * ww, .g_8);
 
-        {
-            var ascent: c_int = 0;
-            var descent: c_int = 0;
-            var line_gap: c_int = 0;
-            c.stbtt_GetFontVMetrics(&finfo, &ascent, &descent, &line_gap);
-
-            result.font.ascent = @as(f32, @floatFromInt(ascent)) * SF;
-            result.font.descent = @as(f32, @floatFromInt(descent)) * SF;
-            result.font.height = result.font.ascent - result.font.descent;
-            result.font.line_gap = result.font.height + @as(f32, @floatFromInt(line_gap)) * SF;
-        }
         _ = result.font.getGlyph(std.unicode.replacement_character);
 
         return result;
@@ -135,17 +145,17 @@ pub const OnlineFont = struct {
         if (PROFILE)
             self.timer.reset();
         self.bitmap_dirty = false;
-        c.glPixelStorei(c.GL_UNPACK_ALIGNMENT, 1);
-        c.glBindTexture(c.GL_TEXTURE_2D, self.font.texture.id);
-        c.glTexImage2D(
-            c.GL_TEXTURE_2D,
+        gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        gl.BindTexture(gl.TEXTURE_2D, self.font.texture.id);
+        gl.TexImage2D(
+            gl.TEXTURE_2D,
             0,
-            c.GL_RED,
+            gl.RED,
             @intCast(self.bitmap.w),
             @intCast(self.bitmap.h),
             0,
-            c.GL_RED,
-            c.GL_UNSIGNED_BYTE,
+            gl.RED,
+            gl.UNSIGNED_BYTE,
             &self.bitmap.data.items[0],
         );
         if (PROFILE) {
@@ -163,42 +173,29 @@ pub const OnlineFont = struct {
             const ww = self.param.cell_count_w;
             const cpo = codepoint;
             const SF = self.SF;
-            if (c.stbtt_FindGlyphIndex(&self.finfo, codepoint) == 0) {}
-            var x: c_int = 0;
-            var y: c_int = 0;
-            var xf: c_int = 0;
-            var yf: c_int = 0;
-            c.stbtt_GetCodepointBitmapBox(&self.finfo, cpo, SF, SF, &x, &y, &xf, &yf);
-            const w: f32 = @floatFromInt(xf - x);
-            const h: f32 = @floatFromInt(yf - y);
-            const atlas_cx = @mod(self.cindex, self.cx);
-            const atlas_cy = @divTrunc(self.cindex, self.cy);
-            if (xf - x > 0 and yf - y > 0) {
-                //var bmp = try Bitmap.initBlank(alloc, xf - x, yf - y, .g_8);
-                c.stbtt_MakeCodepointBitmap(
-                    &self.finfo,
-                    &self.bitmap.data.items[@intCast(atlas_cy * self.cell_height * @as(i32, @intCast(self.bitmap.w)) + atlas_cx * self.cell_width)],
-                    xf - x,
-                    yf - y,
-                    @intCast(self.bitmap.w),
-                    //xf - x,
-                    SF,
-                    SF,
-                    cpo,
-                );
+            _ = SF;
+            const glyph_i = c.FT_Get_Char_Index(self.face, codepoint);
+
+            _ = c.FT_Load_Glyph(self.face, glyph_i, c.FT_LOAD_DEFAULT);
+            _ = c.FT_Render_Glyph(self.face.*.glyph, c.FT_RENDER_MODE_NORMAL);
+            const metrics = &self.face.*.glyph.*.metrics;
+            const bitmap = &(self.face.*.glyph.*.bitmap);
+            var glyph = Glyph{
+                .tr = .{ .x = -1, .y = -1, .w = @as(f32, @floatFromInt(bitmap.width)), .h = @as(f32, @floatFromInt(bitmap.rows)) },
+                .offset_x = @as(f32, @floatFromInt(@divFloor(metrics.horiBearingX, 64))),
+                .offset_y = @as(f32, @floatFromInt(@divFloor(metrics.horiBearingY, 64))),
+                .advance_x = @as(f32, @floatFromInt(@divFloor(metrics.horiAdvance, 64))),
+                .width = @as(f32, @floatFromInt(bitmap.width)),
+                .height = @as(f32, @floatFromInt(bitmap.rows)),
+            };
+            if (bitmap.buffer == null) {
+                self.glyphs.put(cpo, glyph) catch unreachable;
+                return glyph;
             }
 
-            var adv_w: c_int = 0;
-            var left_side_bearing: c_int = 0;
-            c.stbtt_GetCodepointHMetrics(&self.finfo, cpo, &adv_w, &left_side_bearing);
-            var glyph = Glyph{
-                .tr = .{ .x = -1, .y = -1, .w = w, .h = h },
-                .offset_x = @as(f32, @floatFromInt(left_side_bearing)) * SF,
-                .offset_y = -@as(f32, @floatFromInt(y)),
-                .advance_x = @as(f32, @floatFromInt(adv_w)) * SF,
-                .width = w,
-                .height = h,
-            };
+            const atlas_cx = @mod(self.cindex, self.cx);
+            const atlas_cy = @divTrunc(self.cindex, self.cy);
+
             self.bitmap_dirty = true;
             {
                 glyph.tr.x = @floatFromInt(atlas_cx * self.cell_width);
@@ -208,6 +205,15 @@ pub const OnlineFont = struct {
                     self.time += self.timer.read();
                 }
             }
+
+            var bmp = font.Bitmap{
+                .format = .g_8,
+                .data = .{ .items = bitmap.buffer[0 .. bitmap.rows * bitmap.width], .capacity = undefined, .allocator = undefined },
+                .w = bitmap.width,
+                .h = bitmap.rows,
+            };
+            try self.bitmap.copySubR(@intFromFloat(glyph.tr.x), @intFromFloat(glyph.tr.y), &bmp, 0, 0, bitmap.width, bitmap.rows);
+
             self.glyphs.put(cpo, glyph) catch unreachable;
             return glyph;
             //bake the glyph

@@ -17,7 +17,7 @@ pub const Ecs = @import("registry.zig");
 pub const Lua = @import("lua.zig");
 pub const V3 = za.Vec3;
 pub const AssetBake = @import("assetbake.zig");
-pub const OnlineFont = @import("graphics/online_font.zig").OnlineFont;
+pub const OnlineFont = @import("graphics/online_font_freetype.zig").OnlineFont;
 pub const miniz = @import("miniz.zig");
 
 pub const StringStorage = @import("string.zig").StringStorage;
@@ -570,8 +570,8 @@ pub const ImmediateDrawingContext = struct {
         const font = param.font;
         const SF = (param.px_size / font.font_size);
         const fac = 1;
-        const x = @trunc(pos.x);
-        const y = @trunc(pos.y);
+        const x = @round(pos.x);
+        const y = @round(pos.y);
 
         const col = param.color;
         const b = &(self.getBatch(.{
@@ -595,7 +595,7 @@ pub const ImmediateDrawingContext = struct {
         var it = view.iterator();
 
         var vx = x * fac;
-        var vy = y * fac + ((font.ascent + font.descent) * SF);
+        var vy = @round(y * fac + ((font.ascent + font.descent) * SF));
         var max_vx = vx;
         const z = self.zindex +| 1;
         const space = font.getGlyph(' ');
@@ -620,8 +620,8 @@ pub const ImmediateDrawingContext = struct {
             const g = font.getGlyph(ch);
 
             const r = Rect{
-                .x = @trunc(vx + (g.offset_x) * SF),
-                .y = @trunc(vy - (g.offset_y) * SF),
+                .x = @round(vx + (g.offset_x) * SF),
+                .y = @round(vy - (g.offset_y) * SF),
                 .w = (g.width) * SF,
                 .h = (g.height) * SF,
             };

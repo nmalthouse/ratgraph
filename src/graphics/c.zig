@@ -15,7 +15,6 @@ pub const c = @cImport({
     @cInclude("stb_rect_pack.h");
     @cInclude("stb_vorbis.h");
     @cInclude("stb_image.h");
-    @cInclude("stb_truetype.h");
     @cInclude("stb_image_write.h");
 
     @cDefine("QOI_NO_STDIO", "");

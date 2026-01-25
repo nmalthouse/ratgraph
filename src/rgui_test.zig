@@ -256,7 +256,7 @@ pub const MyInspector = struct {
         self.vt.area.dirty();
     }
 
-    pub fn buildTabs(cb: *CbHandle, vt: *iArea, tab_name: []const u8, gui: *Gui, win: *iWindow) void {
+    pub fn buildTabs(cb: *CbHandle, vt: *iArea, tab_name: []const u8, _: usize, gui: *Gui, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         self.vscroll_vt = null;
         const eql = std.mem.eql;
@@ -317,7 +317,7 @@ pub const MyInspector = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         var ly = gui.dstate.vlayout(vt.area);
         for (index..self.num_scroll_items) |i| {
-            _ = Wg.Text.build(vt, ly.getArea(), "item {d}", .{i});
+            _ = Wg.Text.build(vt, ly.getArea(), "item {d}", .{i}, .{});
         }
     }
 
@@ -327,7 +327,7 @@ pub const MyInspector = struct {
         _ = self;
         for (0..100) |i| {
             const ar = ly.getArea() orelse continue;
-            _ = Wg.Text.build(vt, ar, "item {d}", .{i});
+            _ = Wg.Text.build(vt, ar, "item {d}", .{i}, .{});
         }
         scr.hintBounds(ly.getUsed());
     }

@@ -11,6 +11,19 @@ const gl = graph.GL;
 const ArrayList = std.ArrayList;
 const AL = std.mem.Allocator;
 
+// To support nested child windows:
+//
+// add a child: ?*iWindow field to iWindow
+//
+// store a window depth?
+//
+// depth = 0
+//
+// only a single window of any depth > 0 can exist at any time
+//
+// this implies only a single root window can have children at a time
+//
+
 pub const CbHandle = struct {
     pub fn cast(self: *@This(), comptime T: type, comptime name: []const u8) *T {
         return @alignCast(@fieldParentPtr(name, self));
@@ -1183,6 +1196,10 @@ pub const Gui = struct {
     pub fn setTransientWindow(self: *Self, win: *iWindow) void {
         self.closeTransientWindow();
         self.transient_window = win;
+        win.area.area.x = @round(win.area.area.x);
+        win.area.area.y = @round(win.area.area.y);
+        win.area.area.w = @round(win.area.area.w);
+        win.area.area.h = @round(win.area.area.h);
         self.register(&win.area, win);
         _ = self.transient_fbo.setSize(win.area.area.w, win.area.area.h) catch return;
     }
@@ -1278,7 +1295,8 @@ pub const Gui = struct {
         return @enumFromInt(self.windows.items.len - 1);
     }
 
-    pub fn updateWindowSize(self: *Self, window: *iWindow, area: Rect) !void {
+    pub fn updateWindowSize(self: *Self, window: *iWindow, ar: Rect) !void {
+        const area: Rect = .new(@round(ar.x), @round(ar.y), @round(ar.w), @round(ar.h));
         if (window.area.area.eql(area))
             return;
         if (self.fbos.getPtr(window)) |fbo| {

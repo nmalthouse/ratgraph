@@ -456,6 +456,7 @@ pub const Font = struct {
         return result;
     }
 
+    //Freetype
     pub fn init(alloc: Alloc, dir: Dir, filename: []const u8, point_size: f32, options: InitOptions) !Self {
         const codepoints_i: []u21 = try CharMapEntry.flattenList(options.codepoints_to_load, alloc);
 
@@ -713,7 +714,7 @@ pub const Font = struct {
         }
 
         const elapsed = timer.read();
-        try log.print("Rendered {d} glyphs in {d} ms, {d} ms avg\n", .{ result.glyphs.count(), @as(f32, @floatFromInt(elapsed)) / std.time.ns_per_ms, @as(f32, @floatFromInt(elapsed)) / std.time.ns_per_ms / @as(f32, @floatFromInt(result.glyphs.count())) });
+        std.debug.print("Rendered {d} glyphs in {d} ms, {d} ms avg\n", .{ codepoints_i.len, @as(f32, @floatFromInt(elapsed)) / std.time.ns_per_ms, @as(f32, @floatFromInt(elapsed)) / std.time.ns_per_ms / @as(f32, @floatFromInt(codepoints_i.len)) });
         //Each glyph takes up result.max_advance x result.line_gap + padding
         const w_c: i32 = @intFromFloat(@ceil(@sqrt(@as(f32, @floatFromInt(pack_ctx.rects.items.len)))));
         const g_width: i32 = @intFromFloat(result.max_advance);
@@ -1311,6 +1312,6 @@ pub const Texture = struct {
     }
 
     pub fn deinit(self: *Texture) void {
-        gl.DeleteTextures(1, &self.id);
+        gl.DeleteTextures(1, &.{self.id});
     }
 };

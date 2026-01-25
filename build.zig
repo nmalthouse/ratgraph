@@ -35,7 +35,7 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
         cdir ++ "/stb_image.c",
         cdir ++ "/stb/stb_vorbis.c",
         cdir ++ "/stb_rect_pack.c",
-        cdir ++ "/stb_truetype.c",
+        //cdir ++ "/stb_truetype.c",
         cdir ++ "/libspng/spng/spng.c",
         cdir ++ "/miniz/miniz.c",
         cdir ++ "/miniz/miniz_zip.c",
