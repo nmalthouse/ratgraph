@@ -483,7 +483,7 @@ pub const Textbox = struct {
             tr.y,
             selection_pos_max - selection_pos_min,
             tr.h,
-        ), d.style.config.colors.text_highlight);
+        ), d.nstyle.color.text_highlight);
         const THICK = 2 * d.scale;
         if (s.changed) {
             d.ctx.rect(Rect.new(tr.x, tr.y + tr.h - THICK, tr.w, THICK), d.style.config.colors.uncommited);

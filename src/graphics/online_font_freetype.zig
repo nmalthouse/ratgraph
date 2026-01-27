@@ -4,7 +4,7 @@ const sdl = @import("SDL.zig");
 const c = @import("c.zig").c;
 const gl = @import("gl");
 const Glyph = font.Glyph;
-const PROFILE = true;
+const PROFILE = false;
 
 pub const OnlineFont = struct {
     const Self = @This();

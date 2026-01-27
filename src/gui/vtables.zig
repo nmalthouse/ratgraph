@@ -2,6 +2,8 @@ const std = @import("std");
 pub const graph = @import("../graphics.zig");
 const Os9Gui = @import("../gui_app.zig");
 pub const Dctx = graph.ImmediateDrawingContext;
+const builtin = @import("builtin");
+const IS_DEBUG = builtin.mode == .Debug;
 //TODO deprecate this style
 pub const GuiConfig = Os9Gui.GuiConfig;
 pub const Rect = graph.Rect;
@@ -1372,6 +1374,10 @@ pub const Gui = struct {
     }
 
     pub fn drawFbo(area: Rect, fbo: *graph.RenderTexture, dctx: *Dctx, tint: u32) void {
+        if (@as(i32, @intFromFloat(area.w)) != fbo.w or @as(i32, @intFromFloat(area.h)) != fbo.h) {
+            if (IS_DEBUG)
+                std.debug.print("Fbo is mismatched size {d} {d} {d} {d}\n", .{ area.w, area.h, fbo.w, fbo.h });
+        }
         dctx.rectTexTint(
             area,
             graph.Rec(0, 0, area.w, -area.h),
@@ -1524,6 +1530,7 @@ pub const Colorscheme = struct {
     text_fg: u32 = 0xeeeeee_ff,
     text_bg: u32 = 0x333333_ff,
     text_disabled: u32 = shade[5],
+    text_highlight: u32 = 0xc655c1_88,
     textbox_bg: u32 = 0x333333_ff,
     textbox_border: u32 = 0xff,
     drop_down_arrow: u32 = 0xe0e0e0_ff,

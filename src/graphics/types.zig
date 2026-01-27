@@ -49,6 +49,15 @@ pub const Rect = struct {
         return .{ .x = x, .y = y, .w = w, .h = h };
     }
 
+    pub fn round(self: @This()) Self {
+        return .{
+            .x = @round(self.x),
+            .y = @round(self.y),
+            .w = @round(self.w),
+            .h = @round(self.h),
+        };
+    }
+
     pub fn containsPoint(r: Self, p: anytype) bool {
         return rectContainsPoint(r, p);
     }

@@ -229,7 +229,7 @@ pub fn ComboUser(user_data: type) type {
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
             _ = win;
-            self.makeTransientWindow(cb.gui, Rec(vt.area.x, vt.area.y, vt.area.w, cb.gui.dstate.style.config.default_item_h * 10));
+            self.makeTransientWindow(cb.gui, Rec(vt.area.x, vt.area.y, vt.area.w, cb.gui.dstate.style.config.default_item_h * 10).round());
         }
 
         pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
