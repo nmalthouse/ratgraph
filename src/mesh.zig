@@ -114,6 +114,10 @@ pub const Mesh = struct {
     pub fn deinit(self: *Self) void {
         self.vertices.deinit(self.alloc);
         self.indicies.deinit(self.alloc);
+
+        gl.DeleteVertexArrays(1, @ptrCast(&self.vao));
+        gl.DeleteBuffers(1, @ptrCast(&self.vbo));
+        gl.DeleteBuffers(1, @ptrCast(&self.ebo));
     }
 };
 

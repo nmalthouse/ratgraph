@@ -169,7 +169,7 @@ pub const MyInspector = struct {
     color: u32 = 0xff_ff,
     num_scroll_items: u32 = 10,
 
-    tab_index: usize = 0,
+    tab_index: usize = 3,
     scroll_index: usize = 0,
 
     vscroll_vt: ?*iArea = null,
@@ -243,7 +243,7 @@ pub const MyInspector = struct {
         _ = Wg.Slider.build(a, ly.getArea(), &self.i32_n, 0, 10, .{});
 
         ly.pushRemaining();
-        _ = Wg.Tabs.build(a, ly.getArea(), &.{ "main", "next", "third" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle, .index_ptr = &self.tab_index });
+        _ = Wg.Tabs.build(a, ly.getArea(), &.{ "main", "next", "third", "tv" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle, .index_ptr = &self.tab_index });
     }
 
     fn staticSliderCb(cb: *CbHandle, _: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
@@ -262,6 +262,12 @@ pub const MyInspector = struct {
         const eql = std.mem.eql;
         var ly = gui.dstate.vlayout(vt.area);
         ly.padding.top = 10;
+        if (eql(u8, tab_name, "tv")) {
+            ly.pushRemaining();
+            _ = Wg.TextView.build(vt, ly.getArea(), &.{ "Hello\n", "World\n", "my name is niklas" }, win, .{
+                .mode = .split_on_space,
+            });
+        }
         if (eql(u8, tab_name, "main")) {
             _ = Wg.Textbox.build(vt, ly.getArea());
             _ = Wg.Textbox.build(vt, ly.getArea());
@@ -397,6 +403,7 @@ pub fn main() !void {
 
     var timer = try std.time.Timer.start();
 
+    win.forcePoll();
     try gui.active_windows.append(gui.alloc, inspector);
     try gui.active_windows.append(gui.alloc, styler);
     while (!win.should_exit) {

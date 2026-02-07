@@ -1177,6 +1177,11 @@ pub fn NewBatch(comptime vertex_type: type, comptime batch_options: BatchOptions
             self.vertices.deinit(self.alloc);
             if (batch_options.index_buffer)
                 self.indicies.deinit(self.alloc);
+
+            gl.DeleteVertexArrays(1, @ptrCast(&self.vao));
+            if (batch_options.index_buffer)
+                gl.DeleteBuffers(1, @ptrCast(&self.ebo));
+            gl.DeleteBuffers(1, @ptrCast(&self.vbo));
         }
 
         pub fn dirty(self: *Self) bool {

@@ -42,7 +42,7 @@ pub const TextView = struct {
             .lines = .{},
             .opts = opts,
         };
-        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw });
+        parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
 
         const inset = area.inset(INSET_AMOUNT * gui.dstate.scale);
 
@@ -63,6 +63,15 @@ pub const TextView = struct {
             .force_scroll = opts.force_scroll,
             .bg_col = gui.dstate.nstyle.color.text_bg,
         });
+    }
+
+    //Every selection can be drawn with 0-3 rectangles
+    pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+
+        _ = self;
+        _ = cb;
+        _ = win;
     }
 
     pub fn addOwnedText(self: *@This(), owned: []const u8, gui: *Gui) !void {
@@ -173,6 +182,7 @@ pub const TextView = struct {
         try self.lines.append(gui.alloc, string[start_index..]);
     }
 
+    // ^ ^
     fn catStrings(alloc: std.mem.Allocator, text: []const []const u8) ![]const u8 {
         var strlen: usize = 0;
         for (text) |str|
