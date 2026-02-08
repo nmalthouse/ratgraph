@@ -235,7 +235,7 @@ pub const Checkbox = struct {
     pub fn getWidth(gui: *const Gui, name: []const u8, opts: Opts) f32 {
         //TODO this is incorrect for styles
         _ = opts;
-        const tbound = gui.dstate.font.textBounds(name, gui.dstate.style.config.text_h);
+        const tbound = gui.dstate.font.textBounds(name, gui.dstate.nstyle.text_h);
         return tbound.x;
     }
 
@@ -293,7 +293,7 @@ pub const Checkbox = struct {
         d.ctx.rect(vt.area, d.nstyle.color.bg);
 
         const ins = @ceil(d.scale);
-        d.ctx.rectLine(br, ins, if (is_focused) d.style.config.colors.selected else 0xff);
+        d.ctx.rectLine(br, ins, if (is_focused) d.nstyle.color.selection else 0xff);
         const inset = br.inset(ins);
         d.ctx.rect(inset, 0xffff_ffff);
         if (self.bool_ptr.*) {

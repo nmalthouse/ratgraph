@@ -34,7 +34,7 @@ pub const Tabs = struct {
         const area = area_o orelse return .failed;
         if (tabs.len == 0)
             return .failed;
-        var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
+        var ly = g.VerticalLayout{ .item_height = gui.dstate.nstyle.item_h, .bounds = area };
         const tab_area = ly.getArea() orelse return .failed;
         ly.pushHeight(gui.dstate.nstyle.tab_spacing);
         _ = ly.getArea();

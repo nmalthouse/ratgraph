@@ -72,7 +72,7 @@ pub const DynamicTable = struct {
         }
         widths[widths.len - 1] = area.w - last_pos;
 
-        return g.TableLayoutCustom{ .bounds = area, .column_widths = widths, .item_height = gui.dstate.style.config.default_item_h };
+        return g.TableLayoutCustom{ .bounds = area, .column_widths = widths, .item_height = gui.dstate.nstyle.item_h };
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {

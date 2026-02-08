@@ -58,7 +58,7 @@ pub const Colorpicker = struct {
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
 
-        const sz = cb.gui.dstate.style.config.color_picker_size;
+        const sz = cb.gui.dstate.nstyle.color_picker_size;
         const new_r = Rec(vt.area.x, vt.area.y, sz.x * cb.gui.dstate.scale, sz.y * cb.gui.dstate.scale);
         _ = win;
         self.makeTransientWin(cb.gui, cb.gui.clampRectToWindow(new_r));

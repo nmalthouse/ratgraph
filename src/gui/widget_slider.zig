@@ -192,8 +192,9 @@ pub fn SliderGeneric(comptime number_T: type) type {
 
         pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-            const box = d.style.getRect(.slider_box);
-            d.ctx.nineSlice(vt.area, box, d.style.texture, d.scale, d.tint);
+            const box = graph.Rec(0, 0, 3, 3);
+            //const box = d.style.getRect(.slider_box);
+            //d.ctx.nineSlice(vt.area, box, d.style.texture, d.scale, d.tint);
 
             const textb = vt.area.inset(d.scale * box.h / 3);
             const shuttle = d.style.getRect(.slider_shuttle);

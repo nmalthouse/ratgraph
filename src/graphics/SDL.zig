@@ -324,11 +324,9 @@ pub const Window = struct {
         _ = self;
         const win = c.SDL_CreateWindow(
             title,
-            c.SDL_WINDOWPOS_UNDEFINED,
-            c.SDL_WINDOWPOS_UNDEFINED,
             w,
             h,
-            @as(u32, c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_RESIZABLE),
+            @as(u32, c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_RESIZABLE | c.SDL_WINDOW_UTILITY),
         ) orelse {
             sdlLogErr();
             return error.SDLWindowInit;
@@ -351,6 +349,15 @@ pub const Window = struct {
         for (0..@intCast(num_ext)) |i| {
             log.info("ext: {s}", .{gl.GetStringi(gl.EXTENSIONS, @intCast(i))});
         }
+    }
+
+    pub fn dpiDetect(self: *const @This()) !f32 {
+        const sc = c.SDL_GetWindowDisplayScale(self.win);
+        if (sc == 0) {
+            sdlLogErr();
+            return error.sdlDpiDetect;
+        }
+        return sc;
     }
 
     pub fn glHasExtension(name: []const u8) bool {

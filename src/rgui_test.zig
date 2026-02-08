@@ -4,6 +4,7 @@ const Dctx = graph.ImmediateDrawingContext;
 const Os9Gui = @import("gui_app.zig");
 const GuiConfig = Os9Gui.GuiConfig;
 const GuiHelp = guis.GuiHelp;
+const app = @import("gui/app.zig");
 
 const Rect = graph.Rect;
 const Rec = graph.Rec;
@@ -143,6 +144,7 @@ pub const MyInspector = struct {
         reset,
         many,
         bottom,
+        pop,
     };
     const MyEnum = enum {
         hello,
@@ -230,6 +232,7 @@ pub const MyInspector = struct {
         _ = Wg.Combo.build(a, ly.getArea() orelse return, &self.my_enum, .{});
         _ = Wg.Combo.build(a, ly.getArea() orelse return, &self.fenum, .{});
 
+        _ = Wg.Button.build(a, ly.getArea(), "pop", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.pop) });
         _ = Wg.Button.build(a, ly.getArea(), "Add item", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.add) });
         _ = Wg.Button.build(a, ly.getArea(), "reset list", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.reset) });
         _ = Wg.Button.build(a, ly.getArea(), "add many", .{ .cb_vt = &self.cbhandle, .cb_fn = @This().btnCb, .id = @intFromEnum(BtnId.many) });
@@ -238,9 +241,6 @@ pub const MyInspector = struct {
         _ = Wg.Textbox.build(a, ly.getArea());
         _ = Wg.Textbox.build(a, ly.getArea());
         _ = Wg.TextboxNumber.build(a, ly.getArea(), &self.number, .{});
-        _ = Wg.Slider.build(a, ly.getArea(), &self.number, -10, 10, .{});
-        _ = Wg.Slider.build(a, ly.getArea(), &self.i32_n, -10, 10, .{});
-        _ = Wg.Slider.build(a, ly.getArea(), &self.i32_n, 0, 10, .{});
 
         ly.pushRemaining();
         _ = Wg.Tabs.build(a, ly.getArea(), &.{ "main", "next", "third", "tv" }, vt, .{ .build_cb = &buildTabs, .cb_vt = &self.cbhandle, .index_ptr = &self.tab_index });
@@ -278,7 +278,7 @@ pub const MyInspector = struct {
                 .build_cb = &buildFloatScroll,
                 .build_vt = &self.cbhandle,
                 .win = win,
-                .scroll_mul = gui.dstate.style.config.default_item_h * 4,
+                .scroll_mul = gui.dstate.nstyle.item_h * 4,
                 .scroll_y = true,
                 .scroll_x = false,
             });
@@ -288,7 +288,7 @@ pub const MyInspector = struct {
             //    win.registerScissor(empty) catch {};
 
             //    const big_area = graph.Rec(ar.x, ar.y, 1000, 1000);
-            //    var ly2 = guis.VerticalLayout{ .item_height = gui.style.config.default_item_h, .bounds = big_area };
+            //    var ly2 = guis.VerticalLayout{ .item_height = gui.nstyle.item_h, .bounds = big_area };
             //    for (0..10) |_| {
             //        //empty.addChildOpt(gui, win, Wg.Text.buildStatic(gui, big_area, "HELLO WIRLD", 0xff0000_ff));
             //        empty.addChildOpt(gui, win, Wg.Button.build(gui, ly2.getArea(), "My button 2", .{}));
@@ -297,11 +297,7 @@ pub const MyInspector = struct {
 
             return;
         }
-        if (eql(u8, tab_name, "next")) {
-            _ = Wg.Slider.build(vt, ly.getArea(), &self.number, -10, 10, .{});
-            _ = Wg.Slider.build(vt, ly.getArea(), &self.i32_n, -10, 10, .{});
-            _ = Wg.Slider.build(vt, ly.getArea(), &self.i32_n, 0, 10, .{});
-        }
+        if (eql(u8, tab_name, "next")) {}
         if (eql(u8, tab_name, "third")) {
             ly.pushRemaining();
             if (Wg.VScroll.build(vt, ly.getArea(), .{
@@ -309,7 +305,7 @@ pub const MyInspector = struct {
                 .build_vt = &self.cbhandle,
                 .win = win,
                 .count = self.num_scroll_items,
-                .item_h = gui.dstate.style.config.default_item_h,
+                .item_h = gui.dstate.nstyle.item_h,
                 .index_ptr = &self.scroll_index,
             }) == .good) {
                 self.vscroll_vt = vt.getLastChild();
@@ -338,10 +334,14 @@ pub const MyInspector = struct {
         scr.hintBounds(ly.getUsed());
     }
 
-    pub fn btnCb(cb: *CbHandle, id: guis.Uid, _: guis.MouseCbState, _: *iWindow) void {
+    pub fn btnCb(cb: *CbHandle, id: guis.Uid, cbs: guis.MouseCbState, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         const en = std.meta.intToEnum(BtnId, id) catch return;
         switch (en) {
+            .pop => {
+                const child = cbs.gui.sdl_win.createChildWindow("popup", 100, 100) catch return;
+                _ = child;
+            },
             .add => self.num_scroll_items += 1,
             .reset => self.num_scroll_items = 10,
             .many => self.num_scroll_items += 100,
@@ -357,77 +357,23 @@ pub const MyInspector = struct {
 };
 
 pub fn main() !void {
-    std.debug.print("The size is :  {d}\n", .{@sizeOf(guis.iArea)});
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.detectLeaks();
     const alloc = gpa.allocator();
 
-    var env_map = try std.process.getEnvMap(alloc);
-    const cache_dir_name = env_map.get("XDG_RUNTIME_DIR") orelse "";
-    const cache_dir = try std.fs.cwd().openDir(cache_dir_name, .{});
-    std.debug.print("{s}\n", .{cache_dir_name});
-    env_map.deinit();
-
-    var win = try graph.SDL.Window.createWindow("My window", .{
-        // Optional, see Window.createWindow definition for full list of options
-        .window_size = .{ .x = 1000, .y = 1000 },
-    }, alloc);
-    defer win.destroyWindow();
-
-    var draw = graph.ImmediateDrawingContext.init(alloc);
-    defer draw.deinit();
-    std.debug.print("VT SIZE {d}\n", .{@sizeOf(iArea)});
-
-    const TEXT_H = 18;
-    const hh = 28;
-    var font = try graph.Font.init(alloc, std.fs.cwd(), "asset/fonts/roboto.ttf", TEXT_H, .{});
-    defer font.deinit();
-
-    const sc = 1;
-    var gui = try Gui.init(alloc, &win, cache_dir, std.fs.cwd(), &font.font, &draw);
-    defer gui.deinit();
-
-    gui.dstate.style.config.default_item_h = hh;
-    gui.dstate.style.config.text_h = TEXT_H;
-    gui.dstate.nstyle.color = guis.DarkColorscheme;
+    const gg = try app.GuiApp.initDefault(alloc, .{});
+    defer gg.deinit();
+    const gui = &gg.gui;
 
     const window_area = Rect{ .x = 0, .y = 0, .w = 1000, .h = 1000 };
 
-    gui.dstate.scale = sc;
-    const inspector = MyInspector.create(&gui);
-    const styler = Styler.create(&gui);
-    //const glview = MyGlView.create(&gui, &draw);
+    const inspector = MyInspector.create(gui);
+    const styler = Styler.create(gui);
     _ = try gui.addWindow(inspector, window_area, .{});
-    //_ = try gui.addWindow(styler, window_area, .{});
     _ = try gui.addWindow(styler, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = true });
 
-    var timer = try std.time.Timer.start();
-
-    win.forcePoll();
     try gui.active_windows.append(gui.alloc, inspector);
     try gui.active_windows.append(gui.alloc, styler);
-    while (!win.should_exit) {
-        try draw.begin(0xff, win.screen_dimensions.toF());
-        win.pumpEvents(.wait);
-        gui.clamp_window = Rec(0, 0, draw.screen_dimensions.x, draw.screen_dimensions.y);
-        if (win.keyRising(.ESCAPE))
-            win.should_exit = true;
 
-        timer.reset();
-        try gui.pre_update();
-        try gui.update();
-        try gui.draw(false);
-
-        const took = timer.read();
-        if (took > std.time.ns_per_ms * 16) {
-            std.debug.print("Overtime {d} \n", .{took / std.time.ns_per_ms});
-        }
-        gui.drawFbos();
-
-        try draw.flush(null, null); //Flush any draw commands
-
-        try draw.end(null);
-
-        win.swap();
-    }
+    try gg.run();
 }

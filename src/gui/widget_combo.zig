@@ -106,7 +106,7 @@ pub fn ComboUser(user_data: type) type {
                     .build_cb = &build_scroll_cb,
                     .build_vt = &self.cbhandle,
                     .win = vt,
-                    .item_h = gui.dstate.style.config.default_item_h,
+                    .item_h = gui.dstate.nstyle.item_h,
                     .count = p.opts.count,
                     .index_ptr = &p.index,
                 }) != .good) return;
@@ -229,7 +229,7 @@ pub fn ComboUser(user_data: type) type {
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
             _ = win;
-            self.makeTransientWindow(cb.gui, Rec(vt.area.x, vt.area.y, vt.area.w, cb.gui.dstate.style.config.default_item_h * 10).round());
+            self.makeTransientWindow(cb.gui, Rec(vt.area.x, vt.area.y, vt.area.w, cb.gui.dstate.nstyle.item_h * 10).round());
         }
 
         pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
@@ -285,7 +285,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                     .build_vt = &self.cbhandle,
                     .win = vt,
                     .count = info.@"enum".fields.len,
-                    .item_h = gui.dstate.style.config.default_item_h,
+                    .item_h = gui.dstate.nstyle.item_h,
                 });
             }
 
@@ -357,7 +357,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
             const btn_a = vt.area;
             _ = win;
-            self.makeTransientWindow(cb.gui, Rec(btn_a.x, btn_a.y, btn_a.w, cb.gui.dstate.style.config.default_item_h * 4));
+            self.makeTransientWindow(cb.gui, Rec(btn_a.x, btn_a.y, btn_a.w, cb.gui.dstate.nstyle.item_h * 4));
         }
 
         pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {

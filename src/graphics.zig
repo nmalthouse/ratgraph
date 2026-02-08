@@ -252,7 +252,8 @@ pub const ImmediateDrawingContext = struct {
     real_screen_dimensions: Vec2f = .{ .x = 0, .y = 0 },
     /// This can be changed for viewports
     screen_dimensions: Vec2f = .{ .x = 0, .y = 0 },
-    preflush_cb: ?*const fn () void = null,
+    preflush_cb: ?*const fn (?*anyopaque) void = null,
+    preflush_cb_ptr: ?*anyopaque = null,
 
     pub fn init(alloc: Alloc) Self {
         const SD = "graphics/shader/";
@@ -1026,7 +1027,7 @@ pub const ImmediateDrawingContext = struct {
 
     pub fn flushCustomMat(self: *Self, cam_2d: za.Mat4, cam_3d: za.Mat4) !void {
         if (self.preflush_cb) |cb|
-            cb();
+            cb(self.preflush_cb_ptr);
         GL.enable(.blend);
         gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.BlendEquation(gl.FUNC_ADD);

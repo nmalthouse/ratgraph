@@ -60,20 +60,20 @@ pub const BtnContextWindow = struct {
         const self = gui.create(@This());
         var max_w: f32 = 0;
         for (opts.buttons) |btn| {
-            var dim = gui.dstate.font.textBounds(btn[1], gui.dstate.style.config.text_h);
+            var dim = gui.dstate.font.textBounds(btn[1], gui.dstate.nstyle.text_h);
             switch (btn[2]) {
                 else => {},
                 .textbox, .textbox_number => {
                     dim.x *= 2.2;
                 },
                 .vector => {
-                    const vd = gui.dstate.font.textBounds("___________", gui.dstate.style.config.text_h);
+                    const vd = gui.dstate.font.textBounds("___________", gui.dstate.nstyle.text_h);
                     dim.x += vd.x * 3;
                 },
             }
             max_w = @max(max_w, dim.x);
         }
-        const item_h = gui.dstate.style.config.default_item_h;
+        const item_h = gui.dstate.nstyle.item_h;
 
         const rec = if (opts.buttons.len == 0) graph.Rec(pos.x, pos.y, 100, 100) else graph.Rec(pos.x, pos.y, max_w + item_h, item_h * @as(f32, @floatFromInt(opts.buttons.len)));
         self.* = .{
@@ -94,7 +94,7 @@ pub const BtnContextWindow = struct {
         vt.area.area = area;
         vt.area.clearChildren(gui, vt);
 
-        var ly = g.VerticalLayout{ .item_height = gui.dstate.style.config.default_item_h, .bounds = area };
+        var ly = g.VerticalLayout{ .item_height = gui.dstate.nstyle.item_h, .bounds = area };
         for (self.buttons.items, 0..) |btn, btn_i| {
             const ar = ly.getArea();
             _ = switch (btn[2]) {

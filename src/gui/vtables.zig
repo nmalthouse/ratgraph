@@ -474,7 +474,6 @@ pub const iWindow = struct {
 pub const DrawState = struct {
     ctx: *Dctx,
     font: *graph.FontInterface,
-    style: GuiConfig,
     nstyle: Style,
     scale: f32 = 2,
     tint: u32 = 0xffff_ffff, //Tint for textures
@@ -485,25 +484,25 @@ pub const DrawState = struct {
             .do_newlines = false,
             .font = self.font,
             .color = color orelse self.nstyle.color.text_fg,
-            .px_size = self.style.config.text_h,
+            .px_size = self.nstyle.text_h,
         };
     }
 
     pub fn minWidgetWidth(self: *const @This(), string: []const u8) f32 {
-        const bound = self.font.textBounds(string, self.style.config.text_h);
+        const bound = self.font.textBounds(string, self.nstyle.text_h);
 
-        const inset = @max((self.style.config.default_item_h - self.style.config.text_h), 0);
+        const inset = @max((self.nstyle.item_h - self.nstyle.text_h), 0);
         return bound.x + inset;
     }
 
     pub fn textArea(self: *const @This(), area: Rect) Rect {
-        const inset = @max((area.h - self.style.config.text_h) / 2, 0);
+        const inset = @max((area.h - self.nstyle.text_h) / 2, 0);
         return area.inset(inset);
     }
 
     pub fn vlayout(self: *const @This(), area: Rect) VerticalLayout {
         return .{
-            .item_height = self.style.config.default_item_h,
+            .item_height = self.nstyle.item_h,
             .bounds = area,
             .padding = self.nstyle.vlayout_padding,
         };
@@ -515,7 +514,7 @@ pub const DrawState = struct {
 
     pub fn tlayout(self: *const @This(), area: Rect, count: u32) TableLayout {
         return .{
-            .item_height = self.style.config.default_item_h,
+            .item_height = self.nstyle.item_h,
             .bounds = area,
             .columns = count,
         };
@@ -861,7 +860,7 @@ pub const Gui = struct {
 
     dstate: DrawState,
 
-    pub fn init(alloc: AL, win: *graph.SDL.Window, cache_dir: std.fs.Dir, style_dir: std.fs.Dir, font: *graph.FontInterface, dctx: *graph.ImmediateDrawingContext) !Self {
+    pub fn init(alloc: AL, win: *graph.SDL.Window, font: *graph.FontInterface, dctx: *graph.ImmediateDrawingContext) !Self {
         return Gui{
             .alloc = alloc,
             .clamp_window = graph.Rec(0, 0, win.screen_dimensions.x, win.screen_dimensions.y),
@@ -871,7 +870,6 @@ pub const Gui = struct {
             .dstate = .{
                 .ctx = dctx,
                 .font = font,
-                .style = try GuiConfig.init(alloc, style_dir, "asset/os9gui", cache_dir),
                 .nstyle = .{},
                 .scale = 1,
                 .tint = 0xffff_ffff,
@@ -894,7 +892,6 @@ pub const Gui = struct {
         self.active_windows.deinit(self.alloc);
         self.closeTransientWindow();
         self.area_window_map.deinit(self.alloc);
-        self.dstate.style.deinit();
     }
 
     /// Wrapper around alloc.create that never fails
@@ -1480,15 +1477,11 @@ pub const GuiHelp = struct {
     pub fn drawWindowFrame(d: *DrawState, area: Rect) void {
         d.box(area, .{
             .bg = d.nstyle.color.window_bg,
-            //.border = d.nstyle.color.window_border,
         });
-        //const _br = d.style.getRect(.window);
-        //d.ctx.nineSlice(area, _br, d.style.texture, d.scale, d.tint);
     }
 
     pub fn insetAreaForWindowFrame(gui: *Gui, area: Rect) Rect {
-        const _br = gui.dstate.style.getRect(.window);
-        const border_area = area.inset((_br.h / 3) * gui.dstate.scale);
+        const border_area = area.inset(gui.dstate.nstyle.window_inset);
         return border_area;
     }
 };
@@ -1535,6 +1528,8 @@ pub const Colorscheme = struct {
     textbox_border: u32 = 0xff,
     drop_down_arrow: u32 = 0xe0e0e0_ff,
     caret: u32 = 0xaaaaaaff,
+
+    uncommited: u32 = 0xDAA520ff,
 
     selection: u32 = 0x274e91ff,
 
@@ -1620,6 +1615,10 @@ pub const LightColorscheme = Colorscheme{
 };
 
 pub const Style = struct {
+    text_h: f32 = 18,
+    item_h: f32 = 28,
+    color_picker_size: Vec2f = .{ .x = 600, .y = 300 },
+    window_inset: f32 = 3,
     vlayout_padding: graph.Padding = .{
         .top = 1,
         .bottom = 1,

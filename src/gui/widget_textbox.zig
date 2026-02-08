@@ -425,7 +425,7 @@ pub const Textbox = struct {
                 }
             },
         }
-        self.calculateDrawStart(textArea(vt.area, ev.gui), ev.gui.dstate.style.config.text_h, ev.gui);
+        self.calculateDrawStart(textArea(vt.area, ev.gui), ev.gui.dstate.nstyle.text_h, ev.gui);
     }
 
     fn paste(self: *Self, gui: *Gui) !void {
@@ -457,7 +457,7 @@ pub const Textbox = struct {
         const is_focused = gui.isFocused(vt);
         d.ctx.rect(vt.area, if (is_focused) 0xff00ffff else 0x222222ff);
 
-        const text_h = d.style.config.text_h;
+        const text_h = d.nstyle.text_h;
         //const inset = d.style.config.textbox_inset * d.scale;
         const tr = textArea(vt.area, gui);
         //const tr = vt.area.inset(inset);
@@ -486,7 +486,7 @@ pub const Textbox = struct {
         ), d.nstyle.color.text_highlight);
         const THICK = 2 * d.scale;
         if (s.changed) {
-            d.ctx.rect(Rect.new(tr.x, tr.y + tr.h - THICK, tr.w, THICK), d.style.config.colors.uncommited);
+            d.ctx.rect(Rect.new(tr.x, tr.y + tr.h - THICK, tr.w, THICK), d.nstyle.color.uncommited);
         }
         d.ctx.textClipped(tr, "{s}", .{sl}, d.textP(null), .left);
         if (is_focused) {
@@ -498,7 +498,7 @@ pub const Textbox = struct {
     }
 
     fn textArea(widget_area: Rect, d: *const Gui) Rect {
-        const inset = @max((widget_area.h - d.dstate.style.config.text_h) / 2, 0);
+        const inset = @max((widget_area.h - d.dstate.nstyle.text_h) / 2, 0);
 
         //const inset = d.style.config.textbox_inset * d.scale;
         return widget_area.inset(inset);
@@ -515,7 +515,7 @@ pub const Textbox = struct {
         cb.gui.grabFocus(vt, win);
         vt.dirty();
 
-        const sz = cb.gui.dstate.style.config.text_h;
+        const sz = cb.gui.dstate.nstyle.text_h;
         const ar = textArea(vt.area, cb.gui);
         const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
         const nearest_glyph = (cb.gui.dstate.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false));
@@ -525,7 +525,7 @@ pub const Textbox = struct {
                     self.setHead(u_i, 0, true);
                     cb.gui.grabMouse(&mouseGrabbed, vt, win, cb.btn);
                 }
-                self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.dstate.style.config.text_h, cb.gui);
+                self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.dstate.nstyle.text_h, cb.gui);
             },
             .middle => {
                 if (nearest_glyph) |u_i| {
@@ -562,14 +562,14 @@ pub const Textbox = struct {
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        const sz = cb.gui.dstate.style.config.text_h;
+        const sz = cb.gui.dstate.nstyle.text_h;
         const ar = textArea(vt.area, cb.gui);
         const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
         if (cb.gui.dstate.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false)) |u_i| {
             self.setHead(u_i, 0, false);
             vt.dirty();
         }
-        self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.dstate.style.config.text_h, cb.gui);
+        self.calculateDrawStart(textArea(vt.area, cb.gui), cb.gui.dstate.nstyle.text_h, cb.gui);
     }
 
     pub fn getSlice(self: *Self) []const u8 {
