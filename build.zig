@@ -118,6 +118,7 @@ pub fn build(b: *std.Build) !void {
 
     const mode = b.standardOptimizeOption(.{});
     const build_gui = b.option(bool, "gui", "Build the gui test app") orelse true;
+    const strip = mode == .ReleaseFast;
 
     const bake = b.addExecutable(.{
         .name = "assetbake",
@@ -125,6 +126,7 @@ pub fn build(b: *std.Build) !void {
             .root_source_file = b.path("src/assetbake.zig"),
             .target = target,
             .optimize = mode,
+            .strip = strip,
         }),
     });
     b.installArtifact(bake);
@@ -137,6 +139,7 @@ pub fn build(b: *std.Build) !void {
             .root_source_file = if (build_gui) b.path("src/rgui_test.zig") else b.path("src/main.zig"),
             .target = target,
             .optimize = mode,
+            .strip = strip,
         }),
         //.use_llvm = true,
     });

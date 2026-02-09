@@ -4,6 +4,7 @@ const sdl = @import("SDL.zig");
 const c = @import("c.zig").c;
 const gl = @import("gl");
 const Glyph = font.Glyph;
+const Bitmap = @import("bitmap.zig");
 const PROFILE = false;
 
 pub const OnlineFont = struct {
@@ -23,8 +24,8 @@ pub const OnlineFont = struct {
     cx: i32 = 10,
     cy: i32 = 10,
     cindex: i32 = 0,
-    scratch_bmp: font.Bitmap,
-    bitmap: font.Bitmap,
+    scratch_bmp: Bitmap,
+    bitmap: Bitmap,
 
     bitmap_dirty: bool = true,
 
@@ -88,7 +89,7 @@ pub const OnlineFont = struct {
             .cell_width = 0,
             .cell_height = 0,
             .SF = SF,
-            .scratch_bmp = try font.Bitmap.initBlank(alloc, 10, 10, .g_8),
+            .scratch_bmp = try Bitmap.initBlank(alloc, 10, 10, .g_8),
             .bitmap = undefined,
         };
 
@@ -133,7 +134,7 @@ pub const OnlineFont = struct {
             .min_filter = gl.LINEAR,
             .mag_filter = gl.LINEAR_MIPMAP_LINEAR,
         });
-        result.bitmap = try font.Bitmap.initBlank(alloc, result.cell_width * ww, result.cell_height * ww, .g_8);
+        result.bitmap = try Bitmap.initBlank(alloc, result.cell_width * ww, result.cell_height * ww, .g_8);
 
         _ = result.font.getGlyph(std.unicode.replacement_character);
 
@@ -206,7 +207,7 @@ pub const OnlineFont = struct {
                 }
             }
 
-            var bmp = font.Bitmap{
+            var bmp = Bitmap{
                 .format = .g_8,
                 .data = .{ .items = bitmap.buffer[0 .. bitmap.rows * bitmap.width], .capacity = undefined, .allocator = undefined },
                 .w = bitmap.width,
