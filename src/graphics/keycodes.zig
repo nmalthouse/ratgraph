@@ -764,3 +764,13 @@ pub const Keymod = enum(KeymodMask) {
         });
     }
 };
+
+pub const MouseButton = enum(u8) {
+    left,
+    right,
+    middle,
+    x1,
+    x2,
+    max_mouse_btn = std.math.maxInt(u8),
+    _, //SDL seems to support 1-255 mouse buttons
+};

@@ -1417,7 +1417,7 @@ pub const Gui = struct {
                         .falling => {
                             gr.cb(gr.vt, mstate, grab.win);
                         },
-                        .high => {
+                        .high, .rising_repeat => {
                             gr.cb(gr.vt, mstate, grab.win);
                             break;
                         },

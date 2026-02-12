@@ -382,7 +382,7 @@ pub const Button = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         const old = self.is_down;
         self.is_down = switch (cb.state) {
-            .high, .rising => true,
+            .high, .rising, .rising_repeat => true,
             .falling, .low => false,
         };
         if (self.is_down != old)

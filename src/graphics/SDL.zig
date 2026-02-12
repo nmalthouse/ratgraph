@@ -8,6 +8,8 @@ pub const keycodes = @import("keycodes.zig");
 const GL = @import("gl.zig");
 const gl = @import("gl");
 const log = std.log.scoped(.SDL);
+const keybinding = @import("keybinding.zig");
+pub const ButtonState = keybinding.ButtonState;
 
 pub const DialogFileCb = fn (userdata: ?*anyopaque, filelist: [*c]const [*c]const u8, filter_index: c_int) callconv(.c) void;
 
@@ -38,29 +40,6 @@ pub fn openSaveDialog(cb: *const DialogFileCb, userdata: ?*anyopaque, filters: [
         opts.default_location,
     );
 }
-
-/// These names are less ambiguous than "pressed" "released" "held"
-pub const ButtonState = enum {
-    rising,
-    high,
-    falling,
-    low,
-
-    ///From frame to frame, correctly set state of a button given a binary input (up, down)
-    pub fn set(self: *ButtonState, pressed: bool) void {
-        if (pressed) {
-            self.* = switch (self.*) {
-                .rising, .high => .high,
-                .low, .falling => .rising,
-            };
-        } else {
-            self.* = switch (self.*) {
-                .rising, .high => .falling,
-                .low, .falling => .low,
-            };
-        }
-    }
-};
 
 threadlocal var scratch_buffer: [256]u8 = undefined;
 pub fn getScancodeFromName(name: []const u8) usize {
@@ -188,6 +167,8 @@ pub const Window = struct {
     win: *c.SDL_Window,
     ctx: c.SDL_GLContext,
 
+    bindreg: keybinding.BindRegistry,
+
     screen_dimensions: Vec2i = .{ .x = 0, .y = 0 },
     frame_time: std.time.Timer,
 
@@ -203,11 +184,8 @@ pub const Window = struct {
     /// Never put scroll_lock, caps_lock and num_lock in Window.mod when set
     exclude_locking_mod: bool = true,
 
-    //key_state: [c.SDL_SCANCODE_COUNT]ButtonState = [_]ButtonState{.low} ** c.SDL_NUM_SCANCODES,
-    key_state: KeyStateT = [_]ButtonState{.low} ** c.SDL_SCANCODE_COUNT,
+    //key_state: KeyStateT = [_]ButtonState{.low} ** c.SDL_SCANCODE_COUNT,
     keys: KeysT = .{},
-    keyboard_state: KeyboardStateT = KeyboardStateT.initEmpty(),
-    last_frame_keyboard_state: KeyboardStateT = KeyboardStateT.initEmpty(),
 
     text_input_buffer: [256]u8 = undefined,
     text_input: []const u8,
@@ -337,6 +315,7 @@ pub const Window = struct {
             .frame_time = try std.time.Timer.start(),
             .target_frame_len_ns = options.target_frame_len_ns,
             .procs = procs,
+            .bindreg = try .init(alloc),
         };
         ret.pumpEvents(.poll);
         return ret;
@@ -362,6 +341,7 @@ pub const Window = struct {
         self.alloc.destroy(self.procs);
         _ = c.SDL_GL_DestroyContext(self.ctx);
         c.SDL_DestroyWindow(self.win);
+        self.bindreg.deinit();
         c.SDL_Quit();
     }
 
@@ -484,9 +464,17 @@ pub const Window = struct {
 
             self.mouse.wheel_delta = .{ .x = 0, .y = 0 };
         }
-        for (&self.key_state) |*k| {
-            k.* = .low;
+        for (self.bindreg.button_state.items) |*k| {
+            k.* = switch (k.*) {
+                .low => .low,
+                .high => .high,
+                .falling => .low,
+                .rising, .rising_repeat => .high,
+            };
         }
+        //for (&self.key_state) |*k| {
+        //k.* = .low;
+        //}
         self.mod = c.SDL_GetModState();
         if (self.exclude_locking_mod) {
             const big: keycodes.KeymodMask = 0xff_ff_ff_ff;
@@ -495,19 +483,6 @@ pub const Window = struct {
         }
 
         self.keys.clear();
-        self.last_frame_keyboard_state = self.keyboard_state;
-        self.keyboard_state.mask = 0;
-        {
-            var l: i32 = 0;
-            const ret = c.SDL_GetKeyboardState(&l)[0..@intCast(l)];
-            //ret[0..@intCast(usize, l)];
-            for (ret, 0..) |key, i| {
-                if (key) {
-                    self.keyboard_state.set(i);
-                    self.key_state[i] = .high;
-                }
-            }
-        }
         self.text_input = "";
 
         var event: c.SDL_Event = undefined;
@@ -515,12 +490,15 @@ pub const Window = struct {
             switch (event.type) {
                 c.SDL_EVENT_QUIT => self.should_exit = true,
                 c.SDL_EVENT_KEY_DOWN => {
-                    //if (event.key.key == c.SDLK_ESCAPE)
-                    //    self.should_exit = true;
-
                     const scancode = c.SDL_GetScancodeFromKey(event.key.key, null);
-                    if (!self.last_frame_keyboard_state.isSet(scancode))
-                        self.key_state[scancode] = .rising;
+                    self.bindreg.button_state.items[scancode] = switch (self.bindreg.button_state.items[scancode]) {
+                        .low => .rising,
+                        .high => .rising_repeat,
+                        .rising_repeat => .rising_repeat,
+
+                        .rising => .rising, //These will never occur because of the above loop
+                        .falling => .rising,
+                    };
                     self.keys.append(.{
                         .state = .rising,
                         .key_id = @intCast(scancode),
@@ -530,7 +508,7 @@ pub const Window = struct {
                 },
                 c.SDL_EVENT_KEY_UP => {
                     const scancode = c.SDL_GetScancodeFromKey(event.key.key, null);
-                    self.key_state[scancode] = .falling;
+                    self.bindreg.button_state.items[scancode] = .falling;
                 },
                 c.SDL_EVENT_TEXT_EDITING_CANDIDATES => {},
                 c.SDL_EVENT_TEXT_EDITING => {
@@ -610,19 +588,19 @@ pub const Window = struct {
     }
 
     pub fn keyRising(self: *const Self, scancode: keycodes.Scancode) bool {
-        return self.key_state[@intFromEnum(scancode)] == .rising;
+        return self.bindreg.button_state.items[@intFromEnum(scancode)] == .rising;
     }
 
     pub fn keyFalling(self: *const Self, scancode: keycodes.Scancode) bool {
-        return self.key_state[@intFromEnum(scancode)] == .falling;
+        return self.bindreg.button_state.items[@intFromEnum(scancode)] == .falling;
     }
 
     pub fn keyHigh(self: *const Self, scancode: keycodes.Scancode) bool {
-        return self.keyboard_state.isSet(@intFromEnum(scancode));
+        return self.bindreg.button_state.items[@intFromEnum(scancode)] == .high;
     }
 
     pub fn keystate(self: *const Self, scancode: keycodes.Scancode) ButtonState {
-        return self.key_state[@intFromEnum(scancode)];
+        return self.bindreg.button_state.items[@intFromEnum(scancode)];
     }
 
     pub fn isBindState(self: *const Self, bind: NewBind, state: ButtonState) bool {
@@ -640,12 +618,13 @@ pub const Window = struct {
                 new_mod |= SHIFT;
         }
         if (bind.mod == 0 or bind.mod ^ new_mod == 0) {
-            return self.key_state[
+            const ks = self.bindreg.button_state.items[
                 switch (bind.key) {
                     .scancode => |s| @intFromEnum(s),
                     .keycode => |k| @intFromEnum(getScancodeFromKey(k)),
                 }
-            ] == state;
+            ];
+            return (ks == state or (state == .high and ks == .rising_repeat));
         }
         return false;
     }
