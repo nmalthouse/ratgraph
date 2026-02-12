@@ -361,38 +361,6 @@ pub fn main() !void {
     defer _ = gpa.detectLeaks();
     const alloc = gpa.allocator();
 
-    if (true) {
-        const out = try std.fs.cwd().openDir("/tmp/asswipe", .{});
-        const indir = try std.fs.cwd().openDir("/home/tony/testpng", .{ .iterate = true });
-        var it = indir.iterate();
-        var out_buf: [2048]u8 = undefined;
-        while (try it.next()) |file| {
-            if (file.kind != .file) continue;
-
-            var bmp = try graph.Bitmap.initFromPngFile(alloc, indir, file.name);
-            defer bmp.deinit();
-
-            var outfile = try out.createFile(file.name, .{});
-            var wr = outfile.writer(&out_buf);
-
-            try bmp.writeQoi(&wr.interface);
-            try wr.interface.flush();
-            outfile.close();
-
-            //var out = try std.fs.cwd().createFile("/tmp/ass.bmp", .{});
-            //defer out.close();
-        }
-        //var out = try std.fs.cwd().createFile("/tmp/ass.bmp", .{});
-        //defer out.close();
-        //var wr = out.writer(&out_buf);
-        //var bmp = try graph.Bitmap.initBlank(alloc, 10, 10, .rgb_8);
-        //defer bmp.deinit();
-
-        //try bmp.write(&wr.interface, .bmp);
-        //try wr.interface.flush();
-        return;
-    }
-
     const gg = try app.GuiApp.initDefault(alloc, .{});
     defer gg.deinit();
     const gui = &gg.gui;

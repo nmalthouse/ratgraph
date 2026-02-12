@@ -508,7 +508,7 @@ const GBuffer = struct {
         gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, ret.albedo, 0);
 
         const attachments = [_]c_int{ gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, 0 };
-        gl.DrawBuffers(3, @ptrCast(&attachments[0]));
+        gl.DrawBuffers(@intCast(attachments.len), @ptrCast(attachments[0..].ptr));
 
         gl.GenTextures(1, @ptrCast(&ret.depth));
         gl.BindTexture(gl.TEXTURE_2D, ret.depth);

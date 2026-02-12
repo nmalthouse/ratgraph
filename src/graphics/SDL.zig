@@ -7,16 +7,38 @@ pub const glID = gl.uint;
 pub const keycodes = @import("keycodes.zig");
 const GL = @import("gl.zig");
 const gl = @import("gl");
+const log = std.log.scoped(.SDL);
 
-fn reduceU32Mask(items: []const u32) u32 {
-    var result: u32 = 0;
-    for (items) |item| {
-        result |= item;
-    }
-    return result;
+pub const DialogFileCb = fn (userdata: ?*anyopaque, filelist: [*c]const [*c]const u8, filter_index: c_int) callconv(.c) void;
+
+pub fn openFilePicker(cb: *const DialogFileCb, userdata: ?*anyopaque, filters: []const c.SDL_DialogFileFilter, opts: struct {
+    default_location: [*c]const u8 = null,
+    allow_many: bool = false,
+}) void {
+    c.SDL_ShowOpenFileDialog(
+        cb,
+        userdata,
+        null, //Window ptr
+        @ptrCast(filters.ptr),
+        @intCast(filters.len),
+        opts.default_location,
+        opts.allow_many,
+    );
 }
 
-const log = std.log.scoped(.SDL);
+pub fn openSaveDialog(cb: *const DialogFileCb, userdata: ?*anyopaque, filters: []const c.SDL_DialogFileFilter, opts: struct {
+    default_location: [*c]const u8 = null,
+}) void {
+    c.SDL_ShowSaveFileDialog(
+        cb,
+        userdata,
+        null, //windowptr
+        @ptrCast(filters.ptr),
+        @intCast(filters.len),
+        opts.default_location,
+    );
+}
+
 /// These names are less ambiguous than "pressed" "released" "held"
 pub const ButtonState = enum {
     rising,
@@ -735,4 +757,12 @@ pub fn Bind(comptime bind_list: BindList) type {
 
 fn sdl_gl_getProcAddress(prefixed_name: [*:0]const u8) ?gl.PROC {
     return @ptrCast(@alignCast(c.SDL_GL_GetProcAddress(prefixed_name)));
+}
+
+fn reduceU32Mask(items: []const u32) u32 {
+    var result: u32 = 0;
+    for (items) |item| {
+        result |= item;
+    }
+    return result;
 }

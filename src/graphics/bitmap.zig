@@ -73,7 +73,7 @@ pub fn initFromPngBuffer(alloc: std.mem.Allocator, buffer: []const u8) !Bitmap {
     const fmt: ImageFormat = switch (ihdr.color_type) {
         c.SPNG_COLOR_TYPE_GRAYSCALE => .g_8,
         c.SPNG_COLOR_TYPE_GRAYSCALE_ALPHA => .rgba_8,
-        c.SPNG_COLOR_TYPE_TRUECOLOR => .rgb_8,
+        c.SPNG_COLOR_TYPE_TRUECOLOR => .rgba_8,
         c.SPNG_COLOR_TYPE_TRUECOLOR_ALPHA => .rgba_8,
         c.SPNG_COLOR_TYPE_INDEXED => .rgba_8,
         else => return error.unsupportedColorFormat,
