@@ -8,7 +8,7 @@ pub const keycodes = @import("keycodes.zig");
 const GL = @import("gl.zig");
 const gl = @import("gl");
 const log = std.log.scoped(.SDL);
-const keybinding = @import("keybinding.zig");
+pub const keybinding = @import("keybinding.zig");
 pub const ButtonState = keybinding.ButtonState;
 
 pub const DialogFileCb = fn (userdata: ?*anyopaque, filelist: [*c]const [*c]const u8, filter_index: c_int) callconv(.c) void;
@@ -552,6 +552,7 @@ pub const Window = struct {
                 },
             }
         }
+        self.bindreg.updateSdl(self.mod);
     }
 
     pub fn centerWindow(self: *Self) void {
@@ -603,7 +604,11 @@ pub const Window = struct {
         return self.bindreg.button_state.items[@intFromEnum(scancode)];
     }
 
-    pub fn isBindState(self: *const Self, bind: NewBind, state: ButtonState) bool {
+    pub inline fn isBindState(self: *const Self, bind: keybinding.BindId, state: ButtonState) bool {
+        return self.bindreg.isState(bind, state);
+    }
+
+    pub fn isBindStateOld(self: *const Self, bind: NewBind, state: ButtonState) bool {
         var new_mod = self.mod;
         const km = keycodes.Keymod;
         if (bind.mod != 0 and self.mod != 0) {

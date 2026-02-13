@@ -698,15 +698,15 @@ pub const Keycode = enum(u32) {
 
 //
 // \brief Enumeration of valid key mods (possibly OR'd together).
-const KM_LCTRL = 0x0040;
-const KM_RCTRL = 0x0080;
-const KM_LSHIFT = 0x0001;
-const KM_RSHIFT = 0x0002;
-const KM_LALT = 0x0100;
-const KM_RALT = 0x0200;
-const KM_LGUI = 0x0400;
-const KM_RGUI = 0x0800;
-const KM_SCROLL = 0x8000;
+pub const KM_LCTRL = 0x0040;
+pub const KM_RCTRL = 0x0080;
+pub const KM_LSHIFT = 0x0001;
+pub const KM_RSHIFT = 0x0002;
+pub const KM_LALT = 0x0100;
+pub const KM_RALT = 0x0200;
+pub const KM_LGUI = 0x0400;
+pub const KM_RGUI = 0x0800;
+pub const KM_SCROLL = 0x8000;
 pub const KeymodMask = u32;
 pub const Keymod = enum(KeymodMask) {
     NONE = 0x0000,

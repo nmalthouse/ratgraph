@@ -4,6 +4,8 @@ const c = @import("c.zig").c;
 const sdl = @import("SDL.zig");
 const keycodes = @import("keycodes.zig");
 
+const log = std.log.scoped(.keybinding);
+
 /// These names are less ambiguous than "pressed" "released" "held"
 pub const ButtonState = enum {
     rising,
@@ -52,7 +54,7 @@ pub const ButtonBind = union(enum) {
     fn stateIndex(self: @This()) usize {
         return switch (self) {
             .scancode => |s| @intFromEnum(s),
-            .keycode => |k| if (builtin.is_test) @intFromEnum(k) else c.SDL_GetScancodeFromKey(k),
+            .keycode => |k| if (builtin.is_test) @intFromEnum(k) else c.SDL_GetScancodeFromKey(@intFromEnum(k), null),
             .mouse => |m| @as(usize, @intFromEnum(m)) + MouseStateIndexOffset,
         };
     }
@@ -60,25 +62,51 @@ pub const ButtonBind = union(enum) {
 
 pub const Binding = struct {
     button: ButtonBind,
-    modifier: keycodes.KeymodMask,
+    modifier: KeymodMask,
     mode: FocusMode,
 
     priority: u8,
     context: ContextId,
+    repeat: bool = false,
 
-    pub fn bind(btn: ButtonBind, mode: FocusMode, ctx: ContextId) @This() {
+    pub fn bind(btn: ButtonBind, mode: FocusMode, mod: []const Keymod, ctx: ContextId) @This() {
         return .{
             .context = ctx,
             .button = btn,
             .mode = mode,
-            .priority = 1, // TODO calc priority
-            .modifier = 0, //TODO ask for modifier
+            .priority = @intCast(mod.len),
+            .modifier = Keymod.mask(mod),
         };
     }
 };
 
-//How to deal with bindings which can coexist?
-//WASD should not prevent a binding from being active
+pub const KeymodMask = u8;
+pub const Keymod = enum(KeymodMask) {
+    ctrl = 0b1,
+    shift = 0b10,
+    alt = 0b100,
+
+    pub fn mask(to_mask: []const Keymod) KeymodMask {
+        var ret: KeymodMask = 0;
+        for (to_mask) |t|
+            ret |= @intFromEnum(t);
+        return ret;
+    }
+
+    pub fn matches(A: KeymodMask, B: KeymodMask) bool {
+        //A = mod state
+        //B = binding we are testing
+        //AB | out
+        //00 | 1
+        //01 | 0 -> maxterm (A + B')
+        //10 | 1
+        //11 | 1
+        //
+        //If all bits are 1, this mod matches.
+        //Example: ctrl and shift are held. Bind mod requires shift. Matches. Other way around does not.
+        return A | ~B == std.math.maxInt(KeymodMask);
+    }
+};
 
 pub const BindRegistry = struct {
     const Self = @This();
@@ -91,8 +119,10 @@ pub const BindRegistry = struct {
 
     /// contains both scancode and mouse state, mouse state begins at MouseStateIndexOffset as keycodes.MouseButton
     button_state: std.ArrayList(ButtonState),
-    mod: keycodes.KeymodMask,
+    mod: KeymodMask,
 
+    /// maps button_index to list of bind ids
+    /// only .exclusive binds are put in the lut as there is no need to compare the priority of .multi binds.
     button_bind_lut: std.ArrayList(std.ArrayList(BindId)),
 
     contexts: std.ArrayList(bool),
@@ -129,7 +159,12 @@ pub const BindRegistry = struct {
     ///
     /// Priority rules:
     /// keys with more modifier keys have a higher priority
-    pub fn updateSdl(self: *Self) !void {
+    pub fn updateSdl(self: *Self, mod: u32) void {
+        self.mod = 0;
+        if (mod & keycodes.KM_LCTRL > 0 or mod & keycodes.KM_RCTRL > 0) self.mod |= Keymod.mask(&.{.ctrl});
+        if (mod & keycodes.KM_LALT > 0 or mod & keycodes.KM_RALT > 0) self.mod |= Keymod.mask(&.{.alt});
+        if (mod & keycodes.KM_LSHIFT > 0 or mod & keycodes.KM_RSHIFT > 0) self.mod |= Keymod.mask(&.{.shift});
+
         var max_priority: u8 = 0;
         var max_binding: BindId = .none;
         for (self.button_state.items, 0..) |state, key_index| {
@@ -139,7 +174,8 @@ pub const BindRegistry = struct {
                 for (binds) |bind_id| {
                     const bind = self.binds.items[@intFromEnum(bind_id)];
                     if (!self.isContextActive(bind.context)) continue;
-                    if (bind.priority >= max_priority) {
+                    if (Keymod.matches(self.mod, bind.modifier) and bind.priority >= max_priority) {
+                        log.info("key matches: {d} prio {d}", .{ @intFromEnum(bind_id), bind.priority });
                         max_priority = bind.priority;
                         max_binding = bind_id;
                     }
@@ -166,18 +202,26 @@ pub const BindRegistry = struct {
         self.contexts.items[@intFromEnum(ctx_id)] = enable;
     }
 
-    pub fn newContext(self: *Self) !ContextId {
+    pub fn enableAll(self: *Self, enable: bool) void {
+        for (self.contexts.items) |*ctx| {
+            ctx.* = enable;
+        }
+    }
+
+    pub fn newContext(self: *Self, name: ?[]const u8) !ContextId {
         const id = self.contexts.items.len;
         try self.contexts.append(self.alloc, false);
+        if (name) |n| log.info("adding context {s} {d}", .{ n, id });
         return @enumFromInt(id);
     }
 
-    pub fn registerBind(self: *Self, bind: Binding) !BindId {
+    pub fn registerBind(self: *Self, bind: Binding, name: ?[]const u8) !BindId {
         const id: BindId = @enumFromInt(self.binds.items.len);
         try self.binds.append(self.alloc, bind);
 
         if (@intFromEnum(bind.context) >= self.contexts.items.len) return error.invalidContext;
 
+        if (name) |n| log.info("\tbind {s} {d}", .{ n, id });
         switch (bind.mode) {
             .exclusive => {
                 const key_index = bind.button.stateIndex();
@@ -198,24 +242,24 @@ pub const BindRegistry = struct {
         return self.binds.items[@intFromEnum(bind_id)];
     }
 
-    pub fn getState(self: *Self, bind_id: BindId) ButtonState {
+    pub fn getState(self: *const Self, bind_id: BindId) ButtonState {
         const bind = self.getBind(bind_id) orelse return .low;
         switch (bind.mode) {
             .multi => {
                 const btn = self.getButtonState(bind.button);
-                if (!self.isContextActive(bind.context)) return .low;
-                //TODO Check if mask intersects
-                return btn;
+                if (!self.isContextActive(bind.context) or !Keymod.matches(self.mod, bind.modifier)) return .low;
+                return if (btn == .rising_repeat and !bind.repeat) .high else btn;
             },
             .exclusive => {
-                if (bind_id == self.active_bind) return self.active_bind_state;
+                if (bind_id == self.active_bind) return if (self.active_bind_state == .rising_repeat and !bind.repeat) .high else self.active_bind_state;
                 return .low;
             },
         }
     }
 
-    pub fn isState(self: *Self, bind: BindId, state: ButtonState) bool {
-        return self.getState(bind) == state;
+    pub inline fn isState(self: *const Self, bind: BindId, state: ButtonState) bool {
+        const s = self.getState(bind);
+        return (s == state);
     }
 
     fn getButtonState(self: *const Self, btn: ButtonBind) ButtonState {
