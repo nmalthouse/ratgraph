@@ -69,9 +69,10 @@ pub const Binding = struct {
     context: ContextId,
     repeat: bool = false,
 
-    pub fn bind(btn: ButtonBind, mode: FocusMode, mod: []const Keymod, ctx: ContextId) @This() {
+    pub fn bind(btn: ButtonBind, mode: FocusMode, mod: []const Keymod, repeat: bool, ctx: ContextId) @This() {
         return .{
             .context = ctx,
+            .repeat = repeat,
             .button = btn,
             .mode = mode,
             .priority = @intCast(mod.len),
@@ -175,7 +176,6 @@ pub const BindRegistry = struct {
                     const bind = self.binds.items[@intFromEnum(bind_id)];
                     if (!self.isContextActive(bind.context)) continue;
                     if (Keymod.matches(self.mod, bind.modifier) and bind.priority >= max_priority) {
-                        log.info("key matches: {d} prio {d}", .{ @intFromEnum(bind_id), bind.priority });
                         max_priority = bind.priority;
                         max_binding = bind_id;
                     }
@@ -211,7 +211,8 @@ pub const BindRegistry = struct {
     pub fn newContext(self: *Self, name: ?[]const u8) !ContextId {
         const id = self.contexts.items.len;
         try self.contexts.append(self.alloc, false);
-        if (name) |n| log.info("adding context {s} {d}", .{ n, id });
+        _ = name;
+        //if (name) |n| log.info("adding context {s} {d}", .{ n, id });
         return @enumFromInt(id);
     }
 
@@ -221,7 +222,8 @@ pub const BindRegistry = struct {
 
         if (@intFromEnum(bind.context) >= self.contexts.items.len) return error.invalidContext;
 
-        if (name) |n| log.info("\tbind {s} {d}", .{ n, id });
+        _ = name;
+        //if (name) |n| log.info("\tbind {s} {d}", .{ n, id });
         switch (bind.mode) {
             .exclusive => {
                 const key_index = bind.button.stateIndex();
@@ -248,11 +250,20 @@ pub const BindRegistry = struct {
             .multi => {
                 const btn = self.getButtonState(bind.button);
                 if (!self.isContextActive(bind.context) or !Keymod.matches(self.mod, bind.modifier)) return .low;
-                return if (btn == .rising_repeat and !bind.repeat) .high else btn;
+                if (bind.repeat) {
+                    return if (btn == .rising_repeat) .rising else btn;
+                } else {
+                    return if (btn == .rising_repeat) .high else btn;
+                }
             },
             .exclusive => {
-                if (bind_id == self.active_bind) return if (self.active_bind_state == .rising_repeat and !bind.repeat) .high else self.active_bind_state;
-                return .low;
+                const btn = self.active_bind_state;
+                if (bind_id != self.active_bind) return .low;
+                if (bind.repeat) {
+                    return if (btn == .rising_repeat) .rising else btn;
+                } else {
+                    return if (btn == .rising_repeat) .high else btn;
+                }
             },
         }
     }

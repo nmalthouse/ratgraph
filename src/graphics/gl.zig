@@ -79,9 +79,15 @@ pub const DebugSeverity = enum(u32) {
     dont_care = gl.DONT_CARE,
 };
 
-//'*const fn (c_uint, c_uint, c_uint, c_uint, c_int, [*c]const u8, ?*const anyopaque) callconv(.C) void', found '*const fn (c_uint, c_uint, c_uint, c_uint, c_int, *u8, *anyopaque) callconv(.C) void'
-
-pub export fn messageCallback(src: gl.@"enum", Type: gl.@"enum", id: gl.uint, severity: gl.@"enum", length: gl.sizei, msg: [*c]const u8, user_params: ?*const anyopaque) void {
+pub export fn messageCallback(
+    src: gl.@"enum",
+    Type: gl.@"enum",
+    id: gl.uint,
+    severity: gl.@"enum",
+    length: gl.sizei,
+    msg: [*c]const u8,
+    user_params: ?*const anyopaque,
+) callconv(.c) void {
     _ = user_params;
     const fmt = "{s}, {s}, {s}, {d}: {s}";
     const args = .{
