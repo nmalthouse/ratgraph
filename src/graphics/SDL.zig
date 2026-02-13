@@ -528,8 +528,21 @@ pub const Window = struct {
                     self.mouse.wheel_delta = Vec2f.new(event.wheel.x, event.wheel.y);
                 },
                 c.SDL_EVENT_MOUSE_MOTION => {},
-                c.SDL_EVENT_MOUSE_BUTTON_DOWN => {},
-                c.SDL_EVENT_MOUSE_BUTTON_UP => {},
+                c.SDL_EVENT_MOUSE_BUTTON_DOWN => {
+                    const btn = &event.button;
+                    const id = keybinding.MouseStateIndexOffset + btn.button;
+                    self.bindreg.button_state.items[id] = switch (self.bindreg.button_state.items[id]) {
+                        .low => .rising,
+                        .high => .rising_repeat,
+                        .rising_repeat => .rising_repeat,
+                        .rising, .falling => .rising,
+                    };
+                },
+                c.SDL_EVENT_MOUSE_BUTTON_UP => {
+                    const btn = &event.button;
+                    const id = keybinding.MouseStateIndexOffset + btn.button;
+                    self.bindreg.button_state.items[id] = .falling;
+                },
 
                 c.SDL_EVENT_WINDOW_CLOSE_REQUESTED => self.should_exit = true,
                 c.SDL_EVENT_WINDOW_RESIZED, c.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED => {

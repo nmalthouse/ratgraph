@@ -44,7 +44,7 @@ pub const ContextId = enum(u32) {
     _,
 };
 
-const MouseStateIndexOffset: usize = @intFromEnum(keycodes.Scancode.ODES);
+pub const MouseStateIndexOffset: usize = @intFromEnum(keycodes.Scancode.ODES);
 
 pub const ButtonBind = union(enum) {
     keycode: keycodes.Keycode,
