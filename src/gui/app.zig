@@ -1,6 +1,7 @@
 const std = @import("std");
 const graph = @import("../graphics.zig");
 const G = @import("vtables.zig");
+const layouts = @import("layouts.zig");
 const builtin = @import("builtin");
 const IS_DEBUG = builtin.mode == .Debug;
 
@@ -43,6 +44,7 @@ pub const GuiApp = struct {
     font: graph.OnlineFont,
     drawctx: graph.ImmediateDrawingContext,
     gui: G.Gui,
+    workspaces: *layouts.Layouts,
 
     pub fn initDefault(alloc: std.mem.Allocator, opts: Options) !*GuiApp {
         const self = try alloc.create(GuiApp);
@@ -70,7 +72,10 @@ pub const GuiApp = struct {
             .font = try graph.OnlineFont.initFromBuffer(alloc, @embedFile("font/roboto.ttf"), scaled_text_height, .{}),
             .drawctx = graph.ImmediateDrawingContext.init(alloc),
             .gui = try G.Gui.init(alloc, &self.main_window, &self.font.font, &self.drawctx),
+            .workspaces = undefined,
         };
+        self.workspaces = layouts.Layouts.create(&self.gui);
+        _ = try self.gui.addWindow(&self.workspaces.vt, .{ .x = 0, .y = 0, .w = 10, .h = 10 }, .{ .put_fbo = false });
         self.gui.dstate.scale = gui_scale;
         self.gui.dstate.nstyle.item_h = scaled_item_height;
         self.gui.dstate.nstyle.text_h = scaled_text_height;
@@ -100,6 +105,13 @@ pub const GuiApp = struct {
             try self.drawctx.begin(0xff, self.main_window.screen_dimensions.toF());
             self.main_window.pumpEvents(.wait);
 
+            self.workspaces.area = .{
+                .x0 = 0,
+                .y0 = 0,
+                .x1 = @floatFromInt(self.main_window.screen_dimensions.x),
+                .y1 = @floatFromInt(self.main_window.screen_dimensions.y),
+            };
+            try self.workspaces.preGuiUpdate(gui);
             try gui.pre_update();
             try gui.update();
             try gui.draw(false);

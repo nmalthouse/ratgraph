@@ -191,10 +191,12 @@ pub const MyGlView = struct {
 
                 hand.handle_ptr.* = std.math.clamp(x, hand.min + min_w, hand.max - min_w);
             },
-            .falling => {},
+            .falling => {
+                self.ws.updateArea(self.vt.gui_ptr.alloc, self.ws.pane.split.area) catch {};
+                self.ws.rebuildHandles(self.vt.gui_ptr.alloc) catch {};
+            },
             .low => {},
         }
-        self.ws.rebuildHandles(self.vt.gui_ptr.alloc) catch {};
     }
 
     pub fn deinit(vt: *iWindow, gui: *Gui) void {
@@ -447,18 +449,27 @@ pub fn main() !void {
     defer gg.deinit();
     const gui = &gg.gui;
 
+    const main_ws = try gg.workspaces.addWorkspace(.{
+        .split = .{
+            .orientation = .vertical,
+            .children = .{},
+            .handles = .{},
+        },
+    });
+    gg.workspaces.active_ws = main_ws;
+
     const window_area = Rect{ .x = 0, .y = 0, .w = 1000, .h = 1000 };
 
-    const glview = MyGlView.create(gui, &gg.drawctx);
-
     const inspector = MyInspector.create(gui);
-    //const styler = Styler.create(gui);
-    _ = try gui.addWindow(inspector, window_area, .{});
-    //_ = try gui.addWindow(styler, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = true });
-    _ = try gui.addWindow(glview, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = false });
+    const styler = Styler.create(gui);
+    const ins_id = try gui.addWindow(inspector, window_area, .{});
+    const sty_id = try gui.addWindow(styler, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = true });
 
-    try gui.active_windows.append(gui.alloc, inspector);
-    try gui.active_windows.append(gui.alloc, glview);
+    {
+        const ws = gg.workspaces.getWorkspace(main_ws) orelse return error.fucked;
+        try ws.pane.split.append(gg.workspaces.alloc, .{ .window = ins_id });
+        try ws.pane.split.append(gg.workspaces.alloc, .{ .window = sty_id });
+    }
 
     try gg.run();
 }

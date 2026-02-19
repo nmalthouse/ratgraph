@@ -1173,24 +1173,24 @@ pub const Gui = struct {
         const wr = self.clamp_window.toAbsoluteRect();
         var other = area.toAbsoluteRect();
 
-        if (other.w > wr.w) {
-            const diff = other.w - wr.w;
-            other.w = wr.w;
-            other.x -= diff;
+        if (other.x1 > wr.x1) {
+            const diff = other.x1 - wr.x1;
+            other.x1 = wr.x1;
+            other.x0 -= diff;
         }
 
-        if (other.x < wr.x)
-            other.x = wr.x;
+        if (other.x0 < wr.x0)
+            other.x0 = wr.x0;
 
-        if (other.h > wr.h) {
-            const diff = other.h - wr.h;
-            other.h = wr.h;
-            other.y -= diff;
+        if (other.y1 > wr.y1) {
+            const diff = other.y1 - wr.y1;
+            other.y1 = wr.y1;
+            other.y0 -= diff;
         }
 
-        if (other.y < wr.y)
-            other.y = wr.y;
-        return graph.Rec(other.x, other.y, other.w - other.x, other.h - other.y);
+        if (other.y0 < wr.y0)
+            other.y0 = wr.y0;
+        return other.toRect();
     }
 
     fn getFocused(self: *Self) ?Focused {

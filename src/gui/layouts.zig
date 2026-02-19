@@ -12,13 +12,158 @@
 // Orientations MUST alternate, having a child of the same orientation should instead insert it into parent
 
 const std = @import("std");
-const Gui = @import("vtables.zig");
+const guis = @import("vtables.zig");
 const graph = @import("../graphics.zig");
+const Rect = graph.Rect;
+const iArea = guis.iArea;
+const iWindow = guis.iWindow;
 const Orientation = graph.Orientation;
 const RectBound = graph.RectBound;
 
-pub const Layouts = struct {};
+pub const WorkspaceId = enum(u32) {
+    none = std.math.maxInt(u32),
+    _,
+};
 
+//It does its thing,
+//when layout changes, clear gui window list and insert anew.
+pub const Layouts = struct {
+    const Self = @This();
+
+    vt: guis.iWindow,
+    alloc: std.mem.Allocator,
+    area: RectBound,
+    built_area: RectBound,
+    workspaces: std.ArrayList(Workspace),
+
+    set_ws: WorkspaceId = .none,
+    active_ws: WorkspaceId = .none,
+
+    grab_index: usize = 0,
+    drag_start: graph.Vec2f = .zero,
+
+    pub fn create(gui: *guis.Gui) *Self {
+        const self = gui.create(@This());
+        self.* = .{
+            .vt = iWindow.init(build, gui, deinit, .{}, &self.vt),
+            .area = .zero,
+            .built_area = .zero,
+            .alloc = gui.alloc,
+            .workspaces = .{},
+        };
+        gui.registerOnClick(&self.vt.area, onclick, &self.vt) catch {};
+        return self;
+    }
+
+    pub fn deinit(vt: *iWindow, gui: *guis.Gui) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        for (self.workspaces.items) |*ws| {
+            ws.deinit(self.alloc);
+        }
+        self.workspaces.deinit(self.alloc);
+        vt.deinit(gui);
+        gui.alloc.destroy(self);
+    }
+
+    /// This function should not be called during gui update
+    /// TODO allocated each workspace to have pointer stability.
+    pub fn addWorkspace(self: *Self, ws: Pane) !WorkspaceId {
+        const id: WorkspaceId = @enumFromInt(self.workspaces.items.len);
+
+        try self.workspaces.append(self.alloc, .{ .pane = ws });
+        self.set_ws = .none; //Set to none to force a rebuild as all pointers are now invalid
+
+        return id;
+    }
+
+    pub fn getWorkspace(self: *Self, ws_id: WorkspaceId) ?*Workspace {
+        if (@intFromEnum(ws_id) >= self.workspaces.items.len) return null;
+        return &self.workspaces.items[@intFromEnum(ws_id)];
+    }
+
+    pub fn build(vt: *iWindow, gui: *guis.Gui, area: graph.Rect) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        self.vt.area.area = area;
+        std.debug.print("Update area {any}\n", .{area});
+        _ = gui;
+        //self.ws.updateArea(gui.alloc, area.toAbsoluteRect()) catch {};
+        //self.ws.rebuildHandles(gui.alloc) catch {};
+    }
+
+    pub fn preGuiUpdate(self: *Self, gui: *guis.Gui) !void {
+        //TODO check if area is changed
+        if (self.set_ws == self.active_ws and self.built_area.eql(self.area)) return;
+        self.set_ws = self.active_ws;
+        self.built_area = self.area;
+        gui.active_windows.clearRetainingCapacity();
+        defer {
+            gui.updateWindowSize(&self.vt, self.area.toRect()) catch {};
+            gui.active_windows.append(gui.alloc, &self.vt) catch {};
+        }
+
+        if (self.set_ws == .none) return;
+        const ws = &self.workspaces.items[@intFromEnum(self.set_ws)];
+        try ws.updateArea(self.alloc, self.area);
+        try ws.rebuildHandles(self.alloc);
+        for (ws.windows.items) |win| {
+            const win_ptr = gui.getWindowId(win[1]) orelse return error.invalidWindow;
+            try gui.active_windows.append(gui.alloc, win_ptr);
+            try gui.updateWindowSize(win_ptr, win[0]);
+            win_ptr.needs_rebuild = true;
+        }
+    }
+
+    pub fn onclick(vt: *iArea, mcb: guis.MouseCbState, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+
+        const ws = self.getWorkspace(self.set_ws) orelse return;
+        std.debug.print("HAD CLICK\n", .{});
+
+        const p = 10;
+        switch (mcb.state) {
+            else => {},
+            .rising => for (ws.handles.items, 0..) |hand, h_i| {
+                const r = switch (hand.orientation) {
+                    .vertical => graph.Rec(hand.handle_ptr.* - p, hand.y0, p * 2, hand.y1 - hand.y0),
+                    .horizontal => graph.Rec(hand.y0, hand.handle_ptr.* - p, hand.y1 - hand.y0, p * 2),
+                };
+                if (r.containsPoint(mcb.pos)) {
+                    self.grab_index = h_i;
+                    self.drag_start = mcb.pos;
+                    mcb.gui.grabMouse(onGrab, vt, win, .left);
+                }
+            },
+        }
+    }
+
+    pub fn onGrab(vt: *iArea, mcb: guis.MouseCbState, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+        _ = win;
+
+        const ws = self.getWorkspace(self.set_ws) orelse return;
+        switch (mcb.state) {
+            .high, .rising, .rising_repeat => {
+                if (self.grab_index >= ws.handles.items.len) return;
+                const min_w = 30;
+                const hand = ws.handles.items[self.grab_index];
+                if (hand.min >= hand.max) return;
+
+                const x = if (hand.orientation == .vertical) mcb.pos.x else mcb.pos.y;
+
+                hand.handle_ptr.* = std.math.clamp(x, hand.min + min_w, hand.max - min_w);
+                self.set_ws = .none;
+            },
+            .falling => {
+                ws.updateArea(self.vt.gui_ptr.alloc, ws.pane.split.area) catch {};
+                ws.rebuildHandles(self.vt.gui_ptr.alloc) catch {};
+                self.set_ws = .none;
+            },
+            .low => {},
+        }
+    }
+};
+
+const WindowItem = struct { graph.Rect, guis.WindowId };
 pub const Workspace = struct {
     const Handle = struct {
         min: f32,
@@ -35,16 +180,20 @@ pub const Workspace = struct {
     pane: Pane,
 
     handles: std.ArrayList(Handle) = .{},
+    windows: std.ArrayList(WindowItem) = .{},
 
     pub fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
         self.pane.deinit(alloc);
         self.handles.deinit(alloc);
+        self.windows.deinit(alloc);
     }
 
     pub fn updateArea(self: *Self, alloc: std.mem.Allocator, new_area: RectBound) !void {
-        try self.pane.updateArea(alloc, new_area);
+        self.windows.clearRetainingCapacity();
+        try self.pane.updateArea(alloc, new_area, &self.windows);
     }
 
+    //TODO Should this be merged into updateArea
     pub fn rebuildHandles(self: *Self, alloc: std.mem.Allocator) !void {
         self.handles.clearRetainingCapacity();
         try self.pane.buildHandle(alloc, &self.handles);
@@ -96,7 +245,7 @@ pub const Pane = union(enum) {
             };
         }
     },
-    window: Gui.WindowId,
+    window: guis.WindowId,
 
     pub fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
         switch (self.*) {
@@ -110,9 +259,11 @@ pub const Pane = union(enum) {
         }
     }
 
-    pub fn updateArea(self: *@This(), alloc: std.mem.Allocator, new_area: RectBound) !void {
+    pub fn updateArea(self: *@This(), alloc: std.mem.Allocator, new_area: RectBound, windows: *std.ArrayList(WindowItem)) !void {
         switch (self.*) {
-            .window => {},
+            .window => |wid| {
+                try windows.append(alloc, .{ new_area.toRect().inset(20), wid });
+            },
             .split => |*sp| {
                 const old_area = sp.area;
                 sp.area = new_area;
@@ -123,13 +274,13 @@ pub const Pane = union(enum) {
                     try sp.handles.resize(alloc, sp.children.items.len - 1);
                     valid = false;
                 }
-                const width = sp.width(new_area);
+                const x1 = sp.x1(new_area);
 
                 // split is valid if each handle is greater than the last
                 if (valid) {
                     var current_handle: f32 = 0;
                     for (sp.handles.items) |hand| {
-                        if (hand < current_handle or hand > width) {
+                        if (hand < current_handle or hand > x1) {
                             valid = false;
                             break;
                         }
@@ -153,7 +304,7 @@ pub const Pane = union(enum) {
                 }
 
                 for (sp.children.items, 0..) |*child, i| {
-                    try child.updateArea(alloc, sp.childArea(new_area, i));
+                    try child.updateArea(alloc, sp.childArea(new_area, i), windows);
                 }
             },
         }

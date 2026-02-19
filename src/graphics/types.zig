@@ -27,6 +27,19 @@ pub const RectBound = struct {
     y0: f32 = 0,
     x1: f32 = 0,
     y1: f32 = 0,
+
+    pub fn toRect(self: @This()) Rect {
+        return .{
+            .x = self.x0,
+            .y = self.y0,
+            .w = self.x1 - self.x0,
+            .h = self.y1 - self.y0,
+        };
+    }
+
+    pub fn eql(a: @This(), b: @This()) bool {
+        return (a.x0 == b.x0 and a.y0 == b.y0 and a.x1 == b.x1 and a.y1 == b.y1);
+    }
 };
 
 pub const Rect = struct {
