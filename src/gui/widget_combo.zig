@@ -16,6 +16,7 @@ pub const ComboOpts = struct {
     commit_cb: ?*const fn (*CbHandle, index: usize, user_id: g.Uid) void = null,
     commit_vt: ?*CbHandle = null,
     user_id: g.Uid = 0,
+    label: []const u8 = "",
 };
 
 pub const Combo = struct {
@@ -254,8 +255,8 @@ pub fn ComboUser(user_data: type) type {
                 .search_list = .{},
                 .name = "noname",
             };
-            gui.setTransientWindow(&popped.vt);
-            popped.vt.build_fn(&popped.vt, gui, area);
+            gui.setTransientWindow(&popped.vt, &self.vt);
+            popped.vt.build_fn(&popped.vt, gui, popped.vt.area.area);
         }
     };
 }
@@ -339,18 +340,24 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 .enum_ptr = enum_ptr,
                 .opts = opts,
             };
+            self.opts.label = gui.alloc.dupe(u8, opts.label) catch "";
             parent.addChild(&self.vt, .{ .area = area, .deinit_fn = deinit, .draw_fn = draw, .onclick = onclick });
             return .good;
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            gui.alloc.free(self.opts.label);
             gui.alloc.destroy(self);
         }
 
-        pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
+        pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
             const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-            drawCommon(vt.area, d, @tagName(self.enum_ptr.*));
+            drawCommon(
+                vt.area,
+                d,
+                gui.printScratch("{s}{s}", .{ self.opts.label, @tagName(self.enum_ptr.*) }),
+            );
         }
 
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
@@ -384,8 +391,8 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 ),
                 .name = "noname",
             };
-            gui.setTransientWindow(&popped.vt);
-            popped.vt.build_fn(&popped.vt, gui, area);
+            gui.setTransientWindow(&popped.vt, &self.vt);
+            popped.vt.build_fn(&popped.vt, gui, popped.vt.area.area);
         }
     };
 }

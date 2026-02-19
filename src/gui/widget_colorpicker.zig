@@ -78,7 +78,7 @@ pub const Colorpicker = struct {
         };
         //TODO don't do this
         tr.vt.area.draw_fn = ColorpickerTransient.draw;
-        gui.setTransientWindow(&tr.vt);
+        gui.setTransientWindow(&tr.vt, &self.vt);
         tr.vt.build_fn(&tr.vt, gui, area);
     }
 };

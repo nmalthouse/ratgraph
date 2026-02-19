@@ -544,7 +544,7 @@ pub const Textbox = struct {
                         .btn_vt = &self.cbhandle,
                     },
                 ) catch return;
-                cb.gui.setTransientWindow(r_win);
+                cb.gui.setTransientWindow(r_win, &self.vt);
             },
         }
     }

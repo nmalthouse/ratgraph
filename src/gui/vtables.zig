@@ -828,6 +828,7 @@ pub const Gui = struct {
 
     transient_should_close: bool = false,
     transient_window: ?*iWindow = null,
+    transient_parent: ?*iArea = null,
 
     mouse_grab: ?struct {
         win: *iWindow,
@@ -858,9 +859,12 @@ pub const Gui = struct {
 
     dstate: DrawState,
 
+    scratch_arena: std.heap.ArenaAllocator,
+
     pub fn init(alloc: AL, win: *graph.SDL.Window, font: *graph.FontInterface, dctx: *graph.ImmediateDrawingContext) !Self {
         return Gui{
             .alloc = alloc,
+            .scratch_arena = .init(alloc),
             .clamp_window = graph.Rec(0, 0, win.screen_dimensions.x, win.screen_dimensions.y),
             .transient_fbo = try graph.RenderTexture.init(100, 100),
             .fbos = std.AutoHashMap(*iWindow, graph.RenderTexture).init(alloc),
@@ -876,6 +880,7 @@ pub const Gui = struct {
     }
 
     pub fn deinit(self: *Self) void {
+        self.scratch_arena.deinit();
         for (self.windows.items) |win|
             win.deinit_fn(win, self);
 
@@ -890,6 +895,14 @@ pub const Gui = struct {
         self.active_windows.deinit(self.alloc);
         self.closeTransientWindow();
         self.area_window_map.deinit(self.alloc);
+    }
+
+    /// returned string is valid until next pre_update()
+    pub fn printScratch(self: *Self, comptime fmt: []const u8, args: anytype) []const u8 {
+        var printer: std.io.Writer.Allocating = .init(self.scratch_arena.allocator());
+
+        printer.writer.print(fmt, args) catch return "alloc failed";
+        return printer.written();
     }
 
     /// Wrapper around alloc.create that never fails
@@ -983,6 +996,7 @@ pub const Gui = struct {
     }
 
     pub fn pre_update(self: *Self) !void {
+        _ = self.scratch_arena.reset(.retain_capacity);
         if (false) {
             self.tracker.print();
             self.tracker.reset();
@@ -1120,6 +1134,10 @@ pub const Gui = struct {
             }
         }
 
+        if (self.transient_parent == vt) {
+            self.deferTransientClose();
+        }
+
         window.unregisterScissor(vt);
 
         if (self.mouse_grab) |g| {
@@ -1190,9 +1208,10 @@ pub const Gui = struct {
         return false;
     }
 
-    pub fn setTransientWindow(self: *Self, win: *iWindow) void {
+    pub fn setTransientWindow(self: *Self, win: *iWindow, parent_area: *iArea) void {
         self.closeTransientWindow();
         self.transient_window = win;
+        self.transient_parent = parent_area;
         win.area.area.x = @round(win.area.area.x);
         win.area.area.y = @round(win.area.area.y);
         win.area.area.w = @round(win.area.area.w);
@@ -1206,6 +1225,7 @@ pub const Gui = struct {
             tw.deinit_fn(tw, self);
         }
         self.transient_window = null;
+        self.transient_parent = null;
     }
 
     pub fn dispatchTextinput(self: *Self, cb: TextCbState) void {
