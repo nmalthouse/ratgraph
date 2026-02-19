@@ -4,14 +4,13 @@ const Os9Gui = @import("../gui_app.zig");
 pub const Dctx = graph.ImmediateDrawingContext;
 const builtin = @import("builtin");
 const IS_DEBUG = builtin.mode == .Debug;
-//TODO deprecate this style
-pub const GuiConfig = Os9Gui.GuiConfig;
 pub const Rect = graph.Rect;
 pub const Rec = graph.Rec;
 pub const Uid = u64;
 const gl = graph.GL;
 const ArrayList = std.ArrayList;
 const AL = std.mem.Allocator;
+const keybinding = graph.keybinding;
 
 // To support nested child windows:
 //
@@ -277,6 +276,8 @@ pub const iWindow = struct {
     draw_scissor_state: ScissorId = .none,
     bg: Background,
 
+    key_ctx_mask: keybinding.ContextMask = .empty,
+
     pub fn draw(self: *iWindow, gui: *Gui, dctx: *DrawState) void {
         self.area.draw(gui, dctx, self);
     }
@@ -358,9 +359,6 @@ pub const iWindow = struct {
             win.build_fn(win, gui, win.area.area);
             //std.debug.print("Built win in: {d:.2} us\n", .{time.read() / std.time.ns_per_us});
         }
-
-        if (win.update_fn) |upfn|
-            upfn(win, gui);
     }
 
     /// Returns true if this window contains the mouse
@@ -1384,8 +1382,11 @@ pub const Gui = struct {
     }
 
     pub fn handleEvent(self: *Self, us: *const UpdateState, windows: []const *iWindow) !void {
-        for (windows) |win|
+        for (windows) |win| {
+            if (win.update_fn) |upfn|
+                upfn(win, self);
             win.dispatchPoll(self);
+        }
         if (us.tab == .rising)
             self.tabFocus(!(us.shift == .high));
 

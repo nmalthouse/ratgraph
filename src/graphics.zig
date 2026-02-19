@@ -19,6 +19,7 @@ pub const V3 = za.Vec3;
 pub const AssetBake = @import("assetbake.zig");
 pub const OnlineFont = @import("graphics/online_font_freetype.zig").OnlineFont;
 pub const miniz = @import("miniz.zig");
+pub const keybinding = @import("graphics/keybinding.zig");
 
 pub const StringStorage = @import("string.zig").StringStorage;
 pub const meshutil = @import("mesh.zig");

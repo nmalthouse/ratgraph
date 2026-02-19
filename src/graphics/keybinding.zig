@@ -1,50 +1,34 @@
-const std = @import("std");
-const builtin = @import("builtin");
-const c = @import("c.zig").c;
-const sdl = @import("SDL.zig");
-const keycodes = @import("keycodes.zig");
-
-const log = std.log.scoped(.keybinding);
-
-/// These names are less ambiguous than "pressed" "released" "held"
-pub const ButtonState = enum {
-    rising,
-    rising_repeat,
-    high,
-    falling,
-    low,
-
-    ///From frame to frame, correctly set state of a button given a binary input (up, down)
-    pub fn set(self: *ButtonState, pressed: bool) void {
-        if (pressed) {
-            self.* = switch (self.*) {
-                .rising, .high, .rising_repeat => .high,
-                .low, .falling => .rising,
-            };
-        } else {
-            self.* = switch (self.*) {
-                .rising, .high, .rising_repeat => .falling,
-                .low, .falling => .low,
-            };
-        }
-    }
-};
-
-pub const FocusMode = enum {
-    exclusive, //Only one exclusive binding can be active
-    multi, //Many multi binding's can be active, they do not block exclusive
-};
-
-pub const BindId = enum(u32) {
-    none = std.math.maxInt(u32),
-    _,
-};
-
-pub const ContextId = enum(u32) {
-    _,
-};
-
-pub const MouseStateIndexOffset: usize = @intFromEnum(keycodes.Scancode.ODES);
+//! Provides keybinding management.
+//! An application may have multiple contexts in which bindings should apply. These contexts can be enabled and disabled.
+//! Bindings can also partially overlap within a context, for example both z and ctrl+z can be bound.
+//! When ctrl+z is pressed the 'z' bind is not set as it has a lower default priority.
+//!
+//! When an application calls SDL.Window.pumpEvents, the active context set is determined and the highest priority key is set.
+//! By default, priority is equal to the number of modifier keys, although users can choose any value before calling registerBind()
+//!
+//! struct BindRegistry manages binding contexts.
+//!
+//! Internal usage:
+//! Create a Context using newContext(). This returns an handle to the context.
+//!
+//! Register some struct Binding using registerBind.
+//!
+//! A binding has some FocusMode {exclusive, multi}.
+//! Multi key events are always passed if their context is active. Multi binds are useful for binds like WASD
+//! Exclusive binds: Only one can ever be active. If a higher priority exclusive key has a .rising state it replaces
+//! the currently active exclusive bind.
+//! There is no guarantee the sequence .rising, .high, .falling are set for exclusive keys.
+//! Exclusive binds are useful for traditional keybindings (ctrl+z -> undo)
+//!
+//! Bindings can also enable repeat. This passes the Os' key repeat by setting the buttons state to .rising whenever repeating.
+//!
+//! Update loop:
+//!     Enable/disable desired contexts
+//!
+//!     Call updateSdl() (SDL.Window does this internally on pumpEvents())
+//!
+//!     Users can now poll for key state using isState(bind_id, ButtonState) bool or getState(bind_id) ButtonState
+//!     Bindings in inactive contexts always return .low
 
 pub const ButtonBind = union(enum) {
     keycode: keycodes.Keycode,
@@ -81,34 +65,7 @@ pub const Binding = struct {
     }
 };
 
-pub const KeymodMask = u8;
-pub const Keymod = enum(KeymodMask) {
-    ctrl = 0b1,
-    shift = 0b10,
-    alt = 0b100,
-
-    pub fn mask(to_mask: []const Keymod) KeymodMask {
-        var ret: KeymodMask = 0;
-        for (to_mask) |t|
-            ret |= @intFromEnum(t);
-        return ret;
-    }
-
-    pub fn matches(A: KeymodMask, B: KeymodMask) bool {
-        //A = mod state
-        //B = binding we are testing
-        //AB | out
-        //00 | 1
-        //01 | 0 -> maxterm (A + B')
-        //10 | 1
-        //11 | 1
-        //
-        //If all bits are 1, this mod matches.
-        //Example: ctrl and shift are held. Bind mod requires shift. Matches. Other way around does not.
-        return A | ~B == std.math.maxInt(KeymodMask);
-    }
-};
-
+const log = std.log.scoped(.keybinding);
 pub const BindRegistry = struct {
     const Self = @This();
 
@@ -126,11 +83,12 @@ pub const BindRegistry = struct {
     /// only .exclusive binds are put in the lut as there is no need to compare the priority of .multi binds.
     button_bind_lut: std.ArrayList(std.ArrayList(BindId)),
 
-    contexts: std.ArrayList(bool),
+    context_counter: usize = 0,
+    contexts: std.StaticBitSet(MAX_CONTEXT),
 
     pub fn init(alloc: std.mem.Allocator) !Self {
         var self = Self{
-            .contexts = .{},
+            .contexts = .initEmpty(),
             .alloc = alloc,
             .binds = .{},
             .button_state = .{},
@@ -144,7 +102,6 @@ pub const BindRegistry = struct {
     pub fn deinit(self: *Self) void {
         self.binds.deinit(self.alloc);
         self.button_state.deinit(self.alloc);
-        self.contexts.deinit(self.alloc);
 
         for (self.button_bind_lut.items) |*lut| {
             lut.deinit(self.alloc);
@@ -195,22 +152,27 @@ pub const BindRegistry = struct {
     }
 
     fn isContextActive(self: *const Self, ctx_id: ContextId) bool {
-        return self.contexts.items[@intFromEnum(ctx_id)];
+        if (ctx_id == .none) return false;
+        return self.contexts.isSet(@intFromEnum(ctx_id));
+    }
+
+    pub fn enableContexts(self: *Self, mask: ContextMask) void {
+        self.contexts.setUnion(mask.set);
     }
 
     pub fn enableContext(self: *Self, ctx_id: ContextId, enable: bool) void {
-        self.contexts.items[@intFromEnum(ctx_id)] = enable;
+        if (ctx_id == .none) return;
+        self.contexts.setValue(@intFromEnum(ctx_id), enable);
     }
 
     pub fn enableAll(self: *Self, enable: bool) void {
-        for (self.contexts.items) |*ctx| {
-            ctx.* = enable;
-        }
+        if (enable) self.contexts = .initFull() else self.contexts = .initEmpty();
     }
 
     pub fn newContext(self: *Self, name: ?[]const u8) !ContextId {
-        const id = self.contexts.items.len;
-        try self.contexts.append(self.alloc, false);
+        const id = self.context_counter;
+        self.context_counter += 1;
+        if (id >= MAX_CONTEXT) return error.tooManyContext;
         _ = name;
         //if (name) |n| log.info("adding context {s} {d}", .{ n, id });
         return @enumFromInt(id);
@@ -220,7 +182,7 @@ pub const BindRegistry = struct {
         const id: BindId = @enumFromInt(self.binds.items.len);
         try self.binds.append(self.alloc, bind);
 
-        if (@intFromEnum(bind.context) >= self.contexts.items.len) return error.invalidContext;
+        if (@intFromEnum(bind.context) >= self.context_counter) return error.invalidContext;
 
         _ = name;
         //if (name) |n| log.info("\tbind {s} {d}", .{ n, id });
@@ -280,6 +242,87 @@ pub const BindRegistry = struct {
     }
 };
 
+/// These names are less ambiguous than "pressed" "released" "held"
+pub const ButtonState = enum {
+    rising,
+    rising_repeat,
+    high,
+    falling,
+    low,
+
+    ///From frame to frame, correctly set state of a button given a binary input (up, down)
+    pub fn set(self: *ButtonState, pressed: bool) void {
+        if (pressed) {
+            self.* = switch (self.*) {
+                .rising, .high, .rising_repeat => .high,
+                .low, .falling => .rising,
+            };
+        } else {
+            self.* = switch (self.*) {
+                .rising, .high, .rising_repeat => .falling,
+                .low, .falling => .low,
+            };
+        }
+    }
+};
+
+pub const FocusMode = enum {
+    exclusive, //Only one exclusive binding can be active
+    multi, //Many multi binding's can be active, they do not block exclusive
+};
+
+pub const BindId = enum(u32) {
+    none = std.math.maxInt(u32),
+    _,
+};
+
+pub const MAX_CONTEXT = 64;
+
+pub const ContextMask = struct {
+    pub const empty: ContextMask = .{ .set = .initEmpty() };
+    set: std.StaticBitSet(MAX_CONTEXT),
+
+    pub fn setValue(self: *@This(), id: ContextId, value: bool) void {
+        if (id == .none) return;
+        self.set.setValue(@intFromEnum(id), value);
+    }
+};
+
+pub const ContextId = enum(u32) {
+    none = std.math.maxInt(u32),
+    _,
+};
+
+pub const MouseStateIndexOffset: usize = @intFromEnum(keycodes.Scancode.ODES);
+
+pub const KeymodMask = u8;
+pub const Keymod = enum(KeymodMask) {
+    ctrl = 0b1,
+    shift = 0b10,
+    alt = 0b100,
+
+    pub fn mask(to_mask: []const Keymod) KeymodMask {
+        var ret: KeymodMask = 0;
+        for (to_mask) |t|
+            ret |= @intFromEnum(t);
+        return ret;
+    }
+
+    pub fn matches(A: KeymodMask, B: KeymodMask) bool {
+        //A = mod state
+        //B = binding we are testing
+        //AB | out
+        //00 | 1
+        //01 | 0 -> maxterm (A + B')
+        //10 | 1
+        //11 | 1
+        //
+        //If all bits are 1, this mod matches.
+        //Example: ctrl and shift are held. Bind mod requires shift. Matches. Other way around does not.
+        return A | ~B == std.math.maxInt(KeymodMask);
+    }
+};
+
 //In tests, remember that keycodes cannot be used bacause sdl is not compiled!
 test {
     const eq = std.testing.expectEqual;
@@ -336,3 +379,9 @@ test {
         try eq(ButtonState.low, bctx.getState(multi_1));
     }
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+const c = @import("c.zig").c;
+const sdl = @import("SDL.zig");
+const keycodes = @import("keycodes.zig");
