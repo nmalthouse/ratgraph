@@ -21,6 +21,14 @@ pub const Orientation = enum {
     }
 };
 
+pub const RectBound = struct {
+    pub const zero: RectBound = .{};
+    x0: f32 = 0,
+    y0: f32 = 0,
+    x1: f32 = 0,
+    y1: f32 = 0,
+};
+
 pub const Rect = struct {
     const Self = @This();
     pub const Empty = Rect{};
@@ -155,8 +163,8 @@ pub const Rect = struct {
         return self.x + self.w;
     }
 
-    pub fn toAbsoluteRect(self: Self) Rect {
-        return Rect.NewAny(self.x, self.y, self.x + self.w, self.y + self.h);
+    pub fn toAbsoluteRect(self: Self) RectBound {
+        return .{ .x0 = self.x, .y0 = self.y, .x1 = self.x + self.w, .y1 = self.y + self.h };
     }
 
     pub fn eql(a: Self, b: Self) bool {

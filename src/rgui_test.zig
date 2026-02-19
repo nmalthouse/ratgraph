@@ -90,13 +90,37 @@ pub const MyGlView = struct {
 
     draw_ctx: *graph.ImmediateDrawingContext,
 
+    ws: layouts.Workspace,
+    grab_index: usize = 0,
+    drag_start: graph.Vec2f = .zero,
+
     pub fn create(gui: *Gui, draw_ctx: *graph.ImmediateDrawingContext) *iWindow {
         const self = gui.create(@This());
         self.* = .{
             .draw_ctx = draw_ctx,
             .vt = iWindow.init(&@This().build, gui, &@This().deinit, .{}, &self.vt),
+            .ws = .{
+                .pane = .{
+                    .split = .{
+                        .orientation = .vertical,
+                        .children = .{},
+                        .handles = .{},
+                    },
+                },
+            },
         };
+        self.ws.pane.split.append(gui.alloc, .{ .split = .{ .orientation = .horizontal } }) catch {};
+        self.ws.pane.split.append(gui.alloc, .{ .split = .{ .orientation = .horizontal } }) catch {};
+        self.ws.pane.split.append(gui.alloc, .{ .split = .{ .orientation = .horizontal } }) catch {};
+        self.ws.pane.split.append(gui.alloc, .{ .split = .{ .orientation = .horizontal } }) catch {};
+        const last = &self.ws.pane.split.children.items[3];
+        last.split.append(gui.alloc, .{ .window = .none }) catch {};
+        last.split.append(gui.alloc, .{ .window = .none }) catch {};
+        last.split.append(gui.alloc, .{ .window = .none }) catch {};
+
         self.vt.update_fn = update;
+
+        gui.registerOnClick(&self.vt.area, onclick, &self.vt) catch {};
 
         return &self.vt;
     }
@@ -104,24 +128,79 @@ pub const MyGlView = struct {
     pub fn update(vt: *iWindow, gui: *Gui) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
 
-        const can_grab = gui.canGrabMouseOverride(vt);
-
-        if (can_grab) {
-            self.draw_ctx.rect(self.vt.area.area, 0x00ffff);
-            //const mstate = gui.sdl_win.mouse.left;
-            if (gui.sdl_win.keyRising(.LSHIFT)) {
-                const center = self.vt.area.area.center();
-                graph.c.SDL_WarpMouseInWindow(gui.sdl_win.win, center.x, center.y);
+        const help = struct {
+            fn drawPane(s: *MyGlView, pane: *const layouts.Pane, area: graph.RectBound) void {
+                switch (pane.*) {
+                    .window => {},
+                    .split => |*sp| {
+                        const dctx = s.draw_ctx;
+                        for (sp.handles.items) |hand| {
+                            const p = hand;
+                            switch (sp.orientation) {
+                                .vertical => dctx.line(.{ .y = area.y0, .x = p }, .{ .y = area.y1, .x = p }, 0xff0000_ff, 2),
+                                .horizontal => dctx.line(.{ .x = area.x0, .y = p }, .{ .x = area.x1, .y = p }, 0xff0000ff, 2),
+                            }
+                        }
+                        for (sp.children.items, 0..) |*child, i| {
+                            drawPane(s, child, sp.childArea(area, i));
+                        }
+                    },
+                }
             }
-            gui.setGrabOverride(vt, gui.sdl_win.keystate(.LSHIFT) == .low, .{ .hide_pointer = true });
-        } else {
-            self.draw_ctx.rect(self.vt.area.area, 0xff00ffff);
+        };
+
+        const dctx = self.draw_ctx;
+        dctx.rect(self.vt.area.area, 0xaaaaaaff);
+
+        _ = gui;
+        help.drawPane(self, &self.ws.pane, self.vt.area.area.toAbsoluteRect());
+    }
+
+    pub fn onclick(vt: *iArea, mcb: guis.MouseCbState, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+
+        const p = 4;
+        switch (mcb.state) {
+            else => {},
+            .rising => for (self.ws.handles.items, 0..) |hand, h_i| {
+                const r = switch (hand.orientation) {
+                    .vertical => Rec(hand.handle_ptr.* - p, hand.y0, p * 2, hand.y1 - hand.y0),
+                    .horizontal => Rec(hand.y0, hand.handle_ptr.* - p, hand.y1 - hand.y0, p * 2),
+                };
+                if (r.containsPoint(mcb.pos)) {
+                    self.grab_index = h_i;
+                    self.drag_start = mcb.pos;
+                    mcb.gui.grabMouse(onGrab, vt, win, .left);
+                }
+            },
         }
+    }
+
+    pub fn onGrab(vt: *iArea, mcb: guis.MouseCbState, win: *iWindow) void {
+        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+        _ = win;
+
+        switch (mcb.state) {
+            .high, .rising, .rising_repeat => {
+                if (self.grab_index >= self.ws.handles.items.len) return;
+                const min_w = 30;
+                const hand = self.ws.handles.items[self.grab_index];
+                if (hand.min >= hand.max) return;
+
+                const x = if (hand.orientation == .vertical) mcb.pos.x else mcb.pos.y;
+
+                hand.handle_ptr.* = std.math.clamp(x, hand.min + min_w, hand.max - min_w);
+            },
+            .falling => {},
+            .low => {},
+        }
+        self.ws.rebuildHandles(self.vt.gui_ptr.alloc) catch {};
     }
 
     pub fn deinit(vt: *iWindow, gui: *Gui) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         //self.layout.deinit(gui, vt);
+        self.ws.deinit(gui.alloc);
         vt.deinit(gui);
         gui.alloc.destroy(self); //second
     }
@@ -132,9 +211,10 @@ pub const MyGlView = struct {
 
     pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        _ = gui;
-        //TODO MOVE THIS OUT
         self.vt.area.area = area;
+        std.debug.print("Update area {any}\n", .{area});
+        self.ws.updateArea(gui.alloc, area.toAbsoluteRect()) catch {};
+        self.ws.rebuildHandles(gui.alloc) catch {};
     }
 };
 
@@ -356,6 +436,8 @@ pub const MyInspector = struct {
     }
 };
 
+const layouts = @import("gui/layouts.zig");
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.detectLeaks();
@@ -367,13 +449,16 @@ pub fn main() !void {
 
     const window_area = Rect{ .x = 0, .y = 0, .w = 1000, .h = 1000 };
 
+    const glview = MyGlView.create(gui, &gg.drawctx);
+
     const inspector = MyInspector.create(gui);
-    const styler = Styler.create(gui);
+    //const styler = Styler.create(gui);
     _ = try gui.addWindow(inspector, window_area, .{});
-    _ = try gui.addWindow(styler, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = true });
+    //_ = try gui.addWindow(styler, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = true });
+    _ = try gui.addWindow(glview, window_area.replace(window_area.x + window_area.w, null, null, null), .{ .put_fbo = false });
 
     try gui.active_windows.append(gui.alloc, inspector);
-    try gui.active_windows.append(gui.alloc, styler);
+    try gui.active_windows.append(gui.alloc, glview);
 
     try gg.run();
 }

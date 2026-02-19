@@ -25,6 +25,7 @@ pub const StringStorage = @import("string.zig").StringStorage;
 pub const meshutil = @import("mesh.zig");
 pub const ptypes = @import("graphics/types.zig");
 pub const Rect = ptypes.Rect;
+pub const RectBound = ptypes.RectBound;
 pub const Rec = Rect.NewAny;
 pub const Vec2f = ptypes.Vec2f;
 pub const Vec2i = ptypes.Vec2i;

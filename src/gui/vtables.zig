@@ -985,6 +985,7 @@ pub const Gui = struct {
         return null;
     }
 
+    /// Assumes widgets register in order. The deeper the widget the later.
     pub fn registerOnClick(_: *Self, vt: *iArea, onclick: iArea.OnClick, window: *iWindow) !void {
         try window.click_listeners.append(window.alloc, .{ vt, onclick });
     }
