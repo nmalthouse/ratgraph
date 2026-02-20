@@ -1,6 +1,5 @@
 const std = @import("std");
 pub const graph = @import("../graphics.zig");
-const Os9Gui = @import("../gui_app.zig");
 pub const Dctx = graph.ImmediateDrawingContext;
 const builtin = @import("builtin");
 const IS_DEBUG = builtin.mode == .Debug;
@@ -11,6 +10,7 @@ const gl = graph.GL;
 const ArrayList = std.ArrayList;
 const AL = std.mem.Allocator;
 const keybinding = graph.keybinding;
+pub const app = @import("app.zig");
 
 // To support nested child windows:
 //
@@ -856,6 +856,7 @@ pub const Gui = struct {
 
     text_input_enabled: bool = false,
     sdl_win: *graph.SDL.Window,
+    key_ctx_mask: keybinding.ContextMask = .empty,
 
     dstate: DrawState,
 
@@ -997,6 +998,9 @@ pub const Gui = struct {
     }
 
     pub fn pre_update(self: *Self) !void {
+        self.sdl_win.bindreg.enableAll(false);
+        self.sdl_win.bindreg.enableContexts(self.key_ctx_mask);
+
         _ = self.scratch_arena.reset(.retain_capacity);
         if (false) {
             self.tracker.print();
@@ -1016,6 +1020,7 @@ pub const Gui = struct {
         }
         for (self.active_windows.items) |win| {
             win.pre_update(self);
+            if (self.canGrabMouseOverride(win)) self.sdl_win.bindreg.enableContexts(win.key_ctx_mask);
         }
         if (self.transient_window) |tw| {
             tw.pre_update(self);

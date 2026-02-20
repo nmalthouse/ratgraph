@@ -5,6 +5,7 @@ const layouts = @import("layouts.zig");
 const builtin = @import("builtin");
 const IS_DEBUG = builtin.mode == .Debug;
 
+const log = std.log.scoped(.rgui);
 pub const Options = struct {
     display_scale: ?f32 = null,
     item_height: ?f32 = null,
@@ -50,8 +51,10 @@ pub const GuiApp = struct {
         const self = try alloc.create(GuiApp);
 
         var win = try graph.SDL.Window.createWindow(opts.window_title, opts.window_opts, alloc);
+        _ = graph.c.SDL_SetWindowMinimumSize(win.win, 800, 600);
 
         const sc = opts.display_scale orelse try win.dpiDetect();
+        log.info("Detected a display scale of {d}", .{sc});
         const dpi_preset = blk: {
             const default_scaled = DpiPreset{ .fh = 20 * sc, .ih = 25 * sc, .scale = 1 };
             const max_dpi_diff = 0.3;
@@ -59,12 +62,14 @@ pub const GuiApp = struct {
             const p = DPI_presets[index];
             if (@abs(p.dpi - sc) > max_dpi_diff)
                 break :blk default_scaled;
+            log.info("Matching dpi preset number: {d}, display scale: {d}, font_height {d}, item_height {d},", .{ index, p.dpi, p.fh, p.ih });
             break :blk p;
         };
 
         const scaled_item_height = opts.item_height orelse @trunc(dpi_preset.ih);
         const scaled_text_height = opts.font_size orelse @trunc(dpi_preset.fh);
         const gui_scale = opts.gui_scale orelse dpi_preset.scale;
+        log.info("gui Size, text: {d} item: {d} ", .{ scaled_text_height, scaled_item_height });
 
         self.* = .{
             .main_window = win,

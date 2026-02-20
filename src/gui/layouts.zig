@@ -117,7 +117,6 @@ pub const Layouts = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
 
         const ws = self.getWorkspace(self.set_ws) orelse return;
-        std.debug.print("HAD CLICK\n", .{});
 
         const p = 10;
         switch (mcb.state) {
