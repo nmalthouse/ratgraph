@@ -176,6 +176,7 @@ pub const Window = struct {
 
     screen_dimensions: Vec2i = .{ .x = 0, .y = 0 },
     frame_time: std.time.Timer,
+    last_frame_ns: u64 = 16000,
 
     event_counter: usize = 0,
     last_was_pushed: bool = false,
@@ -385,8 +386,9 @@ pub const Window = struct {
 
     pub fn swap(self: *Self) void {
         _ = c.SDL_GL_SwapWindow(self.win);
+        const frame_took = self.frame_time.read();
+        self.last_frame_ns = frame_took;
         if (self.target_frame_len_ns) |tft| {
-            const frame_took = self.frame_time.read();
             if (frame_took < tft)
                 std.Thread.sleep(tft - frame_took);
         }

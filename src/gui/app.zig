@@ -54,6 +54,8 @@ pub const GuiApp = struct {
     update_vts: std.ArrayList(*iUpdate),
 
     event_mode: graph.SDL.EventMode = .poll,
+    frame_timer: std.time.Timer,
+    frame_took_ms: f32 = 16.6,
 
     pub fn initDefault(alloc: std.mem.Allocator, opts: Options) !*GuiApp {
         const self = try alloc.create(GuiApp);
@@ -87,6 +89,7 @@ pub const GuiApp = struct {
             .drawctx = graph.ImmediateDrawingContext.init(alloc),
             .gui = try G.Gui.init(alloc, &self.main_window, &self.font.font, &self.drawctx),
             .workspaces = undefined,
+            .frame_timer = try .start(),
         };
         self.workspaces = layouts.Layouts.create(&self.gui);
         _ = try self.gui.addWindow(&self.workspaces.vt, .{ .x = 0, .y = 0, .w = 10, .h = 10 }, .{ .put_fbo = false });
@@ -122,6 +125,8 @@ pub const GuiApp = struct {
         self.main_window.forcePoll();
         while (!self.main_window.should_exit) {
             try self.drawctx.begin(0xff, self.main_window.screen_dimensions.toF());
+            self.frame_took_ms = @floatCast(@as(f64, @floatFromInt(self.frame_timer.read())) / std.time.ns_per_ms);
+            self.frame_timer.reset();
             self.main_window.pumpEvents(self.event_mode);
 
             for (self.update_vts.items) |up| {
