@@ -11,6 +11,11 @@ const log = std.log.scoped(.SDL);
 pub const keybinding = @import("keybinding.zig");
 pub const ButtonState = keybinding.ButtonState;
 
+pub const EventMode = enum {
+    wait,
+    poll,
+};
+
 pub const DialogFileCb = fn (userdata: ?*anyopaque, filelist: [*c]const [*c]const u8, filter_index: c_int) callconv(.c) void;
 
 pub fn openFilePicker(cb: *const DialogFileCb, userdata: ?*anyopaque, filters: []const c.SDL_DialogFileFilter, opts: struct {
@@ -442,7 +447,7 @@ pub const Window = struct {
         self.last_was_pushed = true;
     }
 
-    pub fn pumpEvents(self: *Self, mode: enum { poll, wait }) void {
+    pub fn pumpEvents(self: *Self, mode: EventMode) void {
         const event_fn = switch (mode) {
             .wait => &waitEvent,
             .poll => &pollEvent,

@@ -11,6 +11,7 @@ const ArrayList = std.ArrayList;
 const AL = std.mem.Allocator;
 const keybinding = graph.keybinding;
 pub const app = @import("app.zig");
+pub const workspaces = @import("layouts.zig");
 
 // To support nested child windows:
 //

@@ -38,6 +38,10 @@ const DPI_presets = [_]DpiPreset{
     .{ .dpi = 1.7, .fh = 18, .ih = 28, .scale = 1 },
 };
 
+pub const iUpdate = struct {
+    pre_update: ?*const fn (*iUpdate) void,
+};
+
 pub const GuiApp = struct {
     const Self = @This();
     alloc: std.mem.Allocator,
@@ -46,6 +50,10 @@ pub const GuiApp = struct {
     drawctx: graph.ImmediateDrawingContext,
     gui: G.Gui,
     workspaces: *layouts.Layouts,
+
+    update_vts: std.ArrayList(*iUpdate),
+
+    event_mode: graph.SDL.EventMode = .poll,
 
     pub fn initDefault(alloc: std.mem.Allocator, opts: Options) !*GuiApp {
         const self = try alloc.create(GuiApp);
@@ -72,6 +80,7 @@ pub const GuiApp = struct {
         log.info("gui Size, text: {d} item: {d} ", .{ scaled_text_height, scaled_item_height });
 
         self.* = .{
+            .update_vts = .{},
             .main_window = win,
             .alloc = alloc,
             .font = try graph.OnlineFont.initFromBuffer(alloc, @embedFile("font/roboto.ttf"), scaled_text_height, .{}),
@@ -95,11 +104,16 @@ pub const GuiApp = struct {
         self.font.syncBitmapToGL();
     }
 
+    pub fn registerUpdateVt(self: *Self, vt: *iUpdate) !void {
+        try self.update_vts.append(self.alloc, vt);
+    }
+
     pub fn deinit(self: *Self) void {
         self.drawctx.deinit();
         self.gui.deinit();
         self.font.deinit();
         self.main_window.destroyWindow();
+        self.update_vts.deinit(self.alloc);
         self.alloc.destroy(self);
     }
 
@@ -108,14 +122,15 @@ pub const GuiApp = struct {
         self.main_window.forcePoll();
         while (!self.main_window.should_exit) {
             try self.drawctx.begin(0xff, self.main_window.screen_dimensions.toF());
-            self.main_window.pumpEvents(.wait);
+            self.main_window.pumpEvents(self.event_mode);
 
-            self.workspaces.area = .{
-                .x0 = 0,
-                .y0 = 0,
-                .x1 = @floatFromInt(self.main_window.screen_dimensions.x),
-                .y1 = @floatFromInt(self.main_window.screen_dimensions.y),
-            };
+            for (self.update_vts.items) |up| {
+                if (up.pre_update) |p| p(up);
+            }
+
+            const win_rect = graph.Rec(0, 0, self.main_window.screen_dimensions.x, self.main_window.screen_dimensions.y);
+            self.workspaces.area = win_rect.toAbsoluteRect();
+            gui.clamp_window = win_rect;
             try self.workspaces.preGuiUpdate(gui);
             try gui.pre_update();
             try gui.update();

@@ -209,7 +209,6 @@ pub const Pane = union(enum) {
         pub fn append(self: *@This(), alloc: std.mem.Allocator, child: Pane) !void {
             if (child == .split and child.split.orientation == self.orientation) return error.recursiveSplit;
             try self.children.append(alloc, child);
-            try self.handles.append(alloc, 0);
         }
 
         fn width(self: *const @This(), area: RectBound) f32 {
@@ -234,9 +233,13 @@ pub const Pane = union(enum) {
         }
 
         pub fn childArea(self: *const @This(), area: RectBound, child_index: usize) RectBound {
+            const inset = 10;
+            const is_fixed = (self.children.items[child_index] == .window and self.children.items[child_index].window.fixed());
+            const inset_r: f32 = if (!is_fixed and child_index < self.children.items.len - 1) inset else 0;
+
             const xx = self.x(area);
             const start = if (child_index == 0) xx else self.handles.items[child_index - 1];
-            const end = if (child_index == self.children.items.len - 1) self.x1(area) else self.handles.items[child_index];
+            const end = -inset_r + if (child_index == self.children.items.len - 1) self.x1(area) else self.handles.items[child_index];
 
             return switch (self.orientation) {
                 .vertical => RectBound{ .x0 = start, .y0 = area.y0, .x1 = end, .y1 = area.y1 },
@@ -244,7 +247,15 @@ pub const Pane = union(enum) {
             };
         }
     },
-    window: guis.WindowId,
+    window: struct {
+        id: guis.WindowId,
+        max_width: f32 = 0,
+        min_width: f32 = 10,
+
+        fn fixed(a: @This()) bool {
+            return (a.max_width > 0 and a.max_width == a.min_width);
+        }
+    },
 
     pub fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
         switch (self.*) {
@@ -261,7 +272,7 @@ pub const Pane = union(enum) {
     pub fn updateArea(self: *@This(), alloc: std.mem.Allocator, new_area: RectBound, windows: *std.ArrayList(WindowItem)) !void {
         switch (self.*) {
             .window => |wid| {
-                try windows.append(alloc, .{ new_area.toRect().inset(20), wid });
+                try windows.append(alloc, .{ new_area.toRect(), wid.id });
             },
             .split => |*sp| {
                 const old_area = sp.area;
@@ -273,22 +284,34 @@ pub const Pane = union(enum) {
                     try sp.handles.resize(alloc, sp.children.items.len - 1);
                     valid = false;
                 }
-                const x1 = sp.x1(new_area);
 
                 // split is valid if each handle is greater than the last
                 if (valid) {
-                    var current_handle: f32 = 0;
-                    for (sp.handles.items) |hand| {
+                    //We use old_area here so that valid layouts get scaled
+                    const x1 = sp.x1(old_area);
+                    var current_handle: f32 = sp.x(old_area);
+
+                    for (sp.handles.items, 0..) |hand, h_i| {
                         if (hand < current_handle or hand > x1) {
                             valid = false;
                             break;
+                        }
+                        if (sp.children.items[h_i] == .window) {
+                            const win = &sp.children.items[h_i].window;
+                            if ((win.max_width > 0 and hand - current_handle > win.max_width) or
+                                (win.min_width > 0 and hand - current_handle < win.min_width))
+                            {
+                                valid = false;
+                                break;
+                            }
                         }
                         current_handle = hand;
                     }
                 }
 
                 if (!valid) { //Default to equal sizes
-                    std.debug.print("INvalid split, rebuilding\n", .{});
+                    std.debug.print("Invalid split, rebuilding {any}\n", .{old_area});
+
                     const each_w = sp.width(new_area) / @as(f32, @floatFromInt(sp.children.items.len));
                     var pos: f32 = sp.x(new_area);
                     for (sp.handles.items) |*hand| {
@@ -299,6 +322,27 @@ pub const Pane = union(enum) {
                     const ratio = sp.width(new_area) / sp.width(old_area);
                     for (sp.handles.items) |*hand| {
                         hand.* *= ratio;
+                    }
+                }
+
+                //Go through and ensure max and min are met
+
+                {
+                    var prev_bound: f32 = sp.x(new_area);
+                    for (sp.handles.items, 0..) |*hand, h_i| {
+                        defer prev_bound = hand.*;
+                        if (sp.children.items[h_i] != .window) continue;
+                        const win = &sp.children.items[h_i].window;
+                        const width = hand.* - prev_bound;
+                        if (win.max_width > 0 and win.max_width < width) { //Handle too far, move back
+                            hand.* -= width - win.max_width;
+                        } else if (win.min_width > 0 and win.min_width > width) { //Handle too near, move fwd, shifting others
+
+                            for (sp.handles.items[h_i..]) |*h| {
+                                //TODO stop it from going over
+                                h.* += win.min_width - width;
+                            }
+                        }
                     }
                 }
 
@@ -318,6 +362,12 @@ pub const Pane = union(enum) {
                 const y0: f32 = if (sp.orientation == .vertical) sp.area.y0 else sp.area.x0;
                 const y1: f32 = if (sp.orientation == .vertical) sp.area.y1 else sp.area.x1;
                 for (sp.handles.items, 0..) |*hand, i| {
+                    if (sp.children.items[i] == .window) {
+                        const win = &sp.children.items[i].window;
+
+                        // Omit this handle as it can not be manipulated
+                        if (win.min_width > 0 and win.min_width == win.max_width) continue;
+                    }
                     try handles.append(alloc, .{
                         .orientation = sp.orientation,
                         .min = start,
