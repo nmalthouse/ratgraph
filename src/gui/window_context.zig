@@ -179,13 +179,13 @@ pub const BtnContextWindow = struct {
         if (self.opts.checkbox_cb) |ch_cb| {
             ch_cb(self.opts.btn_vt, gui, val, id);
         }
-        gui.deferTransientClose();
+        gui.deferTransientClose(&self.vt);
     }
 
     fn btn_wrap_cb(cb: *g.CbHandle, id: g.Uid, dat: g.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         self.opts.btn_cb(self.opts.btn_vt, id, dat, win);
-        dat.gui.deferTransientClose();
+        dat.gui.deferTransientClose(win);
     }
 
     pub fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}

@@ -122,7 +122,7 @@ pub fn ComboUser(user_data: type) type {
                         .index = CommitParam.invalid_index,
                         .search_string = p.string,
                     });
-                    p.gui.deferTransientClose();
+                    p.gui.deferTransientClose(&self.vt);
                     return;
                 }
 
@@ -233,12 +233,12 @@ pub fn ComboUser(user_data: type) type {
             self.makeTransientWindow(cb.gui, Rec(vt.area.x, vt.area.y, vt.area.w, cb.gui.dstate.nstyle.item_h * 10).round());
         }
 
-        pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
+        pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, win: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
             self.vt.dirty();
             self.opts.current = id;
             self.opts.commit_cb(self.opts.user_vt, self.user, .{ .index = id });
-            dat.gui.deferTransientClose();
+            dat.gui.deferTransientClose(win);
         }
 
         pub fn makeTransientWindow(self: *@This(), gui: *Gui, area: Rect) void {
@@ -367,7 +367,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
             self.makeTransientWindow(cb.gui, Rec(btn_a.x, btn_a.y, btn_a.w, cb.gui.dstate.nstyle.item_h * 4));
         }
 
-        pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, _: *iWindow) void {
+        pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, win: *iWindow) void {
             const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
             self.vt.dirty();
             self.enum_ptr.* = @enumFromInt(id);
@@ -375,7 +375,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 if (self.opts.commit_cb) |cbfn|
                     cbfn(cvt, id, self.opts.user_id);
             }
-            dat.gui.deferTransientClose();
+            dat.gui.deferTransientClose(win);
         }
 
         pub fn makeTransientWindow(self: *@This(), gui: *Gui, area: Rect) void {

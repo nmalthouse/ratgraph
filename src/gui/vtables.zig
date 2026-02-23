@@ -827,9 +827,11 @@ pub const Gui = struct {
     /// Windows that are active this frame put themselves in here
     active_windows: ArrayList(*iWindow) = .{},
 
-    transient_should_close: bool = false,
-    transient_window: ?*iWindow = null,
-    transient_parent: ?*iArea = null,
+    transient_windows: std.ArrayList(?struct {
+        defer_close: bool = false,
+        win: *iWindow,
+        parent: ?*iArea = null,
+    }) = .{},
 
     mouse_grab: ?struct {
         win: *iWindow,
@@ -846,7 +848,6 @@ pub const Gui = struct {
     focused: ?Focused = null,
 
     fbos: std.AutoHashMap(*iWindow, graph.RenderTexture),
-    transient_fbo: graph.RenderTexture,
 
     area_window_map: std.AutoArrayHashMapUnmanaged(*iArea, *iWindow) = .{},
 
@@ -868,7 +869,6 @@ pub const Gui = struct {
             .alloc = alloc,
             .scratch_arena = .init(alloc),
             .clamp_window = graph.Rec(0, 0, win.screen_dimensions.x, win.screen_dimensions.y),
-            .transient_fbo = try graph.RenderTexture.init(100, 100),
             .fbos = std.AutoHashMap(*iWindow, graph.RenderTexture).init(alloc),
             .sdl_win = win,
             .dstate = .{
@@ -886,16 +886,20 @@ pub const Gui = struct {
         for (self.windows.items) |win|
             win.deinit_fn(win, self);
 
+        for (self.transient_windows.items) |twin| {
+            const win = twin orelse continue;
+            win.win.deinit_fn(win.win, self);
+        }
+
         {
             var it = self.fbos.valueIterator();
             while (it.next()) |item|
                 item.deinit();
         }
-        self.transient_fbo.deinit();
         self.fbos.deinit();
         self.windows.deinit(self.alloc);
         self.active_windows.deinit(self.alloc);
-        self.closeTransientWindow();
+        self.transient_windows.deinit(self.alloc);
         self.area_window_map.deinit(self.alloc);
     }
 
@@ -1023,12 +1027,36 @@ pub const Gui = struct {
             win.pre_update(self);
             if (self.canGrabMouseOverride(win)) self.sdl_win.bindreg.enableContexts(win.key_ctx_mask);
         }
-        if (self.transient_window) |tw| {
-            tw.pre_update(self);
-        }
-        if (self.transient_should_close) {
-            self.transient_should_close = false;
-            self.closeTransientWindow();
+        { //Transient window section
+
+            var all_active = false;
+            while (!all_active) {
+                all_active = true;
+                for (self.transient_windows.items) |*otw| {
+                    const tw = &(otw.* orelse continue);
+                    if (tw.defer_close) {
+                        tw.win.deinit_fn(tw.win, self); //Internally, will search transient_windows and deinit any dependents
+                        if (self.fbos.getPtr(tw.win)) |fbo| {
+                            fbo.deinit();
+                            _ = self.fbos.remove(tw.win);
+                        }
+                        otw.* = null;
+                        all_active = false;
+                    } else {}
+                }
+            }
+
+            var i = self.transient_windows.items.len;
+            while (i > 0) : (i -= 1) {
+                if (self.transient_windows.items[i - 1] == null) {
+                    _ = self.transient_windows.swapRemove(i - 1);
+                }
+            }
+
+            for (self.transient_windows.items) |*otw| {
+                const tw = &(otw.* orelse continue);
+                tw.win.pre_update(self);
+            }
         }
     }
 
@@ -1038,8 +1066,13 @@ pub const Gui = struct {
 
     /// If transient windows destroy themselves, the program will crash as used memory is freed.
     /// Defer the close till next update
-    pub fn deferTransientClose(self: *Self) void {
-        self.transient_should_close = true;
+    pub fn deferTransientClose(self: *Self, win: *iWindow) void {
+        for (self.transient_windows.items) |*tw| {
+            if (tw.* != null and tw.*.?.win == win) {
+                tw.*.?.defer_close = true;
+                return;
+            }
+        }
     }
 
     pub fn regOnScroll(_: *Self, vt: *iArea, onscroll: iArea.Onscroll, window: *iWindow) !void {
@@ -1063,7 +1096,11 @@ pub const Gui = struct {
     }
 
     fn isWindowActive(self: *Self, id: *iWindow) bool {
-        if (self.transient_window != null and self.transient_window.? == id) return true;
+        for (self.transient_windows.items) |tw| {
+            if (tw) |tt| {
+                if (tt.win == id) return true;
+            }
+        }
         return std.mem.indexOfScalar(*iWindow, self.active_windows.items, id) != null;
     }
 
@@ -1076,11 +1113,15 @@ pub const Gui = struct {
             return;
         }
         if (win.area.area.containsPoint(self.sdl_win.mouse.pos)) {
-            if (self.transient_window) |tr| {
-                if (tr != win)
-                    return false;
+            if (self.transient_windows.items.len > 0) {
+                for (self.transient_windows.items) |tw| {
+                    if (tw) |tt| {
+                        if (tt.win == win)
+                            return true;
+                    }
+                }
+                return false;
             }
-
             return true;
         }
         return false;
@@ -1141,8 +1182,10 @@ pub const Gui = struct {
             }
         }
 
-        if (self.transient_parent == vt) {
-            self.deferTransientClose();
+        for (self.transient_windows.items) |*tw| {
+            if (tw.* != null and tw.*.?.parent == vt) {
+                tw.*.?.defer_close = true;
+            }
         }
 
         window.unregisterScissor(vt);
@@ -1173,6 +1216,18 @@ pub const Gui = struct {
         };
         if (vt.focus_ev_fn) |fc|
             fc(vt, .{ .gui = self, .window = win, .event = .{ .focusChanged = true } });
+    }
+
+    pub fn getCenterArea(self: *Self, width: f32, height: f32) Rect {
+        if (width > self.clamp_window.w or height > self.clamp_window.h) return self.clamp_window;
+
+        const cw = self.clamp_window;
+        return .new(
+            cw.x + (cw.w - width) / 2,
+            cw.y + (cw.h - height) / 2,
+            width,
+            height,
+        );
     }
 
     pub fn clampRectToWindow(self: *const Self, area: Rect) Rect {
@@ -1215,24 +1270,21 @@ pub const Gui = struct {
         return false;
     }
 
-    pub fn setTransientWindow(self: *Self, win: *iWindow, parent_area: *iArea) void {
-        self.closeTransientWindow();
-        self.transient_window = win;
-        self.transient_parent = parent_area;
-        win.area.area.x = @round(win.area.area.x);
-        win.area.area.y = @round(win.area.area.y);
-        win.area.area.w = @round(win.area.area.w);
-        win.area.area.h = @round(win.area.area.h);
-        self.register(&win.area, win);
-        _ = self.transient_fbo.setSize(win.area.area.w, win.area.area.h) catch return;
-    }
-
-    pub fn closeTransientWindow(self: *Self) void {
-        if (self.transient_window) |tw| {
-            tw.deinit_fn(tw, self);
-        }
-        self.transient_window = null;
-        self.transient_parent = null;
+    pub fn setTransientWindow(self: *Self, win: *iWindow, parent_area: ?*iArea) void {
+        self.transient_windows.append(self.alloc, .{
+            .win = win,
+            .parent = parent_area,
+            .defer_close = false,
+        }) catch return;
+        const item = &(self.transient_windows.items[self.transient_windows.items.len - 1].?);
+        item.win.area.area = .{
+            .x = @round(item.win.area.area.x),
+            .y = @round(item.win.area.area.y),
+            .w = @round(item.win.area.area.w),
+            .h = @round(item.win.area.area.h),
+        };
+        self.register(&item.win.area, item.win);
+        self.fbos.put(win, graph.RenderTexture.init(item.win.area.area.w, item.win.area.area.h) catch return) catch return;
     }
 
     pub fn dispatchTextinput(self: *Self, cb: TextCbState) void {
@@ -1257,17 +1309,19 @@ pub const Gui = struct {
     }
 
     pub fn dispatchClick(self: *Self, mstate: MouseCbState, windows: []const *iWindow) void {
-        if (self.transient_window) |tw| {
-            if (tw.dispatchClick(mstate)) {
-                return; //Don't click top level windows
+        for (self.transient_windows.items) |*otw| {
+            const tw = &(otw.* orelse continue);
+            if (tw.win.dispatchClick(mstate)) {
+                return;
             } else {
-                //Close the window, we clicked outside
-                self.closeTransientWindow();
+                //tw.win.deinit_fn(tw.win, self);
+                tw.defer_close = true;
+                //tw.* = null;
             }
         }
         for (windows) |win| {
             if (win.dispatchClick(mstate))
-                break;
+                return;
         }
     }
 
@@ -1282,12 +1336,12 @@ pub const Gui = struct {
     }
 
     pub fn dispatchScroll(self: *Self, pos: Vec2f, dist: f32, windows: []const *iWindow) void {
-        if (self.transient_window) |tw| {
-            if (tw.dispatchScroll(pos, self, dist)) {
-                return; //Don't click top level windows
+        for (self.transient_windows.items) |*otw| {
+            const tw = &(otw.* orelse continue);
+            if (tw.win.dispatchScroll(pos, self, dist)) {
+                return;
             } else {
-                //Close the window, we clicked outside
-                self.closeTransientWindow();
+                tw.defer_close = true;
             }
         }
         for (windows) |win| {
@@ -1326,9 +1380,6 @@ pub const Gui = struct {
         if (self.fbos.getPtr(window)) |fbo| {
             _ = try fbo.setSize(area.w, area.h);
         }
-        if (self.transient_window != null and self.transient_window.? == window) {
-            _ = try self.transient_fbo.setSize(area.w, area.h);
-        }
         window.build_fn(window, self, area);
     }
 
@@ -1340,8 +1391,10 @@ pub const Gui = struct {
             drawFbo(w.area.area, fbo, self.dstate.ctx, self.dstate.tint);
         }
 
-        if (self.transient_window) |tw| {
-            drawFbo(tw.area.area, &self.transient_fbo, self.dstate.ctx, self.dstate.tint);
+        for (self.transient_windows.items) |tw| {
+            const w = tw orelse continue;
+            const fbo = self.fbos.getPtr(w.win) orelse continue;
+            drawFbo(w.win.area.area, fbo, self.dstate.ctx, self.dstate.tint);
         }
     }
 
@@ -1361,8 +1414,10 @@ pub const Gui = struct {
             const fbo = self.fbos.getPtr(win) orelse continue;
             try self.drawWindow(win, dctx, force_redraw, fbo);
         }
-        if (self.transient_window) |tw| {
-            try self.drawWindow(tw, dctx, force_redraw, &self.transient_fbo);
+        for (self.transient_windows.items) |tww| {
+            const tw = tww orelse continue;
+            const fbo = self.fbos.getPtr(tw.win) orelse continue;
+            try self.drawWindow(tw.win, dctx, force_redraw, fbo);
         }
     }
 
