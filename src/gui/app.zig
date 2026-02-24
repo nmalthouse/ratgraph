@@ -22,25 +22,6 @@ pub const Options = struct {
         .gl_flags = if (IS_DEBUG) &[_]u32{graph.c.SDL_GL_CONTEXT_DEBUG_FLAG} else &[_]u32{},
     },
 };
-const DpiPreset = struct {
-    dpi: f32 = 1,
-    fh: f32 = 25,
-    ih: f32 = 14,
-    scale: f32 = 2,
-
-    pub fn distance(_: void, item: @This(), key: @This()) f32 {
-        return @abs(item.dpi - key.dpi);
-    }
-};
-
-const DPI_presets = [_]DpiPreset{
-    .{ .dpi = 1, .fh = 14, .ih = 25, .scale = 1 },
-    .{ .dpi = 1.7, .fh = 18, .ih = 28, .scale = 1 },
-};
-
-pub const iUpdate = struct {
-    pre_update: ?*const fn (*iUpdate) void,
-};
 
 pub const GuiApp = struct {
     const Self = @This();
@@ -148,6 +129,25 @@ pub const GuiApp = struct {
             self.main_window.swap();
         }
     }
+};
+const DpiPreset = struct {
+    dpi: f32 = 1,
+    fh: f32 = 25,
+    ih: f32 = 14,
+    scale: f32 = 2,
+
+    pub fn distance(_: void, item: @This(), key: @This()) f32 {
+        return @abs(item.dpi - key.dpi);
+    }
+};
+
+const DPI_presets = [_]DpiPreset{
+    .{ .dpi = 1, .fh = 14, .ih = 25, .scale = 1 },
+    .{ .dpi = 1.7, .fh = 18, .ih = 28, .scale = 1 },
+};
+
+pub const iUpdate = struct {
+    pre_update: ?*const fn (*iUpdate) void,
 };
 
 pub fn nearest(comptime T: type, items: []const T, context: anytype, comptime distanceFn: fn (@TypeOf(context), item: T, key: T) f32, key: T) ?usize {

@@ -174,7 +174,6 @@ pub const Window = struct {
 
     bindreg: keybinding.BindRegistry,
 
-    screen_dimensions: Vec2i = .{ .x = 0, .y = 0 },
     frame_time: std.time.Timer,
     last_frame_ns: u64 = 16000,
 
@@ -185,16 +184,16 @@ pub const Window = struct {
 
     should_exit: bool = false,
 
+    screen_dimensions: Vec2i = .{ .x = 0, .y = 0 },
+    keys: KeysT = .{},
+    text_input_buffer: [256]u8 = undefined,
+    text_input: []const u8,
     mouse: MouseState = .{},
     mod: keycodes.KeymodMask = 0,
     /// Never put scroll_lock, caps_lock and num_lock in Window.mod when set
     exclude_locking_mod: bool = true,
 
     //key_state: KeyStateT = [_]ButtonState{.low} ** c.SDL_SCANCODE_COUNT,
-    keys: KeysT = .{},
-
-    text_input_buffer: [256]u8 = undefined,
-    text_input: []const u8,
 
     user_event_cbs: std.ArrayList(*const UserEventCb) = .{},
 

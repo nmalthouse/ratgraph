@@ -467,8 +467,8 @@ pub fn main() !void {
 
     {
         const ws = gg.workspaces.getWorkspace(main_ws) orelse return error.fucked;
-        try ws.pane.split.append(gg.workspaces.alloc, .{ .window = ins_id });
-        try ws.pane.split.append(gg.workspaces.alloc, .{ .window = sty_id });
+        try ws.pane.split.append(gg.workspaces.alloc, .{ .window = .{ .id = ins_id } });
+        try ws.pane.split.append(gg.workspaces.alloc, .{ .window = .{ .id = sty_id } });
     }
 
     try gg.run();

@@ -1,3 +1,47 @@
+//! Retained mode gui
+//! Datatypes:
+//!     Gui -> manages everything
+//!     iArea -> vtable that all widgets must implement. Forms the widget tree
+//!     iWindow -> starting point of widget tree.
+//! see ../rgui_test.zig for example usage
+//!
+//! The update loop for the gui looks like:
+//!
+//! gui.pre_update();
+//! gui.active_windows := windows you would like to display this frame
+//! gui.update(); // Dispatch onclick etc
+//! gui.draw(); // Draw each window to its render texture (cached or uncached drawing)
+//!
+//! gui.drawFbos(); //Draw each fbo to backbuffer
+//!
+//! Alternatively the gui can be used from app.zig.
+//! This context manages all the fonts, drawctx, sdl window, workspace layouts etc for you.
+//!
+//!
+//! Windows define some rectangular region of the screen which contains a widget tree.
+//! iWindow is a vtable/interface that a user's window should implement.
+//! It must implement the following functions:
+//! build_fn -> called whenever the widget tree must be completely rebuilt. Resizing or moving the window is one such condition.
+//! Users should avoid calling this function directly and instead set iWindow.needs_rebuild to true to defer rebuilding until next gui.pre_update()
+//!
+//! update_fn - called every gui.update(), can be used to create a gl view window for example. When adding the window with gui.addWindow set put_fbo to false
+//!
+//! deinit_fn
+//!
+//! iArea is a vtable/interface used for all widgets. iWindow implements iArea which acts as the root of each window's widget tree.
+//!
+//! There are two sets of windows in the Gui
+//! The active_windows set, this is manually modified by the user. window.deinit_fn is never called by the gui until gui.deinit().
+//! The transient_windows set, temporary windows can be added to this using gui.setTransientWindow.
+//! An example of the usage of transient windows include:
+//!     The drop-down list of options on a combo box.
+//!     Any right click context menu.
+//!     A nag window
+//!
+//! If a click or scroll event is dispatched and an active transient window is not the receiver, that transient window is closed. Its deinit_fn is called. Users should therefore not store pointers to transient windows they create as they can be destroyed at anytime.
+//!
+//! When creating a transient window, users can optionally specify a parent iArea it depends on. When this parent iArea is deinit the transient window is as well. Consider a combo box drop down window which stores a pointer to its parent to set the value of the combo. If the parent is destroyed the parent pointer is now invalid.
+//!
 const std = @import("std");
 pub const graph = @import("../graphics.zig");
 pub const Dctx = graph.ImmediateDrawingContext;
@@ -13,19 +57,7 @@ const keybinding = graph.keybinding;
 pub const app = @import("app.zig");
 pub const workspaces = @import("layouts.zig");
 
-// To support nested child windows:
-//
-// add a child: ?*iWindow field to iWindow
-//
-// store a window depth?
-//
-// depth = 0
-//
-// only a single window of any depth > 0 can exist at any time
-//
-// this implies only a single root window can have children at a time
-//
-
+/// Gui Widgets that need to callback should store a pointer to CbHandle.
 pub const CbHandle = struct {
     pub fn cast(self: *@This(), comptime T: type, comptime name: []const u8) *T {
         return @alignCast(@fieldParentPtr(name, self));
@@ -93,11 +125,11 @@ pub const TextCbState = struct {
     mod_state: graph.SDL.keycodes.KeymodMask = 0,
 };
 
+/// All widget creation functions should return a WgStatus rather than an error
 pub const WgStatus = enum {
     failed,
     good,
 };
-//TODO store a depth and sort to_draw by depth
 pub const iArea = struct {
     /// Decl'd so we can grep for undefined and not get confused
     pub const UNINITILIZED: iArea = undefined;
@@ -488,10 +520,11 @@ pub const DrawState = struct {
     }
 
     pub fn minWidgetWidth(self: *const @This(), string: []const u8) f32 {
+        const pad = self.nstyle.item_h * 1.5;
         const bound = self.font.textBounds(string, self.nstyle.text_h);
 
         const inset = @max((self.nstyle.item_h - self.nstyle.text_h), 0);
-        return bound.x + inset;
+        return bound.x + inset + pad;
     }
 
     pub fn textArea(self: *const @This(), area: Rect) Rect {
@@ -595,14 +628,6 @@ pub const UpdateState = struct {
     keys: []const graph.SDL.KeyState,
 };
 
-//Two options for this, we use a button widget which registers itself for onclick
-//or we listen for onclick and determine which was clicked
-
-//What happens when area changes?
-//rebuild everyone
-//start with a window
-//call to register window, that window has a "build" vfunc?
-
 pub const HorizLayout = struct {
     count: usize,
     paddingh: f32 = 20,
@@ -626,6 +651,22 @@ pub const HorizLayout = struct {
 
     pub fn pushCount(self: *HorizLayout, next_count: usize) void {
         self.count_override = next_count;
+    }
+};
+
+pub const HorizLayoutMeasured = struct {
+    paddingh: f32 = 20,
+
+    current_w: f32 = 0,
+    bounds: Rect,
+
+    pub fn getArea(self: *@This(), desired: f32) ?Rect {
+        const left = self.bounds.w - self.current_w - self.paddingh;
+        const next = @min(left, desired + self.paddingh);
+        if (next < 1) return null;
+
+        defer self.current_w += next;
+        return .{ .x = self.bounds.x + self.current_w, .y = self.bounds.y, .w = next - self.paddingh, .h = self.bounds.h };
     }
 };
 
@@ -1350,11 +1391,6 @@ pub const Gui = struct {
         }
     }
 
-    ///TODO be carefull with this ptr,
-    ///if the widget who gave this ptr is destroyed while mouse is grabbed we crash.
-    ///how to solve?
-    ///name vtables with ids
-    ///on vt destroy, check and unset
     pub fn grabMouse(self: *Self, cb: MouseGrabFn, vt: *iArea, win: *iWindow, btn: MouseCbState.Btn) void {
         self.mouse_grab = .{ .win = win, .kind = .{ .btn = .{
             .cb = cb,
@@ -1716,4 +1752,20 @@ pub const Style = struct {
     tab_spacing: f32 = 20,
 
     color: Colorscheme = .{},
+};
+
+//Idea, vtable layouts
+//widgets can request a specific size, no guarantee
+
+//Not used, idea
+const iLayout = struct {
+    const getAreaFn = fn (*iLayout, desired_w: ?f32, desired_h: ?f32) ?Rect;
+    bounds: Rect,
+    accepts_custom: bool, // optimization, user should check before calculating their desired width
+
+    getArea_fn: *const getAreaFn,
+
+    pub fn getArea(vt: *iLayout, desired_w: ?f32, desired_h: ?f32) ?Rect {
+        return vt.getArea_fn(vt, desired_w, desired_h);
+    }
 };
