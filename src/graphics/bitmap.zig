@@ -1,8 +1,9 @@
+const Bitmap = @This();
 pub const ImageFormat = enum(usize) {
-    rgba_8 = c.SPNG_FMT_RGBA8,
-    rgb_8 = c.SPNG_FMT_RGB8,
-    g_8 = c.SPNG_FMT_G8, //grayscale, 8 bit
-    ga_8 = c.SPNG_FMT_GA8,
+    rgba_8 = spng.SPNG_FMT_RGBA8,
+    rgb_8 = spng.SPNG_FMT_RGB8,
+    g_8 = spng.SPNG_FMT_G8, //grayscale, 8 bit
+    ga_8 = spng.SPNG_FMT_GA8,
 
     pub fn fromChannelCount(count: u8) ?ImageFormat {
         return switch (count) {
@@ -63,38 +64,38 @@ pub fn initFromBuffer(alloc: std.mem.Allocator, buffer: []const u8, width: anyty
 }
 
 pub fn initFromPngBuffer(alloc: std.mem.Allocator, buffer: []const u8) !Bitmap {
-    const pngctx = c.spng_ctx_new(0);
-    defer c.spng_ctx_free(pngctx);
-    try spngError(c.spng_set_png_buffer(pngctx, &buffer[0], buffer.len));
+    const pngctx = spng.spng_ctx_new(0);
+    defer spng.spng_ctx_free(pngctx);
+    try spngError(spng.spng_set_png_buffer(pngctx, &buffer[0], buffer.len));
 
-    var ihdr: c.spng_ihdr = undefined;
-    try spngError(c.spng_get_ihdr(pngctx, &ihdr));
+    var ihdr: spng.spng_ihdr = undefined;
+    try spngError(spng.spng_get_ihdr(pngctx, &ihdr));
     //ihdr.bit_depth;
     //ihdr.color_type;
     const fmt: ImageFormat = switch (ihdr.color_type) {
-        c.SPNG_COLOR_TYPE_GRAYSCALE => .g_8,
-        c.SPNG_COLOR_TYPE_GRAYSCALE_ALPHA => .rgba_8,
-        c.SPNG_COLOR_TYPE_TRUECOLOR => .rgba_8,
-        c.SPNG_COLOR_TYPE_TRUECOLOR_ALPHA => .rgba_8,
-        c.SPNG_COLOR_TYPE_INDEXED => .rgba_8,
+        spng.SPNG_COLOR_TYPE_GRAYSCALE => .g_8,
+        spng.SPNG_COLOR_TYPE_GRAYSCALE_ALPHA => .rgba_8,
+        spng.SPNG_COLOR_TYPE_TRUECOLOR => .rgba_8,
+        spng.SPNG_COLOR_TYPE_TRUECOLOR_ALPHA => .rgba_8,
+        spng.SPNG_COLOR_TYPE_INDEXED => .rgba_8,
         else => return error.unsupportedColorFormat,
     };
 
     var out_size: usize = 0;
-    try spngError(c.spng_decoded_image_size(pngctx, @intCast(@intFromEnum(fmt)), &out_size));
+    try spngError(spng.spng_decoded_image_size(pngctx, @intCast(@intFromEnum(fmt)), &out_size));
 
     const decoded_data = try alloc.alloc(u8, out_size);
 
-    try spngError(c.spng_decode_image(pngctx, &decoded_data[0], out_size, @intCast(@intFromEnum(fmt)), 0));
+    try spngError(spng.spng_decode_image(pngctx, &decoded_data[0], out_size, @intCast(@intFromEnum(fmt)), 0));
 
     return Bitmap{ .format = fmt, .w = ihdr.width, .h = ihdr.height, .data = .fromOwnedSlice(decoded_data), .alloc = alloc };
 }
 
 pub fn initFromQoiBuffer(alloc: std.mem.Allocator, qoi_buf: []const u8) !Bitmap {
-    var qd: c.qoi_desc = undefined;
+    var qd: qoi.qoi_desc = undefined;
 
-    const decoded = c.qoi_decode(&qoi_buf[0], @intCast(qoi_buf.len), &qd, 0) orelse return error.qoiFailed;
-    defer c.QOI_FREE(decoded);
+    const decoded = qoi.qoi_decode(&qoi_buf[0], @intCast(qoi_buf.len), &qd, 0) orelse return error.qoiFailed;
+    defer qoi.QOI_FREE(decoded);
 
     const qoi_s: [*c]const u8 = @ptrCast(decoded);
 
@@ -185,52 +186,35 @@ fn stbi_write_func(ctx: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.c
     _ = wr.write(dat[0..@intCast(size)]) catch return;
 }
 
-pub fn writeToBmpFile(self: *Bitmap, dir: std.fs.Dir, file_name: []const u8) !void {
-    const out = try dir.createFile(file_name, .{});
-    defer out.close();
-    var write_buf: [4096]u8 = undefined;
-    var wr = out.writer(&write_buf);
-
-    _ = c.stbi_write_tga_to_func(
-        &stbi_write_func,
-        @ptrCast(&wr.interface),
-        @as(c_int, @intCast(self.w)),
-        @as(c_int, @intCast(self.h)),
-        self.format.toChannelCount(),
-        @as([*c]u8, @ptrCast(self.data.items[0..self.data.items.len])),
-    );
-    try wr.interface.flush();
-}
-
 pub fn writeToPngFile(self: *Bitmap, dir: std.fs.Dir, sub_path: []const u8) !void {
     var out_file = try dir.createFile(sub_path, .{});
     defer out_file.close();
     var out_buf: [1024]u8 = undefined;
     var out_wr = out_file.writer(&out_buf);
-    const pngctx = c.spng_ctx_new(c.SPNG_CTX_ENCODER);
-    defer c.spng_ctx_free(pngctx);
+    const pngctx = spng.spng_ctx_new(spng.SPNG_CTX_ENCODER);
+    defer spng.spng_ctx_free(pngctx);
 
-    try spngError(c.spng_set_option(pngctx, c.SPNG_ENCODE_TO_BUFFER, 1));
+    try spngError(spng.spng_set_option(pngctx, spng.SPNG_ENCODE_TO_BUFFER, 1));
 
-    var ihdr = c.spng_ihdr{
+    var ihdr = spng.spng_ihdr{
         .width = self.w,
         .height = self.h,
         .bit_depth = 8,
         .color_type = switch (self.format) {
-            .rgb_8 => c.SPNG_COLOR_TYPE_TRUECOLOR,
-            .rgba_8 => c.SPNG_COLOR_TYPE_TRUECOLOR_ALPHA,
-            .g_8 => c.SPNG_COLOR_TYPE_GRAYSCALE,
-            .ga_8 => c.SPNG_COLOR_TYPE_GRAYSCALE_ALPHA,
+            .rgb_8 => spng.SPNG_COLOR_TYPE_TRUECOLOR,
+            .rgba_8 => spng.SPNG_COLOR_TYPE_TRUECOLOR_ALPHA,
+            .g_8 => spng.SPNG_COLOR_TYPE_GRAYSCALE,
+            .ga_8 => spng.SPNG_COLOR_TYPE_GRAYSCALE_ALPHA,
         },
         .compression_method = 0,
         .filter_method = 0,
         .interlace_method = 0,
     };
     var err: c_int = 0;
-    try spngError(c.spng_set_ihdr(pngctx, &ihdr));
-    try spngError(c.spng_encode_image(pngctx, &self.data.items[0], self.data.items.len, c.SPNG_FMT_PNG, c.SPNG_ENCODE_FINALIZE));
+    try spngError(spng.spng_set_ihdr(pngctx, &ihdr));
+    try spngError(spng.spng_encode_image(pngctx, &self.data.items[0], self.data.items.len, spng.SPNG_FMT_PNG, spng.SPNG_ENCODE_FINALIZE));
     var png_size: usize = 0;
-    const data = c.spng_get_png_buffer(pngctx, &png_size, &err);
+    const data = spng.spng_get_png_buffer(pngctx, &png_size, &err);
     try spngError(err);
     if (data) |d| {
         const sl = @as([*]u8, @ptrCast(d));
@@ -243,9 +227,20 @@ pub fn writeToPngFile(self: *Bitmap, dir: std.fs.Dir, sub_path: []const u8) !voi
     try out_wr.interface.flush();
 }
 
-pub fn writeQoi(self: *Bitmap, wr: *std.io.Writer) !void {
+pub fn writeQoiFile(self: *const Bitmap, dir: std.fs.Dir, file: []const u8) !void {
+    var out = try dir.createFile(file, .{});
+    defer out.close();
+    var wr_buf: [2048]u8 = undefined;
+    var wr = out.writer(&wr_buf);
+
+    try self.writeQoi(&wr.interface);
+
+    try wr.flush();
+}
+
+pub fn writeQoi(self: *const Bitmap, wr: *std.io.Writer) !void {
     const alloc = self.alloc;
-    var qd = c.qoi_desc{
+    var qd = qoi.qoi_desc{
         .width = self.w,
         .height = self.h,
         .channels = switch (self.format) {
@@ -254,7 +249,7 @@ pub fn writeQoi(self: *Bitmap, wr: *std.io.Writer) !void {
             .g_8 => 3,
             .ga_8 => 4,
         },
-        .colorspace = c.QOI_LINEAR,
+        .colorspace = qoi.QOI_LINEAR,
     };
     var reencoded: std.ArrayList(u8) = .{};
     defer reencoded.deinit(alloc);
@@ -290,13 +285,13 @@ pub fn writeQoi(self: *Bitmap, wr: *std.io.Writer) !void {
     }
 
     var qoi_len: c_int = 0;
-    if (c.qoi_encode(@ptrCast(out_data.ptr), &qd, &qoi_len)) |qoi_data| {
+    if (qoi.qoi_encode(@ptrCast(out_data.ptr), &qd, &qoi_len)) |qoi_data| {
         const qoi_s: [*c]const u8 = @ptrCast(qoi_data);
         const qlen: usize = if (qoi_len > 0) @intCast(qoi_len) else 0;
         const slice: []const u8 = qoi_s[0..qlen];
 
         try wr.writeAll(slice);
-        c.QOI_FREE(qoi_data);
+        qoi.QOI_FREE(qoi_data);
     }
 }
 
@@ -337,19 +332,21 @@ pub fn invertY(self: *Bitmap) !void {
 }
 
 fn spngError(errno: c_int) !void {
-    if (errno == c.SPNG_OK) return;
+    if (errno == spng.SPNG_OK) return;
 
-    std.debug.print("spng error: {s}\n", .{c.spng_strerror(errno)});
+    std.debug.print("spng error: {s}\n", .{spng.spng_strerror(errno)});
 
     return error.spng;
 }
 
-const std = @import("std");
 const lcast = std.math.lossyCast;
-const c = @import("c.zig").c;
-const Bitmap = @This();
 const intToColor = ptypes.intToColor;
-const gl = @import("gl");
 const Rect = ptypes.Rect;
-const ptypes = @import("types.zig");
 const Rec = Rect.NewAny;
+
+const std = @import("std");
+const gl = @import("gl");
+const c = @import("c.zig").c;
+const ptypes = @import("types.zig");
+const spng = @import("c.zig").spng;
+const qoi = @import("c.zig").qoi;

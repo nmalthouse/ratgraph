@@ -1,9 +1,5 @@
 const std = @import("std");
-pub const lua = @cImport({
-    @cInclude("lua.h");
-    @cInclude("lauxlib.h");
-    @cInclude("lualib.h");
-});
+const lua = @import("graphics/c.zig").lua;
 
 //TODO have a allocator on hand if we exceed fba
 const Self = @This();

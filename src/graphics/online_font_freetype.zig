@@ -1,11 +1,12 @@
 const std = @import("std");
 const font = @import("font.zig");
 const sdl = @import("SDL.zig");
-const c = @import("c.zig").c;
 const gl = @import("gl");
 const Glyph = font.Glyph;
 const Bitmap = @import("bitmap.zig");
 const PROFILE = false;
+
+const ft = @import("c.zig").ft;
 
 pub const OnlineFont = struct {
     const Self = @This();
@@ -29,8 +30,8 @@ pub const OnlineFont = struct {
 
     bitmap_dirty: bool = true,
 
-    ftlib: c.FT_Library = undefined,
-    face: c.FT_Face = undefined,
+    ftlib: ft.FT_Library = undefined,
+    face: ft.FT_Face = undefined,
 
     SF: f32 = 0,
 
@@ -93,10 +94,10 @@ pub const OnlineFont = struct {
             .bitmap = undefined,
         };
 
-        _ = c.FT_Init_FreeType(&result.ftlib);
+        _ = ft.FT_Init_FreeType(&result.ftlib);
 
-        const open_args = c.FT_Open_Args{
-            .flags = c.FT_OPEN_MEMORY,
+        const open_args = ft.FT_Open_Args{
+            .flags = ft.FT_OPEN_MEMORY,
             .memory_base = &buf[0],
             .memory_size = @intCast(buf.len),
             .pathname = null,
@@ -105,16 +106,16 @@ pub const OnlineFont = struct {
             .num_params = 0,
             .params = null,
         };
-        _ = c.FT_Open_Face(result.ftlib, &open_args, 0, &result.face);
+        _ = ft.FT_Open_Face(result.ftlib, &open_args, 0, &result.face);
 
-        var Req = c.FT_Size_RequestRec{
-            .type = c.FT_SIZE_REQUEST_TYPE_NOMINAL,
+        var Req = ft.FT_Size_RequestRec{
+            .type = ft.FT_SIZE_REQUEST_TYPE_NOMINAL,
             .width = 0,
             .height = @as(i32, @intFromFloat(pixel_size * 64)),
             .horiResolution = 0,
             .vertResolution = 0,
         };
-        _ = c.FT_Request_Size(result.face, &Req);
+        _ = ft.FT_Request_Size(result.face, &Req);
 
         {
             const fr = result.face.*;
@@ -175,10 +176,10 @@ pub const OnlineFont = struct {
             const cpo = codepoint;
             const SF = self.SF;
             _ = SF;
-            const glyph_i = c.FT_Get_Char_Index(self.face, codepoint);
+            const glyph_i = ft.FT_Get_Char_Index(self.face, codepoint);
 
-            _ = c.FT_Load_Glyph(self.face, glyph_i, c.FT_LOAD_DEFAULT);
-            _ = c.FT_Render_Glyph(self.face.*.glyph, c.FT_RENDER_MODE_NORMAL);
+            _ = ft.FT_Load_Glyph(self.face, glyph_i, ft.FT_LOAD_DEFAULT);
+            _ = ft.FT_Render_Glyph(self.face.*.glyph, ft.FT_RENDER_MODE_NORMAL);
             const metrics = &self.face.*.glyph.*.metrics;
             const bitmap = &(self.face.*.glyph.*.bitmap);
             var glyph = Glyph{

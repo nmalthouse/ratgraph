@@ -174,7 +174,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
 const SetType = SparseSet([]const u8, u32);
 test "Sparse set basic usage" {
     const a = testing.allocator;
-    var sset = try SetType.init(a);
+    var sset = SetType.init(a);
     defer sset.deinit();
 
     try sset.insert(0, "first item");
@@ -195,7 +195,7 @@ const SetType1 = SparseSet(u32, u32);
 test "random" {
     const a = testing.allocator;
 
-    var sset = try SetType1.init(a);
+    var sset = SetType1.init(a);
     defer sset.deinit();
 
     var map = std.AutoHashMap(u32, u32).init(a);

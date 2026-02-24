@@ -1,5 +1,4 @@
 const std = @import("std");
-const c = @import("c.zig").c;
 const Alloc = std.mem.Allocator;
 const Dir = std.fs.Dir;
 const SparseSet = @import("sparse_set.zig").SparseSet;
@@ -14,6 +13,9 @@ const glID = GL.glID;
 const Rec = Rect.NewAny;
 const gl = @import("gl");
 const Bitmap = @import("bitmap.zig");
+
+const stb_rp = @import("c.zig").stb_rp;
+const ft = @import("c.zig").ft;
 
 /// Any font type must implement the following methods or fields
 pub const PublicFontInterface = struct {
@@ -283,7 +285,7 @@ pub const Font = struct {
             return;
 
         var found = false;
-        inline for (c.ft_errors) |err| {
+        inline for (ft.ft_errors) |err| {
             if (err.err_code == error_code) {
                 found = true;
                 if (err.err_msg) |msg| {
@@ -341,6 +343,7 @@ pub const Font = struct {
     }
 
     pub fn initFromBuffer(alloc: Alloc, buf: []const u8, pixel_size: f32, options: InitOptions) !Font {
+        const c = {};
         const pad = options.padding_px;
         const codepoints_i: []u21 = try CharMapEntry.flattenList(options.codepoints_to_load, alloc);
         var finfo: c.stbtt_fontinfo = undefined;
@@ -503,10 +506,10 @@ pub const Font = struct {
         var stderr_wr = std.fs.File.stderr().writer(&stderr_buf);
         const stderr = &stderr_wr.interface;
 
-        var ftlib: c.FT_Library = undefined;
-        try freetypeLogErr(stderr, c.FT_Init_FreeType(&ftlib));
+        var ftlib: ft.FT_Library = undefined;
+        try freetypeLogErr(stderr, ft.FT_Init_FreeType(&ftlib));
 
-        var face: c.FT_Face = undefined;
+        var face: ft.FT_Face = undefined;
 
         const infile = try dir.openFile(filename, .{});
         defer infile.close();
@@ -516,8 +519,8 @@ pub const Font = struct {
         defer alloc.free(file_slice);
 
         {
-            const open_args = c.FT_Open_Args{
-                .flags = c.FT_OPEN_MEMORY,
+            const open_args = ft.FT_Open_Args{
+                .flags = ft.FT_OPEN_MEMORY,
                 .memory_base = &file_slice[0],
                 .memory_size = @intCast(file_slice.len),
                 .pathname = null,
@@ -527,7 +530,7 @@ pub const Font = struct {
                 .params = null,
             };
 
-            const err_code = c.FT_Open_Face(ftlib, &open_args, 0, &face);
+            const err_code = ft.FT_Open_Face(ftlib, &open_args, 0, &face);
 
             //var path = std.ArrayList(u8).fromOwnedSlice(alloc, try dir.realpathAlloc(alloc, filename));
             //defer path.deinit();
@@ -536,9 +539,9 @@ pub const Font = struct {
             //FT_New_Face loads font file from filepathname
             //the face pointer should be destroyed with FT_Done_Face()
             {
-                //const err_code = c.FT_New_Face(ftlib, @as([*:0]const u8, @ptrCast(path.items)), 0, &face);
+                //const err_code = ft.FT_New_Face(ftlib, @as([*:0]const u8, @ptrCast(path.items)), 0, &face);
                 switch (err_code) {
-                    c.FT_Err_Cannot_Open_Resource => return error.fucked,
+                    ft.FT_Err_Cannot_Open_Resource => return error.fucked,
                     else => try freetypeLogErr(stderr, err_code),
                 }
             }
@@ -562,25 +565,25 @@ pub const Font = struct {
                 const mask_item = struct { mask: c_long, str: []const u8 };
 
                 const mask_list = [_]mask_item{
-                    .{ .mask = c.FT_FACE_FLAG_SCALABLE, .str = "FT_FACE_FLAG_SCALABLE          " },
-                    .{ .mask = c.FT_FACE_FLAG_FIXED_SIZES, .str = "FT_FACE_FLAG_FIXED_SIZES       " },
-                    .{ .mask = c.FT_FACE_FLAG_FIXED_WIDTH, .str = "FT_FACE_FLAG_FIXED_WIDTH       " },
-                    .{ .mask = c.FT_FACE_FLAG_SFNT, .str = "FT_FACE_FLAG_SFNT              " },
-                    .{ .mask = c.FT_FACE_FLAG_HORIZONTAL, .str = "FT_FACE_FLAG_HORIZONTAL        " },
-                    .{ .mask = c.FT_FACE_FLAG_VERTICAL, .str = "FT_FACE_FLAG_VERTICAL          " },
-                    .{ .mask = c.FT_FACE_FLAG_KERNING, .str = "FT_FACE_FLAG_KERNING           " },
-                    .{ .mask = c.FT_FACE_FLAG_FAST_GLYPHS, .str = "FT_FACE_FLAG_FAST_GLYPHS       " },
-                    .{ .mask = c.FT_FACE_FLAG_MULTIPLE_MASTERS, .str = "FT_FACE_FLAG_MULTIPLE_MASTERS  " },
-                    .{ .mask = c.FT_FACE_FLAG_GLYPH_NAMES, .str = "FT_FACE_FLAG_GLYPH_NAMES       " },
-                    .{ .mask = c.FT_FACE_FLAG_EXTERNAL_STREAM, .str = "FT_FACE_FLAG_EXTERNAL_STREAM   " },
-                    .{ .mask = c.FT_FACE_FLAG_HINTER, .str = "FT_FACE_FLAG_HINTER            " },
-                    .{ .mask = c.FT_FACE_FLAG_CID_KEYED, .str = "FT_FACE_FLAG_CID_KEYED         " },
-                    .{ .mask = c.FT_FACE_FLAG_TRICKY, .str = "FT_FACE_FLAG_TRICKY            " },
-                    .{ .mask = c.FT_FACE_FLAG_COLOR, .str = "FT_FACE_FLAG_COLOR             " },
-                    .{ .mask = c.FT_FACE_FLAG_VARIATION, .str = "FT_FACE_FLAG_VARIATION         " },
-                    .{ .mask = c.FT_FACE_FLAG_SVG, .str = "FT_FACE_FLAG_SVG               " },
-                    .{ .mask = c.FT_FACE_FLAG_SBIX, .str = "FT_FACE_FLAG_SBIX              " },
-                    .{ .mask = c.FT_FACE_FLAG_SBIX_OVERLAY, .str = "FT_FACE_FLAG_SBIX_OVERLAY      " },
+                    .{ .mask = ft.FT_FACE_FLAG_SCALABLE, .str = "FT_FACE_FLAG_SCALABLE          " },
+                    .{ .mask = ft.FT_FACE_FLAG_FIXED_SIZES, .str = "FT_FACE_FLAG_FIXED_SIZES       " },
+                    .{ .mask = ft.FT_FACE_FLAG_FIXED_WIDTH, .str = "FT_FACE_FLAG_FIXED_WIDTH       " },
+                    .{ .mask = ft.FT_FACE_FLAG_SFNT, .str = "FT_FACE_FLAG_SFNT              " },
+                    .{ .mask = ft.FT_FACE_FLAG_HORIZONTAL, .str = "FT_FACE_FLAG_HORIZONTAL        " },
+                    .{ .mask = ft.FT_FACE_FLAG_VERTICAL, .str = "FT_FACE_FLAG_VERTICAL          " },
+                    .{ .mask = ft.FT_FACE_FLAG_KERNING, .str = "FT_FACE_FLAG_KERNING           " },
+                    .{ .mask = ft.FT_FACE_FLAG_FAST_GLYPHS, .str = "FT_FACE_FLAG_FAST_GLYPHS       " },
+                    .{ .mask = ft.FT_FACE_FLAG_MULTIPLE_MASTERS, .str = "FT_FACE_FLAG_MULTIPLE_MASTERS  " },
+                    .{ .mask = ft.FT_FACE_FLAG_GLYPH_NAMES, .str = "FT_FACE_FLAG_GLYPH_NAMES       " },
+                    .{ .mask = ft.FT_FACE_FLAG_EXTERNAL_STREAM, .str = "FT_FACE_FLAG_EXTERNAL_STREAM   " },
+                    .{ .mask = ft.FT_FACE_FLAG_HINTER, .str = "FT_FACE_FLAG_HINTER            " },
+                    .{ .mask = ft.FT_FACE_FLAG_CID_KEYED, .str = "FT_FACE_FLAG_CID_KEYED         " },
+                    .{ .mask = ft.FT_FACE_FLAG_TRICKY, .str = "FT_FACE_FLAG_TRICKY            " },
+                    .{ .mask = ft.FT_FACE_FLAG_COLOR, .str = "FT_FACE_FLAG_COLOR             " },
+                    .{ .mask = ft.FT_FACE_FLAG_VARIATION, .str = "FT_FACE_FLAG_VARIATION         " },
+                    .{ .mask = ft.FT_FACE_FLAG_SVG, .str = "FT_FACE_FLAG_SVG               " },
+                    .{ .mask = ft.FT_FACE_FLAG_SBIX, .str = "FT_FACE_FLAG_SBIX              " },
+                    .{ .mask = ft.FT_FACE_FLAG_SBIX_OVERLAY, .str = "FT_FACE_FLAG_SBIX_OVERLAY      " },
                 };
                 const flags = face.*.face_flags;
                 try log.print("Freetype face_flags mask: {b}\n", .{flags});
@@ -591,12 +594,12 @@ pub const Font = struct {
                 }
             }
         }
-        //try freetypeLogErr(stderr, c.FT_Library_SetLcdFilter(ftlib, c.FT_LCD_FILTER_DEFAULT));
+        //try freetypeLogErr(stderr, ft.FT_Library_SetLcdFilter(ftlib, ft.FT_LCD_FILTER_DEFAULT));
 
         try freetypeLogErr(
             stderr,
-            c.FT_Set_Pixel_Sizes(face, 0, @intFromFloat(point_size)),
-            //c.FT_Set_Char_Size(
+            ft.FT_Set_Pixel_Sizes(face, 0, @intFromFloat(point_size)),
+            //ft.FT_Set_Char_Size(
             //    face,
             //    0,
             //    @as(c_int, @intFromFloat(point_size * 72 / dpi)) * 64, //expects a size in 1/64 of points, font_size is in points
@@ -604,18 +607,18 @@ pub const Font = struct {
             //    @intFromFloat(dpi),
             //),
         );
-        var Req = c.FT_Size_RequestRec{
-            .type = c.FT_SIZE_REQUEST_TYPE_NOMINAL,
+        var Req = ft.FT_Size_RequestRec{
+            .type = ft.FT_SIZE_REQUEST_TYPE_NOMINAL,
             .width = 0,
             .height = @as(i32, @intFromFloat(point_size * 64)),
             .horiResolution = 0,
             .vertResolution = 0,
         };
-        _ = c.FT_Request_Size(face, &Req);
+        _ = ft.FT_Request_Size(face, &Req);
 
         { //Logs all the glyphs in this font file
-            var agindex: c.FT_UInt = 0;
-            var charcode = c.FT_Get_First_Char(face, &agindex);
+            var agindex: ft.FT_UInt = 0;
+            var charcode = ft.FT_Get_First_Char(face, &agindex);
             var col: usize = 0;
             while (agindex != 0) {
                 col += 1;
@@ -625,7 +628,7 @@ pub const Font = struct {
                 }
                 try log.print("[{x} {u}] ", .{ charcode, @as(u21, @intCast(charcode)) });
 
-                charcode = c.FT_Get_Next_Char(face, charcode, &agindex);
+                charcode = ft.FT_Get_Next_Char(face, charcode, &agindex);
             }
             try log.print("\n", .{});
         }
@@ -657,15 +660,15 @@ pub const Font = struct {
 
         var timer = try std.time.Timer.start();
         for (codepoints_i) |code_i| {
-            const glyph_i = c.FT_Get_Char_Index(face, code_i);
+            const glyph_i = ft.FT_Get_Char_Index(face, code_i);
             if (glyph_i == 0) {
                 //std.debug.print("Undefined char index: {d} {x}\n", .{ codepoint.i, codepoint.i });
                 continue;
             }
 
-            try freetypeLogErr(stderr, c.FT_Load_Glyph(face, glyph_i, c.FT_LOAD_DEFAULT));
-            try freetypeLogErr(stderr, c.FT_Render_Glyph(face.*.glyph, c.FT_RENDER_MODE_NORMAL));
-            //freetypeLogErr(stderr, c.FT_Render_Glyph(face.*.glyph, c.FT_RENDER_MODE_LCD));
+            try freetypeLogErr(stderr, ft.FT_Load_Glyph(face, glyph_i, ft.FT_LOAD_DEFAULT));
+            try freetypeLogErr(stderr, ft.FT_Render_Glyph(face.*.glyph, ft.FT_RENDER_MODE_NORMAL));
+            //freetypeLogErr(stderr, ft.FT_Render_Glyph(face.*.glyph, ft.FT_RENDER_MODE_LCD));
 
             const bitmap = &(face.*.glyph.*.bitmap);
 
@@ -675,6 +678,7 @@ pub const Font = struct {
                     var fbs = std.io.FixedBufferStream([]u8){ .buffer = &buf, .pos = 0 };
                     try fbs.writer().print("debug/bitmaps/{d}.bmp", .{glyph_i});
                     try fbs.writer().writeByte(0);
+                    const c = {};
                     _ = c.stbi_write_bmp(
                         @as([*c]const u8, @ptrCast(fbs.getWritten())),
                         @as(c_int, @intCast(bitmap.width)),
@@ -798,9 +802,9 @@ pub const Font = struct {
 ///deinit()
 pub const RectPack = struct {
     const Self = @This();
-    pub const RectType = c.stbrp_rect;
+    pub const RectType = stb_rp.stbrp_rect;
     const RectDimType = c_int;
-    const NodeType = c.stbrp_node;
+    const NodeType = stb_rp.stbrp_node;
     const ExtraNodeCount = 200;
     const InitRectPos = 50;
 
@@ -860,9 +864,9 @@ pub const RectPack = struct {
             return;
 
         try self.nodes.resize(self.alloc, parent_area_w + ExtraNodeCount);
-        var rect_ctx: c.stbrp_context = undefined;
+        var rect_ctx: stb_rp.stbrp_context = undefined;
 
-        c.stbrp_init_target(
+        stb_rp.stbrp_init_target(
             &rect_ctx,
             @intCast(parent_area_w),
             @intCast(parent_area_h),
@@ -870,7 +874,7 @@ pub const RectPack = struct {
             @intCast(self.nodes.items.len),
         );
 
-        const pack_err = c.stbrp_pack_rects(
+        const pack_err = stb_rp.stbrp_pack_rects(
             &rect_ctx,
             @ptrCast(self.rects.items[0 .. self.rects.items.len - 1]),
             @intCast(self.rects.items.len),

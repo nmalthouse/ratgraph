@@ -1,17 +1,6 @@
 pub const c = @cImport({
     @cInclude("SDL3/SDL.h");
-    @cInclude("freetype_init.h");
 
-    @cDefine("SPNG_USE_MINIZ", "");
-    @cInclude("spng.h");
-
-    //@cInclude("AL/al.h");
-    //@cInclude("AL/alc.h");
-    //@cInclude("vorbis/codec.h");
-    //@cInclude("vorbis/vorbisfile.h");
-
-    //Static
-    @cInclude("stb_rect_pack.h");
     @cInclude("stb_vorbis.h");
 
     @cDefine("STBI_NO_STDIO", {});
@@ -20,8 +9,33 @@ pub const c = @cImport({
 
     @cDefine("STBI_WRITE_NO_STDIO", {});
     @cInclude("stb_image_write.h");
+});
 
+pub const ft = @cImport({
+    @cInclude("freetype_init.h");
+});
+
+pub const stb_rp = @cImport({
+    @cInclude("stb_rect_pack.h");
+});
+
+pub const spng = @cImport({
+    @cDefine("SPNG_USE_MINIZ", {});
+    @cInclude("spng.h");
+});
+
+pub const qoi = @cImport({
     @cDefine("QOI_NO_STDIO", {});
     @cDefine("QOI_IMPLEMENTATION", {});
     @cInclude("qoi/qoi.h");
+});
+
+pub const miniz = @cImport({
+    @cInclude("miniz.h");
+});
+
+pub const lua = @cImport({
+    @cInclude("lua.h");
+    @cInclude("lauxlib.h");
+    @cInclude("lualib.h");
 });

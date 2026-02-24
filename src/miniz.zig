@@ -1,15 +1,13 @@
-const c = @cImport({
-    @cInclude("miniz.h");
-});
 const std = @import("std");
+const mz = @import("graphics/c.zig").miniz;
 
 const Status = enum(c_int) {
-    ok = c.MZ_OK,
-    stream_end = c.MZ_STREAM_END,
-    stream_error = c.MZ_STREAM_ERROR,
-    param_error = c.MZ_PARAM_ERROR,
-    buf_error = c.MZ_BUF_ERROR,
-    mem_error = c.MZ_MEM_ERROR,
+    ok = mz.MZ_OK,
+    stream_end = mz.MZ_STREAM_END,
+    stream_error = mz.MZ_STREAM_ERROR,
+    param_error = mz.MZ_PARAM_ERROR,
+    buf_error = mz.MZ_BUF_ERROR,
+    mem_error = mz.MZ_MEM_ERROR,
     _,
 };
 
@@ -25,7 +23,7 @@ const AllocWrap = struct {
     map: std.AutoHashMapUnmanaged(*anyopaque, usize) = .{},
 
     pub export fn alloc_fn(opaque_self: ?*anyopaque, count: usize, size: usize) ?*anyopaque {
-        const self: *@This() = @alignCast(@ptrCast(opaque_self orelse return null));
+        const self: *@This() = @ptrCast(@alignCast(opaque_self orelse return null));
         const length = count * size;
         const raw = self.alloc.rawAlloc(length, _align, 0) orelse return null;
         const item: *anyopaque = @ptrCast(raw);
@@ -37,7 +35,7 @@ const AllocWrap = struct {
     }
 
     pub export fn free_fn(opaque_self: ?*anyopaque, addr_o: ?*anyopaque) void {
-        const self: *@This() = @alignCast(@ptrCast(opaque_self orelse return));
+        const self: *@This() = @ptrCast(@alignCast(opaque_self orelse return));
 
         const addr = addr_o orelse return;
         const mp: [*]u8 = @ptrCast(addr);
@@ -58,7 +56,7 @@ pub fn compressGzip(alloc: std.mem.Allocator, input: []const u8, wr: anytype) !v
     defer awrap.deinit();
 
     var out: [65535]u8 = undefined;
-    var stream: c.mz_stream = .{
+    var stream: mz.mz_stream = .{
         .next_in = &input[0],
         .avail_in = @intCast(input.len),
         .total_in = 0,
@@ -79,19 +77,19 @@ pub fn compressGzip(alloc: std.mem.Allocator, input: []const u8, wr: anytype) !v
 
     try writeGzipHeader(wr);
 
-    const defel: Status = @enumFromInt(c.mz_deflateInit2(
+    const defel: Status = @enumFromInt(mz.mz_deflateInit2(
         &stream,
-        c.MZ_BEST_COMPRESSION,
-        c.MZ_DEFLATED,
-        -c.MZ_DEFAULT_WINDOW_BITS,
+        mz.MZ_BEST_COMPRESSION,
+        mz.MZ_DEFLATED,
+        -mz.MZ_DEFAULT_WINDOW_BITS,
         8,
-        c.MZ_DEFAULT_STRATEGY,
+        mz.MZ_DEFAULT_STRATEGY,
     ));
     if (defel != .ok)
         return error.init;
 
     while (true) {
-        const s: Status = @enumFromInt(c.mz_deflate(&stream, c.MZ_FINISH));
+        const s: Status = @enumFromInt(mz.mz_deflate(&stream, mz.MZ_FINISH));
         switch (s) {
             .stream_end => break,
             else => return error.broken,
@@ -105,14 +103,14 @@ pub fn compressGzip(alloc: std.mem.Allocator, input: []const u8, wr: anytype) !v
     try wr.writeAll(out[0 .. out.len - stream.avail_out]);
     var bits: [4]u8 = undefined;
 
-    const crc = c.mz_crc32(c.mz_crc32(0, null, 0), &input[0], input.len);
+    const crc = mz.mz_crc32(mz.mz_crc32(0, null, 0), &input[0], input.len);
 
     std.mem.writeInt(u32, &bits, @intCast(crc & 0xffffffff), .little);
     try wr.writeAll(&bits);
 
     std.mem.writeInt(u32, &bits, @intCast(input.len), .little);
     try wr.writeAll(&bits);
-    _ = c.mz_deflateEnd(&stream);
+    _ = mz.mz_deflateEnd(&stream);
 }
 
 //tdefl_compress
