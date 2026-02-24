@@ -1271,12 +1271,12 @@ pub const Gui = struct {
     }
 
     pub fn setTransientWindow(self: *Self, win: *iWindow, parent_area: ?*iArea) void {
-        self.transient_windows.append(self.alloc, .{
+        self.transient_windows.insert(self.alloc, 0, .{
             .win = win,
             .parent = parent_area,
             .defer_close = false,
         }) catch return;
-        const item = &(self.transient_windows.items[self.transient_windows.items.len - 1].?);
+        const item = &(self.transient_windows.items[0].?);
         item.win.area.area = .{
             .x = @round(item.win.area.area.x),
             .y = @round(item.win.area.area.y),
@@ -1391,8 +1391,10 @@ pub const Gui = struct {
             drawFbo(w.area.area, fbo, self.dstate.ctx, self.dstate.tint);
         }
 
-        for (self.transient_windows.items) |tw| {
-            const w = tw orelse continue;
+        //draw back to front
+        var i = self.transient_windows.items.len;
+        while (i > 0) : (i -= 1) {
+            const w = self.transient_windows.items[i - 1] orelse continue;
             const fbo = self.fbos.getPtr(w.win) orelse continue;
             drawFbo(w.win.area.area, fbo, self.dstate.ctx, self.dstate.tint);
         }
