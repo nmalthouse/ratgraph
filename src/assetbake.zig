@@ -388,7 +388,7 @@ pub fn assetBake(
 
     var bmps = std.ArrayList(graph.Bitmap){};
     defer {
-        for (bmps.items) |bmp| {
+        for (bmps.items) |*bmp| {
             bmp.deinit();
         }
         bmps.deinit(alloc);

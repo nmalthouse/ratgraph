@@ -40,7 +40,8 @@ pub const ImageFormat = enum(usize) {
 };
 
 format: ImageFormat = .rgba_8,
-data: std.array_list.Managed(u8),
+alloc: std.mem.Allocator,
+data: std.ArrayList(u8),
 w: u32,
 h: u32,
 
@@ -51,14 +52,14 @@ pub fn rect(self: Bitmap) Rect {
 pub fn initBlank(alloc: std.mem.Allocator, width: anytype, height: anytype, format: ImageFormat) !Bitmap {
     const h = lcast(u32, height);
     const w = lcast(u32, width);
-    var ret = Bitmap{ .format = format, .data = std.array_list.Managed(u8).init(alloc), .w = lcast(u32, width), .h = lcast(u32, height) };
-    try ret.data.appendNTimes(0, w * h * ImageFormat.toChannelCount(format));
+    var ret = Bitmap{ .format = format, .data = .{}, .w = lcast(u32, width), .h = lcast(u32, height), .alloc = alloc };
+    try ret.data.appendNTimes(alloc, 0, w * h * ImageFormat.toChannelCount(format));
     return ret;
 }
 
 pub fn initFromBuffer(alloc: std.mem.Allocator, buffer: []const u8, width: anytype, height: anytype, format: ImageFormat) !Bitmap {
     const copy = try alloc.dupe(u8, buffer);
-    return Bitmap{ .data = std.array_list.Managed(u8).fromOwnedSlice(alloc, copy), .w = lcast(u32, width), .h = lcast(u32, height), .format = format };
+    return Bitmap{ .data = .fromOwnedSlice(copy), .w = lcast(u32, width), .h = lcast(u32, height), .format = format, .alloc = alloc };
 }
 
 pub fn initFromPngBuffer(alloc: std.mem.Allocator, buffer: []const u8) !Bitmap {
@@ -86,7 +87,7 @@ pub fn initFromPngBuffer(alloc: std.mem.Allocator, buffer: []const u8) !Bitmap {
 
     try spngError(c.spng_decode_image(pngctx, &decoded_data[0], out_size, @intCast(@intFromEnum(fmt)), 0));
 
-    return Bitmap{ .format = fmt, .w = ihdr.width, .h = ihdr.height, .data = std.array_list.Managed(u8).fromOwnedSlice(alloc, decoded_data) };
+    return Bitmap{ .format = fmt, .w = ihdr.width, .h = ihdr.height, .data = .fromOwnedSlice(decoded_data), .alloc = alloc };
 }
 
 pub fn initFromQoiBuffer(alloc: std.mem.Allocator, qoi_buf: []const u8) !Bitmap {
@@ -142,8 +143,8 @@ pub fn initFromImageBuffer(alloc: std.mem.Allocator, buffer: []const u8) !Bitmap
     );
 }
 
-pub fn deinit(self: Bitmap) void {
-    self.data.deinit();
+pub fn deinit(self: *Bitmap) void {
+    self.data.deinit(self.alloc);
 }
 
 pub fn resize(self: *Bitmap, new_width: anytype, new_height: anytype) !void {
@@ -158,7 +159,7 @@ pub fn resize(self: *Bitmap, new_width: anytype, new_height: anytype) !void {
         .rgb_8 => 3,
         .ga_8 => 2,
     };
-    try self.data.resize(num_comp * w * h);
+    try self.data.resize(self.alloc, num_comp * w * h);
 }
 
 pub fn replaceColor(self: *Bitmap, color: u32, replacement: u32) void {
@@ -243,7 +244,7 @@ pub fn writeToPngFile(self: *Bitmap, dir: std.fs.Dir, sub_path: []const u8) !voi
 }
 
 pub fn writeQoi(self: *Bitmap, wr: *std.io.Writer) !void {
-    const alloc = self.data.allocator;
+    const alloc = self.alloc;
     var qd = c.qoi_desc{
         .width = self.w,
         .height = self.h,
@@ -318,6 +319,21 @@ pub fn copySubR(dest: *Bitmap, des_x: u32, des_y: u32, source: *Bitmap, src_x: u
             }
         }
     }
+}
+
+pub fn invertY(self: *Bitmap) !void {
+    var new = std.ArrayList(u8){};
+    try new.resize(self.alloc, self.data.items.len);
+    const nchannel = self.format.toChannelCount();
+
+    const w = nchannel * self.w;
+    for (0..self.h) |hi| {
+        const old_start = hi * self.w * nchannel;
+        const new_start = (self.h - hi - 1) * self.w * nchannel;
+        @memcpy(new.items[new_start .. new_start + w], self.data.items[old_start .. old_start + w]);
+    }
+    self.data.deinit(self.alloc);
+    self.data = new;
 }
 
 fn spngError(errno: c_int) !void {

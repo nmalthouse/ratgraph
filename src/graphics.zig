@@ -250,8 +250,6 @@ pub const ImmediateDrawingContext = struct {
         yes,
     } = .no,
 
-    /// This is always in sync with the actual window
-    real_screen_dimensions: Vec2f = .{ .x = 0, .y = 0 },
     /// This can be changed for viewports
     screen_dimensions: Vec2f = .{ .x = 0, .y = 0 },
     preflush_cb: ?*const fn (?*anyopaque) void = null,

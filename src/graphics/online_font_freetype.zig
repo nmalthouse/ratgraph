@@ -207,9 +207,10 @@ pub const OnlineFont = struct {
                 }
             }
 
-            var bmp = Bitmap{
+            var bmp = Bitmap{ //This is a dummy bmp, hence the undefined
                 .format = .g_8,
-                .data = .{ .items = bitmap.buffer[0 .. bitmap.rows * bitmap.width], .capacity = undefined, .allocator = undefined },
+                .data = .{ .items = bitmap.buffer[0 .. bitmap.rows * bitmap.width], .capacity = undefined },
+                .alloc = self.alloc,
                 .w = bitmap.width,
                 .h = bitmap.rows,
             };
