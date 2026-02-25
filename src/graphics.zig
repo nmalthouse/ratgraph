@@ -63,7 +63,7 @@ test "basic graph usage" {
     var win = try graph.SDL.Window.createWindow("My window", .{
         // Optional, see Window.createWindow definition for full list of options
         .window_size = .{ .x = 800, .y = 600 },
-    });
+    }, alloc);
     defer win.destroyWindow();
 
     var draw = graph.ImmediateDrawingContext.init(alloc);
@@ -89,7 +89,7 @@ test "basic graph usage" {
         draw.rectVertexColors(r, &.{ 0xff, 0xff, 0xff, 0xff });
         draw.nineSlice(r, r, font.font.texture, 1, Colori.White);
         draw.rectTex(r, r, font.font.texture);
-        draw.line(v1, v2, 0xff);
+        draw.line(v1, v2, 0xff, 2);
         draw.triangle(v1, v2, v3, 0xfffffff0);
 
         try draw.flush(null, null); //Flush any draw commands

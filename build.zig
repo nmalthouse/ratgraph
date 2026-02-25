@@ -5,19 +5,12 @@ fn getSrcDir() []const u8 {
 }
 const srcdir = getSrcDir();
 
-const USE_SYSTEM_FREETYPE = false;
-pub const ToLink = enum {
-    freetype,
-    lua,
-    openal,
-};
-pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink) !void {
+pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module) !void {
     const cdir = "c_libs";
 
     const include_paths = [_][]const u8{
         cdir ++ "/miniz/build",
         cdir ++ "/miniz",
-        cdir ++ "/freetype",
         cdir ++ "/stb",
         cdir,
         cdir ++ "/libspng/spng",
@@ -26,16 +19,11 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
     for (include_paths) |path| {
         mod.addIncludePath(b.path(path));
     }
-    if (!USE_SYSTEM_FREETYPE) {
-        mod.addIncludePath(b.path(cdir ++ "/freetype_build/include"));
-    }
 
     const c_source_files = [_][]const u8{
         cdir ++ "/stb_image_write.c",
-        cdir ++ "/stb_image.c",
         cdir ++ "/stb/stb_vorbis.c",
         cdir ++ "/stb_rect_pack.c",
-        //cdir ++ "/stb_truetype.c",
         cdir ++ "/libspng/spng/spng.c",
         cdir ++ "/miniz/miniz.c",
         cdir ++ "/miniz/miniz_zip.c",
@@ -57,60 +45,27 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module, tolink: []const ToLink
     mod.link_libc = true;
     if (mod.resolved_target) |rt| {
         if (rt.result.os.tag == .windows) {
-            if (USE_SYSTEM_FREETYPE) {
-                mod.addSystemIncludePath(.{ .cwd_relative = "/mingw64/include/freetype2" });
-                mod.linkSystemLibrary("freetype.dll", .{});
-            } else {
-                //mod.addIncludePath(b.path(cdir ++ "/freetype_build/buildwin"));
-                //mod.addObjectFile(b.path(cdir ++ "/freetype_build/buildwin/libfreetype.a"));
-            }
+            //TODO on wine, all is well without linking these, verify this is true on actual Windows
 
             //These all come from sdl/buildwin/sdl3.pc
-            mod.linkSystemLibrary("m", .{});
-            mod.linkSystemLibrary("kernel32", .{});
-            mod.linkSystemLibrary("user32", .{});
-            mod.linkSystemLibrary("gdi32", .{});
-            mod.linkSystemLibrary("winmm", .{});
-            mod.linkSystemLibrary("imm32", .{});
-            mod.linkSystemLibrary("ole32", .{});
-            mod.linkSystemLibrary("oleaut32", .{});
-            mod.linkSystemLibrary("version", .{});
-            mod.linkSystemLibrary("uuid", .{});
-            mod.linkSystemLibrary("advapi32", .{});
-            mod.linkSystemLibrary("setupapi", .{});
-            mod.linkSystemLibrary("shell32", .{});
-            mod.linkSystemLibrary("dinput", .{});
+            // mod.linkSystemLibrary("m", .{});
+            // mod.linkSystemLibrary("kernel32", .{});
+            // mod.linkSystemLibrary("user32", .{});
+            // mod.linkSystemLibrary("gdi32", .{});
+            // mod.linkSystemLibrary("winmm", .{});
+            // mod.linkSystemLibrary("imm32", .{});
+            // mod.linkSystemLibrary("ole32", .{});
+            // mod.linkSystemLibrary("oleaut32", .{});
+            // mod.linkSystemLibrary("version", .{});
+            // mod.linkSystemLibrary("uuid", .{});
+            // mod.linkSystemLibrary("advapi32", .{});
+            // mod.linkSystemLibrary("setupapi", .{});
+            // mod.linkSystemLibrary("shell32", .{});
+            // mod.linkSystemLibrary("dinput", .{});
         } else {
-            mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include" });
-
-            if (USE_SYSTEM_FREETYPE) {
-                mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/freetype2" });
-            } else {
-                mod.addIncludePath(b.path(cdir ++ "/freetype_build/build"));
-            }
-            for (tolink) |tl| {
-                const str = switch (tl) {
-                    .lua => "lua",
-                    .freetype => "freetype",
-                    .openal => "openal",
-                };
-                if (tl == .freetype and !USE_SYSTEM_FREETYPE) {
-                    //mod.addObjectFile(b.path(cdir ++ "/freetype_build/build/libfreetype.a"));
-                    continue;
-                }
-                mod.linkSystemLibrary(str, .{ .preferred_link_mode = .static });
-            }
+            //mod.addIncludePath(b.path(cdir ++ "/freetype_build/build"));
         }
     }
-
-    const gl_bindings = @import("zigglgen").generateBindingsModule(b, .{
-        .api = .gl,
-        .version = .@"4.5",
-        .profile = .core,
-        .extensions = &.{ .ARB_clip_control, .NV_scissor_exclusive, .EXT_texture_compression_s3tc },
-    });
-
-    mod.addImport("gl", gl_bindings);
 }
 
 pub fn build(b: *std.Build) !void {
@@ -119,6 +74,36 @@ pub fn build(b: *std.Build) !void {
     const mode = b.standardOptimizeOption(.{});
     const build_gui = b.option(bool, "gui", "Build the gui test app") orelse true;
     const strip = mode == .ReleaseFast;
+
+    const zalgebra_dep = b.dependency("zalgebra", .{
+        .target = target,
+        .optimize = mode,
+    });
+    const zalgebra_module = zalgebra_dep.module("zalgebra");
+
+    const gl_bindings = @import("zigglgen").generateBindingsModule(b, .{
+        .api = .gl,
+        .version = .@"4.5",
+        .profile = .core,
+        .extensions = &.{ .ARB_clip_control, .NV_scissor_exclusive, .EXT_texture_compression_s3tc },
+    });
+
+    const sdl_dep = b.dependency("sdl", .{
+        .target = target,
+        .optimize = .ReleaseFast,
+        .preferred_linkage = .static,
+        .strip = strip,
+    });
+    const sdl_lib = sdl_dep.artifact("SDL3");
+
+    const m = b.addModule("ratgraph", .{
+        .root_source_file = b.path("src/graphics.zig"),
+        .target = target,
+    });
+    try linkLibrary(b, m);
+    m.addImport("zalgebra", zalgebra_module);
+    m.linkLibrary(sdl_lib);
+    m.addImport("gl", gl_bindings);
 
     const bake = b.addExecutable(.{
         .name = "assetbake",
@@ -130,8 +115,8 @@ pub fn build(b: *std.Build) !void {
         }),
     });
     b.installArtifact(bake);
-    const to_link = [_]ToLink{ .freetype, .openal, .lua };
-    try linkLibrary(b, bake.root_module, &to_link);
+    try linkLibrary(b, bake.root_module);
+    bake.root_module.addImport("zalgebra", zalgebra_module);
 
     const exe = b.addExecutable(.{
         .name = "the_engine",
@@ -141,22 +126,23 @@ pub fn build(b: *std.Build) !void {
             .optimize = mode,
             .strip = strip,
         }),
-        //.use_llvm = true,
     });
-    b.installArtifact(exe);
+    {
+        b.installArtifact(exe);
+        try linkLibrary(b, exe.root_module);
+        exe.root_module.addImport("zalgebra", zalgebra_module);
 
-    try linkLibrary(b, exe.root_module, &to_link);
-    const m = b.addModule("ratgraph", .{ .root_source_file = b.path("src/graphics.zig"), .target = target });
-    try linkLibrary(b, m, &.{.freetype});
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(b.getInstallStep());
+        if (b.args) |args| {
+            run_cmd.addArgs(args);
+        }
 
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
+        const run_step = b.step("run", "run app");
+        run_step.dependOn(&run_cmd.step);
+        exe.root_module.linkLibrary(sdl_lib);
+        exe.root_module.addImport("gl", gl_bindings);
     }
-
-    const run_step = b.step("run", "run app");
-    run_step.dependOn(&run_cmd.step);
 
     const unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -165,43 +151,20 @@ pub fn build(b: *std.Build) !void {
             .optimize = mode,
             .link_libc = true,
         }),
+        .use_llvm = true, //Kcov can't test binaries using zig backend
     });
-    unit_tests.setExecCmd(&[_]?[]const u8{ "kcov", "kcov-output", null });
-    try linkLibrary(b, unit_tests.root_module, &to_link);
+    {
+        unit_tests.setExecCmd(&[_]?[]const u8{ "kcov", "--clean", "--include-pattern=ratgraph/src", "/tmp/kcov-output", null });
+        try linkLibrary(b, unit_tests.root_module);
+        unit_tests.root_module.linkLibrary(sdl_lib);
 
-    const run_unit_tests = b.addRunArtifact(unit_tests);
+        const run_unit_tests = b.addRunArtifact(unit_tests);
 
-    const zalgebra_dep = b.dependency("zalgebra", .{
-        .target = target,
-        .optimize = mode,
-    });
+        unit_tests.root_module.addImport("zalgebra", zalgebra_module);
 
-    const zalgebra_module = zalgebra_dep.module("zalgebra");
-    exe.root_module.addImport("zalgebra", zalgebra_module);
-    bake.root_module.addImport("zalgebra", zalgebra_module);
-    unit_tests.root_module.addImport("zalgebra", zalgebra_module);
-    m.addImport("zalgebra", zalgebra_module);
-
-    const sdl_dep = b.dependency("sdl", .{
-        .target = target,
-        .optimize = .ReleaseFast,
-        .preferred_linkage = .static,
-        //.strip = null,
-        //.sanitize_c = null,
-        //.pic = null,
-        //.lto = null,
-        //.emscripten_pthreads = false,
-        //.install_build_config_h = false,
-    });
-    const sdl_lib = sdl_dep.artifact("SDL3");
-    m.linkLibrary(sdl_lib);
-    exe.root_module.linkLibrary(sdl_lib);
-
-    // Similar to creating the run step earlier, this exposes a `test` step to
-    // the `zig build --help` menu, providing a way for the user to request
-    // running the unit tests.
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
+        const test_step = b.step("test", "Run unit tests");
+        test_step.dependOn(&run_unit_tests.step);
+    }
 }
 
 fn freetype(b: *std.Build, mod: *std.Build.Module) !void {
@@ -264,6 +227,8 @@ fn freetype(b: *std.Build, mod: *std.Build.Module) !void {
         .files = srcs,
         .flags = flags.items,
     });
+    mod.addIncludePath(b.path("c_libs/freetype_build/include"));
+    mod.addIncludePath(b.path("c_libs/freetype"));
 
     if (mod.resolved_target) |rt| {
         switch (rt.result.os.tag) {

@@ -10,7 +10,7 @@ const Mat3 = graph.za.Mat3;
 const Rec = graph.Rec;
 const NewCol = @import("newcol.zig");
 const ColType = NewCol.ColCtx(3, f32);
-const OFont = @import("graphics/online_font.zig").OnlineFont;
+const OFont = @import("graphics/online_font_freetype.zig").OnlineFont;
 const DCtx = graph.ImmediateDrawingContext;
 
 //const Col3d = @import("col3d.zig");
@@ -1049,13 +1049,13 @@ pub fn testMain() !void {
         .window_flags = &.{graph.c.SDL_WINDOW_INPUT_FOCUS},
         //graph.c.SDL_WINDOW_KEYBOARD_GRABBED
         //},
-    });
+    }, alloc);
     defer win.destroyWindow();
     win.pumpEvents(.poll);
     var draw = graph.ImmediateDrawingContext.init(alloc);
     defer draw.deinit();
 
-    const cp437 = try graph.Bitmap.initFromImageBuffer(alloc, @embedFile("font/cp437.png"));
+    const cp437 = try graph.Bitmap.initFromImageBuffer(alloc, @embedFile("gui/font/cp437.png"));
     var ff = try graph.Font.initFixed(alloc, cp437, .{
         .sts = .{
             .start = .{ .x = 0, .y = 0 },
@@ -1138,7 +1138,7 @@ pub fn testMain() !void {
     }
 }
 
-pub const main = game_main;
+pub const main = testMain;
 
 pub fn game_main() !void {
     const cwd = std.fs.cwd();

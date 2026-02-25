@@ -329,25 +329,25 @@ test {
     var bctx = try BindRegistry.init(std.testing.allocator);
     defer bctx.deinit();
 
-    const ctx0 = try bctx.newContext();
+    const ctx0 = try bctx.newContext(null);
 
-    const my_bind = try bctx.registerBind(.bind(.{ .scancode = .E }, .exclusive, ctx0));
-    const ex_1 = try bctx.registerBind(.bind(.{ .scancode = .F }, .exclusive, ctx0));
-    const multi_0 = try bctx.registerBind(.bind(.{ .scancode = .W }, .multi, ctx0));
-    const multi_1 = try bctx.registerBind(.bind(.{ .scancode = .A }, .multi, ctx0));
+    const my_bind = try bctx.registerBind(.bind(.{ .scancode = .E }, .exclusive, &.{}, false, ctx0), null);
+    const ex_1 = try bctx.registerBind(.bind(.{ .scancode = .F }, .exclusive, &.{}, false, ctx0), null);
+    const multi_0 = try bctx.registerBind(.bind(.{ .scancode = .W }, .multi, &.{}, false, ctx0), null);
+    const multi_1 = try bctx.registerBind(.bind(.{ .scancode = .A }, .multi, &.{}, false, ctx0), null);
 
     try std.testing.expectEqual(ButtonState.low, bctx.getState(my_bind));
     bctx.button_state.items[@intFromEnum(keycodes.Scancode.E)] = .rising;
 
     bctx.enableContext(ctx0, true);
-    try bctx.updateSdl();
+    bctx.updateSdl(0);
     try std.testing.expectEqual(ButtonState.rising, bctx.getState(my_bind));
 
     { //Test multi
 
         bctx.button_state.items[@intFromEnum(keycodes.Scancode.W)] = .high;
         bctx.button_state.items[@intFromEnum(keycodes.Scancode.A)] = .rising;
-        try bctx.updateSdl();
+        bctx.updateSdl(0);
         try eq(ButtonState.rising, bctx.getState(my_bind));
         try eq(ButtonState.high, bctx.getState(multi_0));
         try eq(ButtonState.rising, bctx.getState(multi_1));
@@ -355,7 +355,7 @@ test {
 
     { // test multi and exclusive
         bctx.button_state.items[@intFromEnum(keycodes.Scancode.E)] = .high;
-        try bctx.updateSdl();
+        bctx.updateSdl(0);
         try eq(ButtonState.high, bctx.getState(my_bind));
         try eq(ButtonState.high, bctx.getState(multi_0));
         try eq(ButtonState.rising, bctx.getState(multi_1));
@@ -363,7 +363,7 @@ test {
 
     { //exclusive rising takes priority
         bctx.button_state.items[@intFromEnum(keycodes.Scancode.F)] = .rising;
-        try bctx.updateSdl();
+        bctx.updateSdl(0);
         try eq(ButtonState.low, bctx.getState(my_bind));
         try eq(ButtonState.rising, bctx.getState(ex_1));
         try eq(ButtonState.high, bctx.getState(multi_0));
@@ -372,7 +372,7 @@ test {
 
     { //ctx disable
         bctx.enableContext(ctx0, false);
-        try bctx.updateSdl();
+        bctx.updateSdl(0);
         try eq(ButtonState.low, bctx.getState(my_bind));
         try eq(ButtonState.low, bctx.getState(ex_1));
         try eq(ButtonState.low, bctx.getState(multi_0));

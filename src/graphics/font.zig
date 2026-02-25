@@ -673,20 +673,6 @@ pub const Font = struct {
             const bitmap = &(face.*.glyph.*.bitmap);
 
             if (bitmap.width != 0 and bitmap.rows != 0) {
-                if (options.debug_dir != null) {
-                    var buf: [255]u8 = undefined;
-                    var fbs = std.io.FixedBufferStream([]u8){ .buffer = &buf, .pos = 0 };
-                    try fbs.writer().print("debug/bitmaps/{d}.bmp", .{glyph_i});
-                    try fbs.writer().writeByte(0);
-                    const c = {};
-                    _ = c.stbi_write_bmp(
-                        @as([*c]const u8, @ptrCast(fbs.getWritten())),
-                        @as(c_int, @intCast(bitmap.width)),
-                        @as(c_int, @intCast(bitmap.rows)),
-                        1,
-                        @as([*c]u8, @ptrCast(bitmap.buffer[0 .. bitmap.rows * bitmap.width])),
-                    );
-                }
                 try bitmaps.append(alloc, try Bitmap.initFromBuffer(alloc, bitmap.buffer[0 .. bitmap.width * bitmap.rows], bitmap.width, bitmap.rows, .g_8));
 
                 try pack_ctx.appendRect(code_i, bitmap.width + padding + padding, bitmap.rows + padding + padding);
