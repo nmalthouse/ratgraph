@@ -170,6 +170,7 @@ pub fn build(b: *std.Build) !void {
 }
 
 fn freetype(b: *std.Build, mod: *std.Build.Module) !void {
+    const ftsrc = b.dependency("freetype", .{}).path("");
     // adapted from allyourcodebase/freetype
     const srcs: []const []const u8 = &.{
         "autofit/autofit.c",
@@ -225,33 +226,33 @@ fn freetype(b: *std.Build, mod: *std.Build.Module) !void {
     });
 
     mod.addCSourceFiles(.{
-        .root = b.path("c_libs/freetype_build/src"),
+        .root = ftsrc.path(b, "src"),
         .files = srcs,
         .flags = flags.items,
     });
-    mod.addIncludePath(b.path("c_libs/freetype_build/include"));
+    mod.addIncludePath(ftsrc.path(b, "include"));
     mod.addIncludePath(b.path("c_libs/freetype"));
 
     if (mod.resolved_target) |rt| {
         switch (rt.result.os.tag) {
             .windows => {
                 mod.addCSourceFile(.{
-                    .file = b.path("c_libs/freetype_build/builds/windows/ftsystem.c"),
+                    .file = ftsrc.path(b, "builds/windows/ftsystem.c"),
                     .flags = flags.items,
                 });
             },
-            .linux => mod.addCSourceFile(.{ .file = b.path("c_libs/freetype_build/builds/unix/ftsystem.c"), .flags = flags.items }),
-            else => mod.addCSourceFile(.{ .file = b.path("c_libs/freetype_build/src/base/ftsystem.c"), .flags = flags.items }),
+            .linux => mod.addCSourceFile(.{ .file = ftsrc.path(b, "builds/unix/ftsystem.c"), .flags = flags.items }),
+            else => mod.addCSourceFile(.{ .file = ftsrc.path(b, "src/base/ftsystem.c"), .flags = flags.items }),
         }
         switch (rt.result.os.tag) {
-            else => mod.addCSourceFile(.{ .file = b.path("c_libs/freetype_build/src/base/ftdebug.c"), .flags = flags.items }),
+            else => mod.addCSourceFile(.{ .file = ftsrc.path(b, "src/base/ftdebug.c"), .flags = flags.items }),
             .windows => {
                 mod.addCSourceFile(.{
-                    .file = b.path("c_libs/freetype_build/builds/windows/ftdebug.c"),
+                    .file = ftsrc.path(b, "builds/windows/ftdebug.c"),
                     .flags = flags.items,
                 });
                 mod.addWin32ResourceFile(.{
-                    .file = b.path("c_libs/freetype_build/src/base/ftver.rc"),
+                    .file = ftsrc.path(b, "src/base/ftver.rc"),
                 });
             },
         }

@@ -15,6 +15,10 @@
             .url = "git+https://github.com/castholm/zigglgen.git#b624cc7d2e984f61c63a83a3d0ad6c686782f961",
             .hash = "zigglgen-0.4.0-bmyqLV6PLwAt0VCiGVgz6kZ448zaiTix2Z8MXEEuN4Vi",
         },
+        .freetype = .{
+            .url = "git+https://gitlab.freedesktop.org/freetype/freetype.git#459af335b9314bbbc9ec2f8306b7ed0c4773ad8a",
+            .hash = "N-V-__8AAPxZqgDWoIbOU4fENn0GECH9C5oP9ESlzKDs7Lf9",
+        },
     },
     .paths = .{
         "",
