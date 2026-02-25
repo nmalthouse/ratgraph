@@ -1,14 +1,12 @@
 pub const c = @cImport({
     @cInclude("SDL3/SDL.h");
 
-    @cInclude("stb_vorbis.h");
+    //@cDefine("STBI_NO_STDIO", {});
+    //@cDefine("STBI_ONLY_JPEG", {});
+    //@cInclude("stb_image.h");
 
-    @cDefine("STBI_NO_STDIO", {});
-    @cDefine("STBI_ONLY_JPEG", {});
-    @cInclude("stb_image.h");
-
-    @cDefine("STBI_WRITE_NO_STDIO", {});
-    @cInclude("stb_image_write.h");
+    //@cDefine("STBI_WRITE_NO_STDIO", {});
+    //@cInclude("stb_image_write.h");
 });
 
 pub const ft = @cImport({

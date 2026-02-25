@@ -7,13 +7,14 @@ const srcdir = getSrcDir();
 
 pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module) !void {
     const cdir = "c_libs";
+    const vend = "c_libs/vendored";
 
     const include_paths = [_][]const u8{
-        cdir ++ "/miniz/build",
-        cdir ++ "/miniz",
-        cdir ++ "/stb",
+        vend ++ "/miniz",
+        vend ++ "/stb",
         cdir,
-        cdir ++ "/libspng/spng",
+        vend ++ "/libspng",
+        vend,
     };
 
     for (include_paths) |path| {
@@ -21,14 +22,15 @@ pub fn linkLibrary(b: *std.Build, mod: *std.Build.Module) !void {
     }
 
     const c_source_files = [_][]const u8{
-        cdir ++ "/stb_image_write.c",
-        cdir ++ "/stb/stb_vorbis.c",
+        //cdir ++ "/stb_image_write.c",
+        //cdir ++ "/stb_image.c",
         cdir ++ "/stb_rect_pack.c",
-        cdir ++ "/libspng/spng/spng.c",
-        cdir ++ "/miniz/miniz.c",
-        cdir ++ "/miniz/miniz_zip.c",
-        cdir ++ "/miniz/miniz_tinfl.c",
-        cdir ++ "/miniz/miniz_tdef.c",
+        vend ++ "/libspng/spng.c",
+
+        vend ++ "/miniz/miniz.c",
+        vend ++ "/miniz/miniz_zip.c",
+        vend ++ "/miniz/miniz_tinfl.c",
+        vend ++ "/miniz/miniz_tdef.c",
     };
 
     for (c_source_files) |cfile| {

@@ -915,10 +915,6 @@ pub const Texture = struct {
             var bmp = try Bitmap.initFromPngFile(alloc, dir, sub_path);
             defer bmp.deinit();
             return initFromBitmap(bmp, o);
-        } else {
-            var bmp = try Bitmap.initFromImageFile(alloc, dir, sub_path);
-            defer bmp.deinit();
-            return initFromBitmap(bmp, o);
         }
         return error.unrecognizedImageFileFormat;
     }
