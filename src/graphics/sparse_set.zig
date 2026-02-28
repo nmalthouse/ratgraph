@@ -17,6 +17,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
 
         /// Sparse maps a global index to a 'dense' index
         sparse: ArrayList(index_type) = .{},
+        count: usize = 0,
 
         dense: std.array_list.Managed(child_type),
         /// dense_index_lut is parallel to dense, mapping dense indices to global indices
@@ -71,6 +72,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             try self.sparse.resize(self.alloc, 0);
             try self.dense_index_lut.resize(self.alloc, 0);
             try self.dense.resize(0);
+            self.count = 0;
             try self._freelist.resize(self.alloc, 0);
         }
 
@@ -93,6 +95,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
                 break :blk self.dense_index_lut.items.len - 1;
             };
 
+            self.count += 1;
             self.sparse.items[index] = @as(index_type, @intCast(dense_index));
             self.dense.items[dense_index] = item;
             self.dense_index_lut.items[dense_index] = index;
@@ -105,6 +108,7 @@ pub fn SparseSet(comptime child_type: type, comptime index_type: type) type {
             self.sparse.items[index] = sparse_null_marker;
             const item = self.dense.items[di];
             self.dense_index_lut.items[di] = dense_null_marker;
+            self.count -= 1;
             return item;
         }
 
