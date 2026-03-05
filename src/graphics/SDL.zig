@@ -266,6 +266,8 @@ pub const Window = struct {
         };
         errdefer c.SDL_DestroyWindow(win);
 
+        std.debug.print("win id {d}\n", .{c.SDL_GetWindowID(win)});
+
         const context = c.SDL_GL_CreateContext(win) orelse {
             sdlLogErr();
             return error.SDLCreatingContext;
@@ -338,6 +340,7 @@ pub const Window = struct {
             return error.SDLWindowInit;
         };
         errdefer c.SDL_DestroyWindow(win);
+        std.debug.print("child win id {d}\n", .{c.SDL_GetWindowID(win)});
         return .{ .win = win };
     }
 

@@ -1,5 +1,6 @@
 const std = @import("std");
 const graph = @import("../graphics.zig");
+//TODO get this working
 
 pub const EventCb = fn (user: *iEvent, data: ?*anyopaque) void;
 pub const iEvent = struct {

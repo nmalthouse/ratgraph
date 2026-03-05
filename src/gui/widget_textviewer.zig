@@ -38,12 +38,6 @@ pub const TextView = struct {
         state: enum { init, point0, point1 } = .init,
         start_line: usize = 0,
         start_char: usize = 0,
-        x0: f32 = 0,
-        y0: f32 = 0,
-
-        x1: f32 = 0,
-        y1: f32 = 0,
-
         end_line: usize = 0,
         end_char: usize = 0,
     } = .{},
@@ -94,9 +88,11 @@ pub const TextView = struct {
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         switch (ev.event) {
-            .keydown => |kev| {
-                _ = kev;
-                _ = self;
+            .keydown => {
+                const b = &Gui.binds.global;
+                if (ev.gui.sdl_win.isBindState(b.copy, .rising)) {
+                    self.copySelection(ev.gui) catch {};
+                }
             },
             else => {},
         }
@@ -156,9 +152,7 @@ pub const TextView = struct {
         switch (id) {
             bi("copy") => {
                 self.copySelection(dat.gui) catch return;
-                //setClipboard(dat.gui.alloc, self.getSelectionSlice()) catch return,
             },
-            //bi("paste") => self.paste(dat.gui) catch return,
             else => {},
         }
     }

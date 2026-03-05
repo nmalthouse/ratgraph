@@ -837,10 +837,56 @@ pub const WindowId = enum(u32) {
     _,
 };
 
+pub const Bindings = struct {
+    const Bind = keybinding.SerialBinding;
+    pub const GlobEnum = genBindEnum(Global);
+    pub const Global = struct {
+        copy: Bind = .{ .button = .{ .scancode = .C }, .mod = &.{.ctrl}, .mode = .exclusive },
+        paste: Bind = .{ .button = .{ .scancode = .V }, .mod = &.{.ctrl}, .mode = .exclusive },
+
+        commit: Bind = .{ .button = .{ .scancode = .RETURN }, .mode = .exclusive },
+        backspace: Bind = .{ .button = .{ .scancode = .BACKSPACE }, .mode = .exclusive, .repeat = true },
+        delete: Bind = .{ .button = .{ .scancode = .DELETE }, .mode = .exclusive, .repeat = true },
+        delete_word_right: Bind = .{ .button = .{ .scancode = .DELETE }, .mod = &.{.ctrl}, .mode = .exclusive, .repeat = true },
+        delete_word_left: Bind = .{ .button = .{ .scancode = .BACKSPACE }, .mod = &.{.ctrl}, .mode = .exclusive, .repeat = true },
+        move_left: Bind = .{ .button = .{ .scancode = .LEFT }, .mode = .exclusive, .repeat = true },
+        move_word_left: Bind = .{ .button = .{ .scancode = .LEFT }, .mod = &.{.ctrl}, .mode = .exclusive, .repeat = true },
+        move_right: Bind = .{ .button = .{ .scancode = .RIGHT }, .mode = .exclusive, .repeat = true },
+        move_word_right: Bind = .{ .button = .{ .scancode = .RIGHT }, .mod = &.{.ctrl}, .mode = .exclusive, .repeat = true },
+        select_word_left: Bind = .{ .button = .{ .scancode = .LEFT }, .mod = &.{ .ctrl, .shift }, .mode = .exclusive, .repeat = true },
+        select_word_right: Bind = .{ .button = .{ .scancode = .RIGHT }, .mod = &.{ .ctrl, .shift }, .mode = .exclusive, .repeat = true },
+        select_right: Bind = .{ .button = .{ .scancode = .RIGHT }, .mod = &.{.shift}, .mode = .exclusive, .repeat = true },
+        select_left: Bind = .{ .button = .{ .scancode = .LEFT }, .mod = &.{.shift}, .mode = .exclusive, .repeat = true },
+        select_all: Bind = .{ .button = .{ .scancode = .A }, .mod = &.{.ctrl}, .mode = .exclusive },
+    };
+
+    global: Global = .{},
+};
+
+fn genBindEnum(comptime T: type) type {
+    const inf = @typeInfo(T).@"struct".fields;
+    var ret: [inf.len]std.builtin.Type.EnumField = undefined;
+    inline for (inf, 0..) |f, i| {
+        ret[i] = .{
+            .name = f.name,
+            .value = i,
+        };
+    }
+    return @Type(.{
+        .@"enum" = .{ .fields = &ret, .tag_type = u32, .decls = &.{}, .is_exhaustive = true },
+    });
+}
+
 pub const Gui = struct {
     const Self = @This();
     pub const MouseGrabFn = *const fn (*iArea, MouseCbState, *iWindow) void;
     pub const TextinputFn = *const fn (*iArea, TextCbState, *iWindow) void;
+
+    //This is global state as multiple gui contexts can exist and should share the same keybindings
+    //Initialized within Gui.init
+    pub var binds: keybinding.genBindingIdStruct(Bindings) = undefined;
+    var binds_init: bool = false;
+
     const Focused = struct {
         vt: *iArea,
         win: *iWindow,
@@ -906,6 +952,10 @@ pub const Gui = struct {
     scratch_arena: std.heap.ArenaAllocator,
 
     pub fn init(alloc: AL, win: *graph.SDL.Window, font: *graph.FontInterface, dctx: *graph.ImmediateDrawingContext) !Self {
+        if (!binds_init) {
+            binds_init = true;
+            binds = try keybinding.registerBindIds(Bindings, &win.bindreg, .{});
+        }
         return Gui{
             .alloc = alloc,
             .scratch_arena = .init(alloc),
@@ -1064,6 +1114,7 @@ pub const Gui = struct {
                 self.focused = null;
             }
         }
+        self.sdl_win.bindreg.enableContext(binds.global.context_id, self.focused != null);
         for (self.active_windows.items) |win| {
             win.pre_update(self);
             if (self.canGrabMouseOverride(win)) self.sdl_win.bindreg.enableContexts(win.key_ctx_mask);

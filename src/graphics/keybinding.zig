@@ -44,6 +44,38 @@ pub const ButtonBind = union(enum) {
     }
 };
 
+pub const SerialBinding = struct {
+    mode: FocusMode = .multi,
+    button: ButtonBind,
+    repeat: bool = false,
+    mod: []const Keymod = &.{},
+
+    pub fn Keycode(k: sdl.keycodes.Keycode) @This() {
+        return .{ .button = .{ .keycode = k } };
+    }
+
+    pub fn Scancode(k: sdl.keycodes.Scancode) @This() {
+        return .{ .button = .{ .scancode = k } };
+    }
+
+    pub fn name(self: @This()) []const u8 {
+        return switch (self.button) {
+            inline else => |k| @tagName(k),
+        };
+    }
+
+    pub fn nameFull(self: @This(), buf: []u8) []const u8 {
+        //const mod_name = graph.keycodes.Keymod.name(self.mod, buf);
+        //if (mod_name.len >= buf.len) return mod_name;
+        const mod_name = "";
+        var fbs = std.io.FixedBufferStream([]u8){ .buffer = buf, .pos = mod_name.len };
+
+        fbs.writer().print("{s}", .{self.name()}) catch {};
+
+        return buf[0..fbs.pos];
+    }
+};
+
 pub const Binding = struct {
     button: ButtonBind,
     modifier: KeymodMask,
@@ -378,6 +410,73 @@ test {
         try eq(ButtonState.low, bctx.getState(multi_0));
         try eq(ButtonState.low, bctx.getState(multi_1));
     }
+}
+
+pub fn registerBindIds(comptime BindingSerialT: type, bindreg: *BindRegistry, serial: BindingSerialT) !genBindingIdStruct(BindingSerialT) {
+    const BindingIdStruct = genBindingIdStruct(BindingSerialT);
+    var ret: BindingIdStruct = undefined;
+    const info = @typeInfo(BindingIdStruct).@"struct";
+    inline for (info.fields) |field| {
+        const ctx_info = @typeInfo(field.type).@"struct";
+        const ctx_id = try bindreg.newContext(field.name);
+        @field(ret, field.name).context_id = ctx_id;
+
+        inline for (ctx_info.fields[0 .. ctx_info.fields.len - 1]) |bf| {
+            const bind = @field(@field(serial, field.name), bf.name);
+
+            const bind_id = try bindreg.registerBind(.bind(bind.button, bind.mode, bind.mod, bind.repeat, ctx_id), bf.name);
+
+            @field(@field(ret, field.name), bf.name) = bind_id;
+        }
+    }
+    return ret;
+}
+pub fn genBindingIdStruct(comptime config_mapping: type) type {
+    const info = @typeInfo(config_mapping).@"struct";
+    var main_out: [info.fields.len]std.builtin.Type.StructField = undefined;
+    inline for (info.fields, 0..) |field, f_i| {
+        const binf = @typeInfo(field.type).@"struct";
+        var bind_fields: [binf.fields.len + 1]std.builtin.Type.StructField = undefined;
+        const default: BindId = .none;
+        inline for (binf.fields, 0..) |bind, b_i| {
+            bind_fields[b_i] = .{
+                .name = bind.name,
+                .type = BindId,
+                .default_value_ptr = &default,
+                .is_comptime = false,
+                .alignment = @alignOf(BindId),
+            };
+        }
+        bind_fields[binf.fields.len] = .{
+            .name = "context_id",
+            .type = ContextId,
+            .default_value_ptr = null,
+            .is_comptime = false,
+            .alignment = @alignOf(ContextId),
+        };
+
+        const T = @Type(.{ .@"struct" = .{
+            .fields = &bind_fields,
+            .layout = .auto,
+            .decls = &.{},
+            .is_tuple = false,
+        } });
+        main_out[f_i] = .{
+            .name = field.name,
+            .type = T,
+            .default_value_ptr = null,
+            .is_comptime = false,
+            .alignment = @alignOf(T),
+        };
+    }
+    return @Type(.{
+        .@"struct" = .{
+            .fields = &main_out,
+            .layout = .auto,
+            .decls = &.{},
+            .is_tuple = false,
+        },
+    });
 }
 
 const std = @import("std");

@@ -129,29 +129,7 @@ pub const Textbox = struct {
     };
     const Utf8It = utf8.BiDirectionalUtf8Iterator;
     const Self = @This();
-    const uni = std.unicode;
-    const M = graph.SDL.keycodes.Keymod;
-    const None = M.mask(&.{.NONE});
     //TODO make this configurable
-    const edit_keys_list = graph.Bind(&.{
-        .{ .name = "commit", .bind = .{ .RETURN, None } },
-        .{ .name = "backspace", .bind = .{ .BACKSPACE, None } },
-        .{ .name = "delete", .bind = .{ .DELETE, None } },
-        .{ .name = "delete_word_right", .bind = .{ .DELETE, M.mask(&.{.LCTRL}) } },
-        .{ .name = "delete_word_left", .bind = .{ .BACKSPACE, M.mask(&.{.LCTRL}) } },
-        .{ .name = "move_left", .bind = .{ .LEFT, None } },
-        .{ .name = "move_word_left", .bind = .{ .LEFT, M.mask(&.{.LCTRL}) } },
-        .{ .name = "move_right", .bind = .{ .RIGHT, None } },
-        .{ .name = "move_word_right", .bind = .{ .RIGHT, M.mask(&.{.LCTRL}) } },
-        .{ .name = "select_right", .bind = .{ .RIGHT, M.mask(&.{.LSHIFT}) } },
-        .{ .name = "select_left", .bind = .{ .LEFT, M.mask(&.{.LSHIFT}) } },
-        .{ .name = "select_word_right", .bind = .{ .RIGHT, M.mask(&.{ .LCTRL, .LSHIFT }) } },
-        .{ .name = "select_word_left", .bind = .{ .LEFT, M.mask(&.{ .LCTRL, .LSHIFT }) } },
-        //TODO Should "A" be a keycode not a scancode? On dvorak ctrl-a,z,x,c,v are all remapped. What happens with non english keyboard layouts.
-        .{ .name = "select_all", .bind = .{ .A, M.mask(&.{.LCTRL}) } },
-        .{ .name = "copy", .bind = .{ .C, M.mask(&.{.LCTRL}) } },
-        .{ .name = "paste", .bind = .{ .V, M.mask(&.{.LCTRL}) } },
-    });
 
     //TODO These should be configurable
     const setClipboard: fn (std.mem.Allocator, []const u8) std.mem.Allocator.Error!void = graph.SDL.Window.setClipboard;
@@ -365,60 +343,55 @@ pub const Textbox = struct {
                 self.changed = true;
                 self.commitChange(ev);
             },
-            .keydown => |kev| {
+            .keydown => {
                 vt.dirty();
-                const mod = kev.mod_state & ~M.mask(&.{ .SCROLL, .NUM, .CAPS });
+                //const mod = kev.mod_state & ~M.mask(&.{ .SCROLL, .NUM, .CAPS });
                 const tb = self;
-                const StaticData = struct {
-                    var are_binds_init: bool = false;
-                    var key_binds: edit_keys_list = undefined;
-                };
-                if (!StaticData.are_binds_init) {
-                    StaticData.are_binds_init = true;
-                    StaticData.key_binds = edit_keys_list.init();
-                }
                 var should_commit = false;
-                for (kev.keys) |key| {
-                    const kb = StaticData.key_binds.getWithMod(key.key_id, mod) orelse continue;
-                    switch (kb) {
-                        .delete, .delete_word_right, .delete_word_left, .paste, .backspace => should_commit = true,
-                        else => {},
-                    }
-                    switch (kb) {
-                        .commit => {
-                            self.commitNumber();
-                            if (self.opts.commit_when != .never)
-                                self.sendCommit(ev.gui, true);
-                            //if (self.opts.commit_vt) |cvt| {
-                            //    if (self.opts.commit_when != .never)
-                            //        self.opts.commit_cb.?(cvt, ev.gui, self.codepoints.items, self.opts.user_id);
-                            //}
-                        },
-                        .move_left => tb.move_to(.left),
-                        .move_right => tb.move_to(.right),
-                        .move_word_right => tb.move_to(.next_word_end),
-                        .move_word_left => tb.move_to(.prev_word_end),
-                        .backspace => try tb.delete_to(.left),
-                        .delete => try tb.delete_to(.right),
-                        .delete_word_right => try tb.delete_to(.next_word_end),
-                        .delete_word_left => try tb.delete_to(.prev_word_end),
-                        .select_left => tb.select_to(.left),
-                        .select_right => tb.select_to(.right),
-                        .select_word_right => tb.select_to(.next_word_end),
-                        .select_word_left => tb.select_to(.prev_word_end),
-                        .select_all => {
-                            tb.tail = 0;
-                            tb.head = @intCast(tb.codepoints.items.len);
-                            //_ = Utf8It.lastCodepointSlice(&tb.head, tb.codepoints.items);
-                        },
-                        .copy => {
-                            try setClipboard(ev.gui.alloc, tb.getSelectionSlice());
-                        },
-                        .paste => {
-                            try self.paste(ev.gui);
-                        },
+                inline for (@typeInfo(g.Bindings.Global).@"struct".fields, 0..) |f, f_i| {
+                    if (ev.gui.sdl_win.isBindState(@field(Gui.binds.global, f.name), .rising)) {
+                        const kb: g.Bindings.GlobEnum = @enumFromInt(f_i);
+                        switch (kb) {
+                            .delete, .delete_word_right, .delete_word_left, .paste, .backspace => should_commit = true,
+                            else => {},
+                        }
+                        switch (kb) {
+                            .commit => {
+                                self.commitNumber();
+                                if (self.opts.commit_when != .never)
+                                    self.sendCommit(ev.gui, true);
+                                //if (self.opts.commit_vt) |cvt| {
+                                //    if (self.opts.commit_when != .never)
+                                //        self.opts.commit_cb.?(cvt, ev.gui, self.codepoints.items, self.opts.user_id);
+                                //}
+                            },
+                            .move_left => tb.move_to(.left),
+                            .move_right => tb.move_to(.right),
+                            .move_word_right => tb.move_to(.next_word_end),
+                            .move_word_left => tb.move_to(.prev_word_end),
+                            .backspace => try tb.delete_to(.left),
+                            .delete => try tb.delete_to(.right),
+                            .delete_word_right => try tb.delete_to(.next_word_end),
+                            .delete_word_left => try tb.delete_to(.prev_word_end),
+                            .select_left => tb.select_to(.left),
+                            .select_right => tb.select_to(.right),
+                            .select_word_right => tb.select_to(.next_word_end),
+                            .select_word_left => tb.select_to(.prev_word_end),
+                            .select_all => {
+                                tb.tail = 0;
+                                tb.head = @intCast(tb.codepoints.items.len);
+                                //_ = Utf8It.lastCodepointSlice(&tb.head, tb.codepoints.items);
+                            },
+                            .copy => {
+                                try setClipboard(ev.gui.alloc, tb.getSelectionSlice());
+                            },
+                            .paste => {
+                                try self.paste(ev.gui);
+                            },
+                        }
                     }
                 }
+
                 if (should_commit) {
                     self.changed = true;
                     self.commitChange(ev);
