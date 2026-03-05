@@ -46,6 +46,19 @@ pub fn openSaveDialog(cb: *const DialogFileCb, userdata: ?*anyopaque, filters: [
     );
 }
 
+pub fn openFolderPicker(cb: *const DialogFileCb, userdata: ?*anyopaque, opts: struct {
+    default_location: [*c]const u8 = null,
+    allow_many: bool = false,
+}) void {
+    c.SDL_ShowOpenFolderDialog(
+        cb,
+        userdata,
+        null, //Window ptr
+        opts.default_location,
+        opts.allow_many,
+    );
+}
+
 threadlocal var scratch_buffer: [256]u8 = undefined;
 pub fn getScancodeFromName(name: []const u8) usize {
     if (name.len > scratch_buffer.len - 1)
