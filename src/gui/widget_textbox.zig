@@ -517,7 +517,7 @@ pub const Textbox = struct {
 
         const sz = cb.gui.dstate.nstyle.text_h;
         const ar = textArea(vt.area, cb.gui);
-        const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
+        const rel = cb.pos.sub(ar.pos());
         const nearest_glyph = (cb.gui.dstate.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false));
         switch (cb.btn) {
             .left => {
@@ -564,7 +564,7 @@ pub const Textbox = struct {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
         const sz = cb.gui.dstate.nstyle.text_h;
         const ar = textArea(vt.area, cb.gui);
-        const rel = cb.pos.sub(ar.pos()).sub(.{ .x = sz / 2, .y = 0 });
+        const rel = cb.pos.sub(ar.pos());
         if (cb.gui.dstate.font.nearestGlyphX(self.getVisibleSlice(), sz, rel, false)) |u_i| {
             self.setHead(u_i, 0, false);
             vt.dirty();

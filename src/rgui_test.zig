@@ -257,6 +257,8 @@ pub const MyInspector = struct {
     scroll_index: usize = 0,
 
     vscroll_vt: ?*iArea = null,
+    tv_vt: ?*Wg.TextView = null,
+    tv_index: usize = 0,
     //This subscribes to onScroll
     //has two child layouts,
     //the act of splitting is not the Layouts job
@@ -288,6 +290,7 @@ pub const MyInspector = struct {
         self.vt.area.area = area;
         self.vt.area.clearChildren(gui, vt);
         self.vscroll_vt = null;
+        self.tv_vt = null;
         //self.layout.reset(gui, vt);
         //start a vlayout
         //var ly = Vert{ .area = vt.area };
@@ -346,9 +349,14 @@ pub const MyInspector = struct {
         ly.padding.top = 10;
         if (eql(u8, tab_name, "tv")) {
             ly.pushRemaining();
-            _ = Wg.TextView.build(vt, ly.getArea(), &.{ "Hello\n", "World\n", "my name is niklas" }, win, .{
+            const st = Wg.TextView.build(vt, ly.getArea(), &.{ "Hello\n", "World\n", "my name is niklas", @embedFile("rgui_test.zig") }, win, .{
                 .mode = .split_on_space,
+                .index_ptr = &self.tv_index,
             });
+            if (st == .good) {
+                if (vt.getLastChild()) |last|
+                    self.tv_vt = @alignCast(@fieldParentPtr("vt", last));
+            }
         }
         if (eql(u8, tab_name, "main")) {
             _ = Wg.Textbox.build(vt, ly.getArea());
@@ -416,7 +424,7 @@ pub const MyInspector = struct {
         scr.hintBounds(ly.getUsed());
     }
 
-    pub fn btnCb(cb: *CbHandle, id: guis.Uid, cbs: guis.MouseCbState, _: *iWindow) void {
+    pub fn btnCb(cb: *CbHandle, id: guis.Uid, cbs: guis.MouseCbState, win: *iWindow) void {
         const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
         const en = std.meta.intToEnum(BtnId, id) catch return;
         switch (en) {
@@ -431,6 +439,11 @@ pub const MyInspector = struct {
                 if (self.vscroll_vt) |vscr| {
                     const scr: *Wg.VScroll = @alignCast(@fieldParentPtr("vt", vscr));
                     scr.gotoBottom();
+                }
+                if (self.tv_vt) |tv| {
+                    tv.gotoBottom();
+                    _ = win;
+                    //tv.rebuildScroll(cbs.gui, win);
                 }
             },
         }

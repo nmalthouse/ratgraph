@@ -35,7 +35,7 @@ pub const VScroll = struct {
 
         /// if set, index_ptr is recalculated to ensure this index is visible
         current_index: ?usize = null,
-        bg_col: u32 = 0,
+        bg_col: ?u32 = null,
     };
 
     vt: iArea,
@@ -65,11 +65,11 @@ pub const VScroll = struct {
             .onscroll = if (needs_scroll) onScroll else null,
         });
 
+        self.sc_count = self.getScrollableCount();
         if (self.index_ptr.* >= self.opts.count) {
-            self.index_ptr.* = if (self.opts.count > 0) self.opts.count - 1 else 0;
+            self.index_ptr.* = if (self.sc_count > 0) self.sc_count - 1 else 0;
         }
 
-        self.sc_count = self.getScrollableCount();
         //self.sc_count = opts.count - self.getFitted();
 
         const split = self.vt.area.split(.vertical, if (needs_scroll) getAreaW(self.vt.area.w, gui.dstate.scale) else self.vt.area.w);
@@ -114,7 +114,7 @@ pub const VScroll = struct {
             }
         }
 
-        return self.opts.count;
+        return 1;
     }
 
     pub fn gotoBottom(self: *@This()) void {
@@ -156,10 +156,8 @@ pub const VScroll = struct {
 
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
         const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
-        if (self.opts.bg_col > 0) {
-            d.ctx.rect(vt.area, self.opts.bg_col);
-        } else {
-            d.ctx.rect(vt.area, d.nstyle.color.bg);
+        if (self.opts.bg_col) |bg| {
+            d.ctx.rect(vt.area, bg);
         }
     }
 

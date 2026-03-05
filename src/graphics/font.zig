@@ -115,8 +115,10 @@ pub const PublicFontInterface = struct {
         var bounds = Vec2f{ .x = 0, .y = 0 };
 
         var it = std.unicode.Utf8Iterator{ .bytes = string, .i = 0 };
+        var current_i = it.i;
         var char = it.nextCodepoint();
         while (char != null) : (char = it.nextCodepoint()) {
+            defer current_i = it.i;
             const glyph = self.getGlyph(char.?);
             const xw = glyph.advance_x * scale;
             const yw = self.line_gap * scale;
@@ -134,12 +136,8 @@ pub const PublicFontInterface = struct {
                 },
                 '\r' => continue,
                 else => {
-                    const x = rel_coord.x;
-                    //const y = rel_coord.y;
-                    //if (x < x_bound + xw and x > x_bound and y < bounds.y + yw and y > bounds.y) {
-                    if (x < x_bound + xw and x > x_bound) {
-                        return it.i;
-                    }
+                    if (rel_coord.x >= x_bound and rel_coord.x <= x_bound + xw)
+                        return current_i;
                 },
             }
 
