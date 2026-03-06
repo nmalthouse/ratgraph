@@ -39,10 +39,11 @@ pub const BtnContextWindow = struct {
         checkbox_cb: ?Widget.Checkbox.CommitCb = null,
     };
     const BtnCb = Widget.Button.ButtonCallbackT;
+    pub var __cbhandle = g.cbReg("cbhandle");
     vt: iWindow,
 
     opts: Opts,
-    cbhandle: g.CbHandle = .{},
+    cbhandle: g.CbHandle = .init(@This()),
 
     buttons: ArrayList(ButtonMapping) = .{},
 
@@ -157,7 +158,7 @@ pub const BtnContextWindow = struct {
     }
 
     fn btn_toggle_child(cb: *g.CbHandle, id: g.Uid, dat: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         switch (self.buttons.items[id][2]) {
             else => {},
             .child => |*child| {
@@ -175,7 +176,7 @@ pub const BtnContextWindow = struct {
     }
 
     fn checkbox_wrap_cb(cb: *g.CbHandle, gui: *Gui, val: bool, id: g.Uid) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         if (self.opts.checkbox_cb) |ch_cb| {
             ch_cb(self.opts.btn_vt, gui, val, id);
         }
@@ -183,7 +184,7 @@ pub const BtnContextWindow = struct {
     }
 
     fn btn_wrap_cb(cb: *g.CbHandle, id: g.Uid, dat: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         self.opts.btn_cb(self.opts.btn_vt, id, dat, win);
         dat.gui.deferTransientClose(win);
     }

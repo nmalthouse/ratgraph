@@ -20,8 +20,9 @@ const Wg = guis.Widget;
 const CbHandle = guis.CbHandle;
 
 pub const Styler = struct {
+    pub var __cbhandle = guis.cbReg("cbhandle");
     vt: iWindow,
-    cbhandle: CbHandle = .{},
+    cbhandle: CbHandle = .init(@This()),
 
     pub fn create(gui: *Gui) *iWindow {
         const self = gui.create(@This());
@@ -70,7 +71,7 @@ pub const Styler = struct {
     }
 
     fn commit_color(cb: *CbHandle, _: *Gui, color: u32, id: usize) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
 
         inline for (@typeInfo(guis.Colorscheme).@"struct".fields, 0..) |f, i| {
             if (i == id and @typeInfo(f.type) == .int) {
@@ -85,8 +86,9 @@ pub const Styler = struct {
 };
 
 pub const MyGlView = struct {
+    pub var __cbhandle = guis.cbReg("cbhandle");
     vt: iWindow,
-    cbhandle: CbHandle = .{},
+    cbhandle: CbHandle = .init(@This()),
 
     draw_ctx: *graph.ImmediateDrawingContext,
 
@@ -239,9 +241,10 @@ pub const MyInspector = struct {
         has,
         fields,
     };
+    pub var __cbhandle = guis.cbReg("cbhandle");
 
     vt: iWindow,
-    cbhandle: CbHandle = .{},
+    cbhandle: CbHandle = .init(@This()),
 
     inspector_state: u32 = 0,
     bool1: bool = false,
@@ -332,17 +335,17 @@ pub const MyInspector = struct {
     }
 
     fn staticSliderCb(cb: *CbHandle, _: *Gui, _: f32, _: usize, _: Wg.StaticSliderOpts.State) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         self.vt.area.dirty();
     }
 
     fn staticSliderSet(cb: *CbHandle, _: *Gui, _: f32, _: usize) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         self.vt.area.dirty();
     }
 
     pub fn buildTabs(cb: *CbHandle, vt: *iArea, tab_name: []const u8, _: usize, gui: *Gui, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         self.vscroll_vt = null;
         const eql = std.mem.eql;
         var ly = gui.dstate.vlayout(vt.area);
@@ -406,7 +409,7 @@ pub const MyInspector = struct {
     pub fn buildScrollItems(cb: *CbHandle, vt: *iArea, index: usize) void {
         const gui = vt.win_ptr.gui_ptr;
 
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         var ly = gui.dstate.vlayout(vt.area);
         for (index..self.num_scroll_items) |i| {
             _ = Wg.Text.build(vt, ly.getArea(), "item {d}", .{i}, .{});
@@ -414,7 +417,7 @@ pub const MyInspector = struct {
     }
 
     pub fn buildFloatScroll(cb: *CbHandle, vt: *iArea, gui: *Gui, _: *iWindow, scr: *Wg.FloatScroll) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         var ly = gui.dstate.vlayout(vt.area);
         _ = self;
         for (0..100) |i| {
@@ -425,7 +428,7 @@ pub const MyInspector = struct {
     }
 
     pub fn btnCb(cb: *CbHandle, id: guis.Uid, cbs: guis.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         const en = std.meta.intToEnum(BtnId, id) catch return;
         switch (en) {
             .pop => {

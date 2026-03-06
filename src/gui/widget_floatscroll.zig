@@ -26,9 +26,10 @@ pub const FloatScroll = struct {
     const scroll_index = 0;
     const virtual_area_index = 1;
     const num_widget = 2;
+    pub var __cbhandle = g.cbReg("cbhandle");
     vt: iArea,
 
-    cb: CbHandle = .{},
+    cb: CbHandle = .init(@This()),
     opts: Opts,
     hinted_bounds: ?Rect = null,
     y: f32,

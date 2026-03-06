@@ -57,10 +57,39 @@ const keybinding = graph.keybinding;
 pub const app = @import("app.zig");
 pub const workspaces = @import("layouts.zig");
 
+/// pub var __cbhandle = cbReg("my_cbhandle_field");
+pub fn cbReg(comptime cbhandle_name: []const u8) struct {
+    pub const name = cbhandle_name;
+    type_id: u32, //this isn't actually an id, we take a pointer to it and compare
+} {
+    return .{
+        .type_id = 0,
+    };
+}
+
 /// Gui Widgets that need to callback should store a pointer to CbHandle.
 pub const CbHandle = struct {
-    pub fn cast(self: *@This(), comptime T: type, comptime name: []const u8) *T {
-        return @alignCast(@fieldParentPtr(name, self));
+    type_id_ptr: if (IS_DEBUG) *u32 else void,
+    type_name: if (IS_DEBUG) []const u8 else void,
+
+    pub fn init(comptime T: type) CbHandle {
+        return .{
+            .type_id_ptr = if (IS_DEBUG) &T.__cbhandle.type_id else {},
+            .type_name = if (IS_DEBUG) @typeName(T) else {},
+        };
+    }
+
+    /// T must contain a decl from cbReg()
+    pub fn cast(self: *@This(), comptime T: type) *T {
+        if (IS_DEBUG) {
+            if (&T.__cbhandle.type_id != self.type_id_ptr) {
+                std.debug.print("cbhandle invalid cast from {s} to {s}\n", .{
+                    self.type_name, @typeName(T),
+                });
+                @panic("cooked");
+            }
+        }
+        return @alignCast(@fieldParentPtr(@TypeOf(T.__cbhandle).name, self));
     }
 };
 const log = std.log.scoped(.rgui);
@@ -126,9 +155,15 @@ pub const TextCbState = struct {
 };
 
 /// All widget creation functions should return a WgStatus rather than an error
+/// Most of the time, we don't care if a widget construction succeded.
 pub const WgStatus = enum {
     failed,
     good,
+
+    //used to discard the return rather that _ =
+    pub fn ignore(self: @This()) void {
+        _ = self;
+    }
 };
 pub const iArea = struct {
     /// Decl'd so we can grep for undefined and not get confused
@@ -540,7 +575,7 @@ pub const DrawState = struct {
         };
     }
 
-    pub fn hlayout(_: *const @This(), area: Rect, count: usize) HorizLayout {
+    pub fn hlayout(_: *const @This(), area: Rect, count: u32) HorizLayout {
         return .{ .bounds = area, .count = count };
     }
 
@@ -629,12 +664,12 @@ pub const UpdateState = struct {
 };
 
 pub const HorizLayout = struct {
-    count: usize,
+    count: u32,
     paddingh: f32 = 20,
-    index: usize = 0,
+    index: u32 = 0,
     current_w: f32 = 0,
     hidden: bool = false,
-    count_override: ?usize = null,
+    count_override: ?u32 = null,
 
     bounds: Rect,
 
@@ -649,7 +684,7 @@ pub const HorizLayout = struct {
         return .{ .x = self.bounds.x + self.current_w, .y = self.bounds.y, .w = w, .h = self.bounds.h };
     }
 
-    pub fn pushCount(self: *HorizLayout, next_count: usize) void {
+    pub fn pushCount(self: *HorizLayout, next_count: u32) void {
         self.count_override = next_count;
     }
 };
@@ -785,7 +820,7 @@ pub const VerticalLayout = struct {
         self.next_height = self.item_height * count;
     }
 
-    pub fn countLeft(self: *Self) usize {
+    pub fn countLeft(self: *Self) u32 {
         if (self.item_height <= 0) return 0;
 
         const count = (self.bounds.h - self.current_h) / (self.padding.vertical() + self.item_height);
@@ -1804,6 +1839,30 @@ pub const Style = struct {
 
     color: Colorscheme = .{},
 };
+
+test {
+    const TestCbHandlePanic = struct {
+        pub const OtherT = struct {
+            pub var __cbhandle = cbReg("cbhandle");
+            cbhandle: CbHandle = .init(@This()),
+
+            pub fn myCallback(cb: *CbHandle) void {
+                const self = cb.cast(OtherT);
+                _ = self;
+            }
+        };
+
+        pub var __cbhandle = cbReg("cbhandle");
+        cbhandle: CbHandle = .init(@This()),
+    };
+    var outer = TestCbHandlePanic{};
+    var inner = TestCbHandlePanic.OtherT{};
+    TestCbHandlePanic.OtherT.myCallback(&inner.cbhandle); //Should not panic
+
+    //Should panic in debug
+    _ = &outer;
+    //TestCbHandlePanic.OtherT.myCallback(&outer.cbhandle);
+}
 
 //Idea, vtable layouts
 //widgets can request a specific size, no guarantee

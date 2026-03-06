@@ -112,7 +112,7 @@ const TabHeader = struct {
         const tabs = self.parent.tabs.items;
         if (tabs.len == 0)
             return;
-        var ly = g.HorizLayout{ .count = tabs.len, .bounds = vt.area };
+        var ly = g.HorizLayout{ .count = @intCast(tabs.len), .bounds = vt.area };
         for (0..tabs.len) |i| {
             const a = ly.getArea() orelse return;
             if (a.containsPoint(cb.pos)) {
@@ -136,7 +136,7 @@ const TabHeader = struct {
         const tabs = self.parent.tabs.items;
         if (tabs.len == 0)
             return;
-        var ly = g.HorizLayout{ .count = tabs.len, .bounds = vt.area.insetV(d.nstyle.tab_spacing, 0), .paddingh = d.nstyle.tab_spacing };
+        var ly = g.HorizLayout{ .count = @intCast(tabs.len), .bounds = vt.area.insetV(d.nstyle.tab_spacing, 0), .paddingh = d.nstyle.tab_spacing };
         for (tabs, 0..) |tab, i| {
             const a = ly.getArea() orelse continue;
             const active = i == self.parent.opts.index_ptr.?.*;

@@ -25,8 +25,9 @@ pub const TextView = struct {
         bg_col: ?u32 = null,
         index_ptr: ?*usize = null,
     };
+    pub var __cbhandle = g.cbReg("cbhandle");
     vt: iArea,
-    cbhandle: CbHandle = .{},
+    cbhandle: CbHandle = .init(@This()),
 
     cat_string: []const u8, //Alloced by gui
     lines: std.ArrayList([]const u8), //slices into cat_string
@@ -146,7 +147,7 @@ pub const TextView = struct {
     }
 
     fn rightClickMenuBtn(cb: *CbHandle, id: g.Uid, dat: g.MouseCbState, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         //self.vt.dirty();
         const bi = g.Widget.BtnContextWindow.buttonId;
         switch (id) {
@@ -253,7 +254,7 @@ pub const TextView = struct {
     pub fn buildScroll(cb: *CbHandle, layout: *iArea, index: usize) void {
         const gui = layout.win_ptr.gui_ptr;
 
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         var ly = scrollLay(layout.area, gui);
         self.scroll_area = layout.area;
         if (index >= self.lines.items.len) return;

@@ -74,8 +74,9 @@ pub fn ComboUser(user_data: type) type {
         };
         const ParentT = @This();
         pub const PoppedWindow = struct {
+            pub var __cbhandle = g.cbReg("cbhandle");
             vt: iWindow,
-            cbhandle: CbHandle = .{},
+            cbhandle: CbHandle = .init(@This()),
 
             parent_vt: *iArea,
             name: []const u8,
@@ -116,7 +117,7 @@ pub fn ComboUser(user_data: type) type {
             }
 
             pub fn textbox_cb(pop_vt: *CbHandle, p: Widget.Textbox.CommitParam) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", pop_vt));
+                const self = pop_vt.cast(@This());
                 const parent: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 if (parent.opts.commit_invalid and p.forced) {
                     parent.opts.commit_cb(parent.opts.user_vt, parent.user, .{
@@ -138,7 +139,7 @@ pub fn ComboUser(user_data: type) type {
             pub fn build_scroll_cb(cb: *CbHandle, area: *iArea, index: usize) void {
                 const gui = area.win_ptr.gui_ptr;
 
-                const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+                const self = cb.cast(@This());
                 var ly = gui.dstate.vlayout(area.area);
                 ly.padding = .zero;
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
@@ -197,10 +198,11 @@ pub fn ComboUser(user_data: type) type {
                 _ = vt;
             }
         };
+        pub var __cbhandle = g.cbReg("cbhandle");
 
         vt: iArea,
 
-        cbhandle: CbHandle = .{},
+        cbhandle: CbHandle = .init(@This()),
         opts: ComboVt,
         index: usize = 0,
         current: usize = 0,
@@ -235,7 +237,7 @@ pub fn ComboUser(user_data: type) type {
         }
 
         pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, win: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+            const self = cb.cast(@This());
             self.vt.dirty();
             self.opts.current = id;
             self.opts.commit_cb(self.opts.user_vt, self.user, .{ .index = id });
@@ -266,8 +268,9 @@ pub fn ComboGeneric(comptime enumT: type) type {
     return struct {
         const ParentT = @This();
         pub const PoppedWindow = struct {
+            pub var __cbhandle = g.cbReg("cbhandle");
             vt: iWindow,
-            cbhandle: CbHandle = .{},
+            cbhandle: CbHandle = .init(@This()),
 
             parent_vt: *iArea,
             name: []const u8,
@@ -294,7 +297,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
 
             pub fn build_cb(cb: *CbHandle, area: *iArea, index: usize) void {
                 const gui = area.win_ptr.gui_ptr;
-                const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+                const self = cb.cast(@This());
                 const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
                 var ly = gui.dstate.vlayout(area.area);
                 ly.padding = .zero;
@@ -327,9 +330,10 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 _ = vt;
             }
         };
+        pub var __cbhandle = g.cbReg("cbhandle");
 
         vt: iArea,
-        cbhandle: CbHandle = .{},
+        cbhandle: CbHandle = .init(@This()),
 
         enum_ptr: *enumT,
         opts: ComboOpts,
@@ -370,7 +374,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
         }
 
         pub fn buttonCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, win: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+            const self = cb.cast(@This());
             self.vt.dirty();
             self.enum_ptr.* = @enumFromInt(id);
             if (self.opts.commit_vt) |cvt| {

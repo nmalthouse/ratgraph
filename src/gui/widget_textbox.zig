@@ -143,9 +143,10 @@ pub const Textbox = struct {
         start,
         end,
     };
+    pub var __cbhandle = g.cbReg("cbhandle");
 
     vt: iArea,
-    cbhandle: CbHandle = .{},
+    cbhandle: CbHandle = .init(@This()),
     codepoints: std.ArrayList(u8),
 
     options: struct {
@@ -523,7 +524,7 @@ pub const Textbox = struct {
     }
 
     fn rightClickMenuBtn(cb: *CbHandle, id: g.Uid, dat: g.MouseCbState, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         self.vt.dirty();
         const bi = g.Widget.BtnContextWindow.buttonId;
         switch (id) {

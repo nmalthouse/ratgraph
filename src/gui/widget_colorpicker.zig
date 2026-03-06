@@ -84,8 +84,9 @@ pub const Colorpicker = struct {
 };
 
 const ColorpickerTransient = struct {
+    pub var __cbhandle = g.cbReg("cbhandle");
     vt: iWindow,
-    cbhandle: CbHandle = .{},
+    cbhandle: CbHandle = .init(@This()),
 
     parent_ptr: *Colorpicker,
 
@@ -174,7 +175,7 @@ const ColorpickerTransient = struct {
     }
 
     pub fn pastedTextboxCb(cb: *CbHandle, p: Widget.Textbox.CommitParam) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         if (p.string.len > 0) {
             _ = blk: {
                 const newcolor = ((std.fmt.parseInt(u32, p.string, 0) catch |err| switch (err) {
@@ -197,7 +198,7 @@ const ColorpickerTransient = struct {
     }
 
     fn warpNotify(vt: *CbHandle, _: *Gui) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", vt));
+        const self = vt.cast(@This());
         const w = self.vt.area.children.items;
         if (w.len < 2)
             return;
@@ -213,7 +214,7 @@ const ColorpickerTransient = struct {
     }
 
     fn closeBtnCb(cb: *CbHandle, id: usize, dat: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
 
         self.parent_ptr.commitColor(dat.gui, self.parent_ptr.color_hsv.toInt());
         self.parent_ptr.vt.dirty();
@@ -261,12 +262,12 @@ const ColorpickerTransient = struct {
     pub fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
 
     fn ssliderCb(cb: *CbHandle, _: *Gui, _: f32, _: usize, _: Widget.StaticSliderOpts.State) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         self.vt.area.dirty();
     }
 
     fn ssliderCbCommit(cb: *CbHandle, _: *Gui, _: f32, _: usize) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cbhandle", cb));
+        const self = cb.cast(@This());
         self.vt.area.dirty();
     }
 };
