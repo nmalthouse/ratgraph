@@ -67,7 +67,7 @@ pub const SerialBinding = struct {
     pub fn nameFull(self: @This(), buf: []u8) []const u8 {
         //const mod_name = graph.keycodes.Keymod.name(self.mod, buf);
         //if (mod_name.len >= buf.len) return mod_name;
-        const mod_name = "";
+        const mod_name = Keymod.name(Keymod.mask(self.mod), buf);
         var fbs = std.io.FixedBufferStream([]u8){ .buffer = buf, .pos = mod_name.len };
 
         fbs.writer().print("{s}", .{self.name()}) catch {};
@@ -338,6 +338,18 @@ pub const Keymod = enum(KeymodMask) {
         for (to_mask) |t|
             ret |= @intFromEnum(t);
         return ret;
+    }
+
+    pub fn name(mask_: KeymodMask, buf: []u8) []const u8 {
+        var fbs = std.io.FixedBufferStream([]u8){ .buffer = buf, .pos = 0 };
+        inline for (@typeInfo(Keymod).@"enum".fields) |f| {
+            if (f.value & mask_ != 0) {
+                fbs.writer().print("{s}+", .{
+                    f.name,
+                }) catch return "";
+            }
+        }
+        return fbs.getWritten();
     }
 
     pub fn matches(A: KeymodMask, B: KeymodMask) bool {

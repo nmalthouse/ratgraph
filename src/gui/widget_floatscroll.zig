@@ -128,7 +128,7 @@ pub const FloatScroll = struct {
         if (self.vt.children.items.len != num_widget) return;
 
         const child = self.vt.children.items[virtual_area_index];
-        child.area.y += dist * self.opts.scroll_mul;
+        child.area.y += dist * self.opts.scroll_mul * -1;
 
         if (self.hinted_bounds) |hbb| {
             var hb = hbb;
