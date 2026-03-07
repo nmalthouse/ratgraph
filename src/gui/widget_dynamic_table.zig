@@ -19,6 +19,7 @@ pub const DynamicTable = struct {
         build_cb: *const fn (*g.CbHandle, area_vt: *iArea, *Gui, *iWindow) void,
         build_vt: *g.CbHandle,
     };
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     opts: Opts,
@@ -76,12 +77,12 @@ pub const DynamicTable = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         d.ctx.rect(vt.area, d.nstyle.color.table_bg);
         const y = vt.area.y;
         const y1 = vt.area.y + vt.area.h;
@@ -93,6 +94,7 @@ pub const DynamicTable = struct {
 };
 
 const TableHeader = struct {
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     parent: *DynamicTable,
@@ -110,7 +112,7 @@ const TableHeader = struct {
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const click_pad = 2 * cb.gui.dstate.scale;
         for (self.parent.opts.column_positions, 0..) |pos, i| {
@@ -124,7 +126,7 @@ const TableHeader = struct {
     }
 
     pub fn grabbed(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const pad = (4 * cb.gui.dstate.scale) / vt.area.w;
         const ind = self.grab_index orelse return;
         const cpos = self.parent.opts.column_positions;
@@ -143,7 +145,7 @@ const TableHeader = struct {
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         d.ctx.rect(vt.area, d.nstyle.color.bg);
         const dat = self.parent.opts;
         if (dat.column_positions.len == 0 or dat.column_positions.len + 1 != dat.column_names.len)
@@ -168,7 +170,7 @@ const TableHeader = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 };

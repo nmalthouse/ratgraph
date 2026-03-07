@@ -47,6 +47,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
     }
 
     return struct {
+        pub var __iArea = g.iAreaReg("vt");
         vt: iArea,
 
         shuttle_rect: Rect,
@@ -85,7 +86,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
         }
 
         pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             switch (ev.event) {
                 .focusChanged => vt.dirty(),
                 else => {},
@@ -145,7 +146,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             gui.alloc.destroy(self);
         }
 
@@ -156,7 +157,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
         }
 
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             if (self.shuttleSS().containsPoint(cb.pos)) {
                 vt.dirty();
                 cb.gui.grabFocus(vt, win);
@@ -165,7 +166,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
         }
 
         pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             if (self.shuttle_rect.w >= vt.area.w) return; //Just give up
             const old = self.shuttle_rect.x;
             self.shuttle_rect.x += cb.delta.x;
@@ -191,7 +192,7 @@ pub fn SliderGeneric(comptime number_T: type) type {
         }
 
         pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             const box = graph.Rec(0, 0, 3, 3);
             //const box = d.style.getRect(.slider_box);
             //d.ctx.nineSlice(vt.area, box, d.style.texture, d.scale, d.tint);

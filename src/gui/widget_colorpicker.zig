@@ -19,6 +19,7 @@ pub const Colorpicker = struct {
         commit_cb: ?CommitCb = null,
         user_id: usize = 0,
     };
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     color: u32,
@@ -40,12 +41,12 @@ pub const Colorpicker = struct {
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         d.ctx.rect(vt.area, self.color);
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 
@@ -56,7 +57,7 @@ pub const Colorpicker = struct {
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const sz = cb.gui.dstate.nstyle.color_picker_size;
         const new_r = Rec(vt.area.x, vt.area.y, sz.x * cb.gui.dstate.scale, sz.y * cb.gui.dstate.scale);
@@ -85,6 +86,7 @@ pub const Colorpicker = struct {
 
 const ColorpickerTransient = struct {
     pub var __cbhandle = g.cbReg("cbhandle");
+    pub var __iWindow = g.iWindowReg("vt");
     vt: iWindow,
     cbhandle: CbHandle = .init(@This()),
 
@@ -94,7 +96,7 @@ const ColorpickerTransient = struct {
     hue_handle: f32 = 0,
 
     pub fn build(win: *iWindow, gui: *Gui, area: Rect) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", win));
+        const self = win.cast(@This());
         self.vt.area.area = area;
         win.area.dirty();
         self.vt.area.clearChildren(gui, win);
@@ -192,7 +194,7 @@ const ColorpickerTransient = struct {
     }
 
     pub fn deinit(vt: *iWindow, gui: *Gui) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         vt.deinit(gui);
         gui.alloc.destroy(self);
     }
@@ -223,7 +225,7 @@ const ColorpickerTransient = struct {
     }
 
     pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+        const self = vt.cast(iWindow).cast(@This());
         const w = vt.children.items;
         if (w.len < 2)
             return;
@@ -274,6 +276,7 @@ const ColorpickerTransient = struct {
 
 const WarpArea = struct {
     const WarpNotifyFn = *const fn (*CbHandle, *Gui) void;
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
     xptr: ?*f32,
     yptr: ?*f32,
@@ -300,7 +303,7 @@ const WarpArea = struct {
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         if (self.xptr) |x|
             x.* = cb.pos.x - vt.area.x;
@@ -315,7 +318,7 @@ const WarpArea = struct {
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.xptr) |x| {
             if (cb.pos.x >= vt.area.x and cb.pos.x <= vt.area.x + vt.area.w) {
                 x.* += cb.delta.x;
@@ -342,7 +345,7 @@ const WarpArea = struct {
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const x = if (self.xptr) |o| o.* else vt.area.w / 2;
         const y = if (self.yptr) |o| o.* else vt.area.h / 2;
 
@@ -356,7 +359,7 @@ const WarpArea = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 };

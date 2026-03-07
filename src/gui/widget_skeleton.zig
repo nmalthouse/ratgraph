@@ -1,6 +1,9 @@
 //// Copy this as a starting point for new widgets.
 /// Example of a widget
 pub const Template = struct {
+    /// This decl isn't necessary but allows using iArea.cast(Template) rather than fieldParentPtr
+    pub var __iArea = g.iAreaReg("vt");
+
     /// The vtable, should NOT be initilized directly
     vt: iArea,
 
@@ -21,7 +24,7 @@ pub const Template = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 

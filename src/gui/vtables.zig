@@ -165,6 +165,14 @@ pub const WgStatus = enum {
         _ = self;
     }
 };
+
+pub fn iAreaReg(comptime vt_name: []const u8) struct {
+    pub const name = vt_name;
+    type_id: u8, // not really an id, pointer is taken to determine if types match
+} {
+    return .{ .type_id = 0 };
+}
+
 pub const iArea = struct {
     /// Decl'd so we can grep for undefined and not get confused
     pub const UNINITILIZED: iArea = undefined;
@@ -187,6 +195,8 @@ pub const iArea = struct {
     pub const DrawFn = *const fn (*iArea, *Gui, *DrawState) void;
     pub const DeinitFn = *const fn (*iArea, *Gui, *iWindow) void;
 
+    //type_id_ptr: if (IS_DEBUG) *u8 else void,
+
     deinit_fn: DeinitFn,
     area: Rect,
     children: ArrayList(*iArea) = .{},
@@ -206,11 +216,22 @@ pub const iArea = struct {
 
     win_ptr: *iWindow,
 
+    /// To use this function, T must: pub var __iArea = iAreaReg("my_vt_field_name")
+    pub fn cast(self: *iArea, comptime T: type) *T {
+        return @alignCast(@fieldParentPtr(@TypeOf(T.__iArea).name, self));
+    }
+
     /// Use as follows:
     /// self.* = .{.vt = .UNINITILIZED, .my_other = 0};
     /// parent.addChild(&self.vt, .{.deinit_fn = deinit});
-    pub fn addChild(parent: *iArea, reserved_memory: *iArea, args: Args) void {
+    pub fn addChild(
+        parent: *iArea,
+        reserved_memory: *iArea,
+        args: Args,
+        //comptime parent_T: type,
+    ) void {
         reserved_memory.* = .{
+            //.type_id_ptr = if (IS_DEBUG) &parent_T.__iArea.type_id else {},
             .depth = parent.depth + 1,
             .deinit_fn = args.deinit_fn,
             .area = args.area,
@@ -309,7 +330,15 @@ pub fn label(lay: *iArea, area_o: ?Rect, comptime fmt: []const u8, args: anytype
     return sp[1];
 }
 
+pub fn iWindowReg(comptime vt_name: []const u8) struct {
+    pub const name = vt_name;
+    type_id: u8, // not really an id, pointer is taken to determine if types match
+} {
+    return .{ .type_id = 0 };
+}
+
 pub const iWindow = struct {
+    pub var __iArea = iAreaReg("area");
     const Background = union(enum) {
         window,
         color: u32,
@@ -345,6 +374,11 @@ pub const iWindow = struct {
     bg: Background,
 
     key_ctx_mask: keybinding.ContextMask = .empty,
+
+    /// To use this function, T must: pub var __iWindow = iWindowReg("my_vt_field_name")
+    pub fn cast(self: *iWindow, comptime T: type) *T {
+        return @alignCast(@fieldParentPtr(@TypeOf(T.__iWindow).name, self));
+    }
 
     pub fn draw(self: *iWindow, gui: *Gui, dctx: *DrawState) void {
         self.area.draw(gui, dctx, self);
@@ -391,7 +425,7 @@ pub const iWindow = struct {
 
     fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
     fn draw_area(vt: *iArea, _: *Gui, dctx: *DrawState) void {
-        const self: *iWindow = @alignCast(@fieldParentPtr("area", vt));
+        const self = vt.cast(iWindow);
         switch (self.bg) {
             .window => GuiHelp.drawWindowFrame(dctx, self.area.area),
             .none => {},

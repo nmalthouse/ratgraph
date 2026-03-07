@@ -34,6 +34,7 @@ pub fn NumberDummy(comptime T: type) type {
     return struct {
         const charset = charsetForNum(T);
         const num_type = getNumtype(T);
+        pub var __iArea = g.iAreaReg("vt");
         vt: iArea,
 
         __value: T,
@@ -52,17 +53,17 @@ pub fn NumberDummy(comptime T: type) type {
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             gui.alloc.destroy(self);
         }
 
         pub fn printTo(vt: *iArea, arraylist: *std.ArrayList(u8)) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             arraylist.print(vt.win_ptr.gui_ptr.alloc, "{d:.2}", .{self.ptr.*}) catch return;
         }
 
         pub fn parseFrom(vt: *iArea, slice: []const u8) error{invalid}!void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             self.ptr.* = switch (num_type) {
                 .float => std.fmt.parseFloat(T, slice) catch return error.invalid,
                 .uint, .int => std.fmt.parseInt(T, slice, 0) catch return error.invalid,
@@ -144,6 +145,7 @@ pub const Textbox = struct {
         end,
     };
     pub var __cbhandle = g.cbReg("cbhandle");
+    pub var __iArea = g.iAreaReg("vt");
 
     vt: iArea,
     cbhandle: CbHandle = .init(@This()),
@@ -247,7 +249,7 @@ pub const Textbox = struct {
 
     pub fn buildNumber(parent: *iArea, area: Rect, num_vt: *iArea, num_print: NumberPrintFn, num_parse: NumberParseFn, opts: TextboxOptions) g.WgStatus {
         if (buildOpts(parent, area, opts) != .good) return .failed;
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", parent.getLastChild() orelse return .failed));
+        const self = (parent.getLastChild() orelse return .failed).cast(@This());
         self.vt.dirty();
         self.reset("") catch return .good;
         num_print(num_vt, &self.codepoints);
@@ -260,7 +262,7 @@ pub const Textbox = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         self.codepoints.deinit(gui.alloc);
         gui.alloc.destroy(self);
     }
@@ -270,7 +272,7 @@ pub const Textbox = struct {
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.opts.fevent_override_cb) |cb| {
             cb(self.opts.commit_vt orelse return, ev, self);
         } else {
@@ -331,7 +333,7 @@ pub const Textbox = struct {
     }
 
     pub fn fevent_err(vt: *iArea, ev: g.FocusedEvent) !void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         switch (ev.event) {
             .focusChanged => |focused| {
                 if (focused) ev.gui.startTextinput(vt.area) else ev.gui.stopTextInput();
@@ -427,7 +429,7 @@ pub const Textbox = struct {
     }
 
     pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
-        const s: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const s = vt.cast(@This());
         const is_focused = gui.isFocused(vt);
         d.ctx.rect(vt.area, if (is_focused) 0xff00ffff else 0x222222ff);
 
@@ -485,7 +487,7 @@ pub const Textbox = struct {
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         cb.gui.grabFocus(vt, win);
         vt.dirty();
 
@@ -535,7 +537,7 @@ pub const Textbox = struct {
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const sz = cb.gui.dstate.nstyle.text_h;
         const ar = textArea(vt.area, cb.gui);
         const rel = cb.pos.sub(ar.pos());
@@ -608,7 +610,7 @@ pub const Textbox = struct {
     }
 
     pub fn textinput_cb_err(vt: *iArea, d: g.TextCbState, _: *iWindow) !void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const view = try std.unicode.Utf8View.init(d.text);
         var it = view.iterator();

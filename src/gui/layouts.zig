@@ -29,6 +29,7 @@ pub const WorkspaceId = enum(u32) {
 //when layout changes, clear gui window list and insert anew.
 pub const Layouts = struct {
     const Self = @This();
+    pub var __iWindow = guis.iWindowReg("vt");
 
     vt: guis.iWindow,
     alloc: std.mem.Allocator,
@@ -56,7 +57,7 @@ pub const Layouts = struct {
     }
 
     pub fn deinit(vt: *iWindow, gui: *guis.Gui) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         for (self.workspaces.items) |*ws| {
             ws.deinit(self.alloc);
         }
@@ -82,7 +83,7 @@ pub const Layouts = struct {
     }
 
     pub fn build(vt: *iWindow, gui: *guis.Gui, area: graph.Rect) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         self.vt.area.area = area;
         std.debug.print("Update area {any}\n", .{area});
         _ = gui;
@@ -114,7 +115,7 @@ pub const Layouts = struct {
     }
 
     pub fn onclick(vt: *iArea, mcb: guis.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+        const self = vt.cast(iWindow).cast(@This());
 
         const ws = self.getWorkspace(self.set_ws) orelse return;
 
@@ -136,7 +137,7 @@ pub const Layouts = struct {
     }
 
     pub fn onGrab(vt: *iArea, mcb: guis.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+        const self = vt.cast(iWindow).cast(@This());
         _ = win;
 
         const ws = self.getWorkspace(self.set_ws) orelse return;

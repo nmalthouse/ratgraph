@@ -69,6 +69,7 @@ pub const Slide = struct {
 
 /// A box that when clicked allows allows manipulation of a value by moving mouse in +- x
 pub const StaticSlider = struct {
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     opts: StaticSliderOpts,
@@ -110,7 +111,7 @@ pub const StaticSlider = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.opts.label) |l| {
             gui.alloc.free(l);
         }
@@ -124,7 +125,7 @@ pub const StaticSlider = struct {
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         d.ctx.rect(vt.area, d.nstyle.color.static_slider_bg);
         const ins = @ceil(d.scale);
         const inset = vt.area.inset(ins);
@@ -167,7 +168,7 @@ pub const StaticSlider = struct {
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const old_num = self.num.*;
         const dist = self.opts.max - self.opts.min;
@@ -183,7 +184,7 @@ pub const StaticSlider = struct {
     }
 
     pub fn scroll(vt: *iArea, gui: *Gui, _: *iWindow, dist: f32) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         var d = dist;
         if (self.opts.slide.snap > 0) d *= self.opts.slide.snap;
         const old_num = self.num.*;
@@ -208,7 +209,7 @@ pub const StaticSlider = struct {
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         switch (cb.btn) {
             .left => {
                 self.cancelEdit(cb.gui);
@@ -249,7 +250,7 @@ pub const StaticSlider = struct {
     }
 
     pub fn fevent_err(vt: *iArea, ev: g.FocusedEvent) !void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         switch (ev.event) {
             .focusChanged => |focused| {
                 if (!focused) {

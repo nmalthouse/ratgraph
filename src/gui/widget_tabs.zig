@@ -23,6 +23,7 @@ pub const Tabs = struct {
         cb_vt: *CbHandle,
         index_ptr: ?*usize = null,
     };
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     tabs: std.ArrayList(Tab),
@@ -80,7 +81,7 @@ pub const Tabs = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         self.tabs.deinit(gui.alloc);
         gui.alloc.destroy(self);
     }
@@ -91,6 +92,7 @@ pub const Tabs = struct {
 };
 
 const TabHeader = struct {
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     parent: *Tabs,
@@ -108,7 +110,7 @@ const TabHeader = struct {
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const tabs = self.parent.tabs.items;
         if (tabs.len == 0)
             return;
@@ -124,7 +126,7 @@ const TabHeader = struct {
     }
 
     pub fn draw(vt: *iArea, _: *Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const col = &d.nstyle.color;
         d.ctx.rect(vt.area, d.nstyle.color.bg);
 
@@ -153,7 +155,7 @@ const TabHeader = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 };

@@ -21,6 +21,7 @@ const CbHandle = guis.CbHandle;
 
 pub const Styler = struct {
     pub var __cbhandle = guis.cbReg("cbhandle");
+    pub var __iWindow = guis.iWindowReg("vt");
     vt: iWindow,
     cbhandle: CbHandle = .init(@This()),
 
@@ -36,7 +37,7 @@ pub const Styler = struct {
     fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
 
     pub fn deinit(vt: *iWindow, gui: *Gui) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         //self.layout.deinit(gui, vt);
         vt.deinit(gui);
         gui.alloc.destroy(self); //second
@@ -47,7 +48,7 @@ pub const Styler = struct {
     }
 
     pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         self.vt.area.area = area;
         self.vt.area.clearChildren(gui, vt);
         //self.layout.reset(gui, vt);
@@ -87,6 +88,7 @@ pub const Styler = struct {
 
 pub const MyGlView = struct {
     pub var __cbhandle = guis.cbReg("cbhandle");
+    pub var __iWindow = guis.iWindowReg("vt");
     vt: iWindow,
     cbhandle: CbHandle = .init(@This()),
 
@@ -128,7 +130,7 @@ pub const MyGlView = struct {
     }
 
     pub fn update(vt: *iWindow, gui: *Gui) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const help = struct {
             fn drawPane(s: *MyGlView, pane: *const layouts.Pane, area: graph.RectBound) void {
@@ -159,7 +161,7 @@ pub const MyGlView = struct {
     }
 
     pub fn onclick(vt: *iArea, mcb: guis.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+        const self = vt.cast(iWindow).cast(@This());
 
         const p = 4;
         switch (mcb.state) {
@@ -179,7 +181,7 @@ pub const MyGlView = struct {
     }
 
     pub fn onGrab(vt: *iArea, mcb: guis.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", @as(*iWindow, @alignCast(@fieldParentPtr("area", vt)))));
+        const self = vt.cast(iWindow).cast(@This());
         _ = win;
 
         switch (mcb.state) {
@@ -202,7 +204,7 @@ pub const MyGlView = struct {
     }
 
     pub fn deinit(vt: *iWindow, gui: *Gui) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         //self.layout.deinit(gui, vt);
         self.ws.deinit(gui.alloc);
         vt.deinit(gui);
@@ -214,7 +216,7 @@ pub const MyGlView = struct {
     }
 
     pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         self.vt.area.area = area;
         std.debug.print("Update area {any}\n", .{area});
         self.ws.updateArea(gui.alloc, area.toAbsoluteRect()) catch {};
@@ -242,6 +244,7 @@ pub const MyInspector = struct {
         fields,
     };
     pub var __cbhandle = guis.cbReg("cbhandle");
+    pub var __iWindow = guis.iWindowReg("vt");
 
     vt: iWindow,
     cbhandle: CbHandle = .init(@This()),
@@ -278,7 +281,7 @@ pub const MyInspector = struct {
     fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
 
     pub fn deinit(vt: *iWindow, gui: *Gui) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         //self.layout.deinit(gui, vt);
         vt.deinit(gui);
         gui.alloc.destroy(self); //second
@@ -289,7 +292,7 @@ pub const MyInspector = struct {
     }
 
     pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         self.vt.area.area = area;
         self.vt.area.clearChildren(gui, vt);
         self.vscroll_vt = null;
@@ -358,7 +361,7 @@ pub const MyInspector = struct {
             });
             if (st == .good) {
                 if (vt.getLastChild()) |last|
-                    self.tv_vt = @alignCast(@fieldParentPtr("vt", last));
+                    self.tv_vt = last.cast(Wg.TextView);
             }
         }
         if (eql(u8, tab_name, "main")) {
@@ -440,8 +443,7 @@ pub const MyInspector = struct {
             .many => self.num_scroll_items += 100,
             .bottom => {
                 if (self.vscroll_vt) |vscr| {
-                    const scr: *Wg.VScroll = @alignCast(@fieldParentPtr("vt", vscr));
-                    scr.gotoBottom();
+                    vscr.cast(Wg.VScroll).gotoBottom();
                 }
                 if (self.tv_vt) |tv| {
                     tv.gotoBottom();

@@ -26,7 +26,8 @@ pub const FloatScroll = struct {
     const scroll_index = 0;
     const virtual_area_index = 1;
     const num_widget = 2;
-    pub var __cbhandle = g.cbReg("cbhandle");
+    pub var __cbhandle = g.cbReg("cb");
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     cb: CbHandle = .init(@This()),
@@ -66,7 +67,7 @@ pub const FloatScroll = struct {
             .failed => {
                 _ = self.vt.addEmpty(split[1]);
             },
-            .good => self.scroll_ptr = @alignCast(@fieldParentPtr("vt", self.vt.getLastChild() orelse return .failed)),
+            .good => self.scroll_ptr = (self.vt.getLastChild() orelse return .failed).cast(FloatScrollBar),
         }
 
         const virt = self.vt.addEmpty(Rect{
@@ -83,7 +84,7 @@ pub const FloatScroll = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 
@@ -97,7 +98,7 @@ pub const FloatScroll = struct {
     }
 
     pub fn notifyChange(cb: *CbHandle, gui: *Gui, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("cb", cb));
+        const self = cb.cast(@This());
         if (self.vt.children.items.len != num_widget) return;
         const child = self.vt.children.items[virtual_area_index];
         // area_y - y_ptr = child_y
@@ -124,7 +125,7 @@ pub const FloatScroll = struct {
     }
 
     pub fn onScroll(vt: *iArea, gui: *Gui, win: *iWindow, dist: f32) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         if (self.vt.children.items.len != num_widget) return;
 
@@ -194,6 +195,7 @@ pub const FloatScroll = struct {
 pub const FloatScrollBar = struct {
     const NotifyFn = *const fn (*CbHandle, *Gui, *iWindow) void;
     const shuttle_min_w = 50;
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     parent_vt: *CbHandle,
@@ -230,12 +232,12 @@ pub const FloatScrollBar = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const actual_pos = calculateShuttlePos(self.area_h, self.y_ptr.*, self.vt.area.h, self.shuttle_h);
         const handle = shuttleRect(vt.area.replace(null, null, null, self.vt.area.h), actual_pos, self.shuttle_h);
@@ -246,7 +248,7 @@ pub const FloatScrollBar = struct {
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const travel = self.vt.area.h - self.shuttle_h;
         const vtravel = self.area_h - self.vt.area.h;
         if (travel <= 0 or vtravel <= 0) return;
@@ -269,7 +271,7 @@ pub const FloatScrollBar = struct {
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const sp = calculateShuttlePos(self.area_h, self.y_ptr.*, self.vt.area.h, self.shuttle_h);
         const ar = vt.area.replace(null, null, null, self.vt.area.h);
         const handle = shuttleRect(ar, sp, self.shuttle_h);

@@ -18,6 +18,7 @@ pub const GLTexture = struct {
         cb_fn: ?Widget.Button.ButtonCallbackT = null,
         id: usize = 0,
     };
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     uv: Rect,
@@ -40,18 +41,18 @@ pub const GLTexture = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 
     pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const r = vt.area;
         d.ctx.rectTexTint(r, self.uv, self.opts.tint, self.tex);
     }
 
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         vt.dirty();
         if (self.opts.cb_fn) |cbfn|

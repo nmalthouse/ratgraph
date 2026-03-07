@@ -75,6 +75,7 @@ pub fn ComboUser(user_data: type) type {
         const ParentT = @This();
         pub const PoppedWindow = struct {
             pub var __cbhandle = g.cbReg("cbhandle");
+            pub var __iWindow = g.iWindowReg("vt");
             vt: iWindow,
             cbhandle: CbHandle = .init(@This()),
 
@@ -87,12 +88,12 @@ pub fn ComboUser(user_data: type) type {
             search_list: std.ArrayList(usize),
 
             pub fn buildWindow(vt: *iWindow, gui: *Gui, area: Rect) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+                const self = vt.cast(@This());
                 vt.area.area = area;
                 vt.area.clearChildren(gui, vt);
                 self.vscroll_vt = null;
                 vt.area.dirty();
-                const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
+                const p = self.parent_vt.cast(ParentT);
                 var ly = gui.dstate.vlayout(area.inset(gui.dstate.scale));
                 ly.padding = .zero;
                 _ = Widget.Textbox.buildOpts(&vt.area, ly.getArea(), .{
@@ -113,12 +114,12 @@ pub fn ComboUser(user_data: type) type {
                     .index_ptr = &p.index,
                     .bg_col = gui.dstate.nstyle.color.bg,
                 }) != .good) return;
-                self.vscroll_vt = @alignCast(@fieldParentPtr("vt", vt.area.getLastChild() orelse return));
+                self.vscroll_vt = (vt.area.getLastChild() orelse return).cast(VScroll);
             }
 
             pub fn textbox_cb(pop_vt: *CbHandle, p: Widget.Textbox.CommitParam) void {
                 const self = pop_vt.cast(@This());
-                const parent: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
+                const parent = self.parent_vt.cast(ParentT);
                 if (parent.opts.commit_invalid and p.forced) {
                     parent.opts.commit_cb(parent.opts.user_vt, parent.user, .{
                         .index = CommitParam.invalid_index,
@@ -142,7 +143,7 @@ pub fn ComboUser(user_data: type) type {
                 const self = cb.cast(@This());
                 var ly = gui.dstate.vlayout(area.area);
                 ly.padding = .zero;
-                const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
+                const p = self.parent_vt.cast(ParentT);
                 const total_count = p.opts.count;
 
                 const do_search = self.search_string.len > 0;
@@ -182,23 +183,14 @@ pub fn ComboUser(user_data: type) type {
             }
 
             pub fn deinit(vt: *iWindow, gui: *Gui) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+                const self = vt.cast(@This());
                 vt.deinit(gui);
                 self.search_list.deinit(gui.alloc);
                 gui.alloc.destroy(self);
             }
-
-            pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
-                _ = self;
-                d.ctx.rectLine(vt.area, @ceil(d.scale), 0xff);
-            }
-
-            pub fn deinit_area(vt: *iArea, _: *Gui, _: *iWindow) void {
-                _ = vt;
-            }
         };
         pub var __cbhandle = g.cbReg("cbhandle");
+        pub var __iArea = g.iAreaReg("vt");
 
         vt: iArea,
 
@@ -221,17 +213,17 @@ pub fn ComboUser(user_data: type) type {
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             gui.alloc.destroy(self);
         }
 
         pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             drawCommon(vt.area, d, self.opts.name_cb(self.opts.user_vt, self.opts.current, gui, self.user).name);
         }
 
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             _ = win;
             self.makeTransientWindow(cb.gui, Rec(vt.area.x, vt.area.y, vt.area.w, cb.gui.dstate.nstyle.item_h * 10).round());
         }
@@ -269,6 +261,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
         const ParentT = @This();
         pub const PoppedWindow = struct {
             pub var __cbhandle = g.cbReg("cbhandle");
+            pub var __iWindow = g.iWindowReg("vt");
             vt: iWindow,
             cbhandle: CbHandle = .init(@This()),
 
@@ -280,7 +273,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
                 gui: *Gui,
                 area: Rect,
             ) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+                const self = vt.cast(@This());
                 vt.area.area = area;
                 vt.area.clearChildren(gui, vt);
                 const info = @typeInfo(enumT);
@@ -298,7 +291,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
             pub fn build_cb(cb: *CbHandle, area: *iArea, index: usize) void {
                 const gui = area.win_ptr.gui_ptr;
                 const self = cb.cast(@This());
-                const p: *ParentT = @alignCast(@fieldParentPtr("vt", self.parent_vt));
+                const p = self.parent_vt.cast(ParentT);
                 var ly = gui.dstate.vlayout(area.area);
                 ly.padding = .zero;
                 const info = @typeInfo(enumT);
@@ -315,22 +308,13 @@ pub fn ComboGeneric(comptime enumT: type) type {
             }
 
             pub fn deinit(vt: *iWindow, gui: *Gui) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+                const self = vt.cast(@This());
                 vt.deinit(gui);
                 gui.alloc.destroy(self);
             }
-
-            pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-                const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
-                _ = d;
-                _ = self;
-            }
-
-            pub fn deinit_area(vt: *iArea, _: *Gui, _: *iWindow) void {
-                _ = vt;
-            }
         };
         pub var __cbhandle = g.cbReg("cbhandle");
+        pub var __iArea = g.iAreaReg("vt");
 
         vt: iArea,
         cbhandle: CbHandle = .init(@This()),
@@ -352,13 +336,13 @@ pub fn ComboGeneric(comptime enumT: type) type {
         }
 
         pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             gui.alloc.free(self.opts.label);
             gui.alloc.destroy(self);
         }
 
         pub fn draw(vt: *iArea, gui: *g.Gui, d: *g.DrawState) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             drawCommon(
                 vt.area,
                 d,
@@ -367,7 +351,7 @@ pub fn ComboGeneric(comptime enumT: type) type {
         }
 
         pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-            const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+            const self = vt.cast(@This());
             const btn_a = vt.area;
             _ = win;
             self.makeTransientWindow(cb.gui, Rec(btn_a.x, btn_a.y, btn_a.w, cb.gui.dstate.nstyle.item_h * 4));

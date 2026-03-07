@@ -37,6 +37,7 @@ pub const VScroll = struct {
         current_index: ?usize = null,
         bg_col: ?u32 = null,
     };
+    pub var __iArea = g.iAreaReg("vt");
 
     vt: iArea,
 
@@ -129,7 +130,7 @@ pub const VScroll = struct {
 
     pub fn updateCount(self: *@This(), new_count: usize) void {
         if (self.vt.children.items.len != 2 or !self.has_scroll) return;
-        const scr: *ScrollBar = @alignCast(@fieldParentPtr("vt", self.vt.children.items[1]));
+        const scr = self.vt.children.items[1].cast(ScrollBar);
         self.opts.count = new_count;
         self.sc_count = self.getScrollableCount();
         scr.updateCount(self.sc_count);
@@ -149,25 +150,25 @@ pub const VScroll = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, window: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         _ = window;
         gui.alloc.destroy(self);
     }
 
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.opts.bg_col) |bg| {
             d.ctx.rect(vt.area, bg);
         }
     }
 
     pub fn notifyChange(vt: *iArea, gui: *Gui, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         self.rebuild(gui, win);
     }
 
     pub fn onScroll(vt: *iArea, gui: *Gui, win: *iWindow, dist: f32) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.sc_count == 0) {
             self.index_ptr.* = 0;
             return;
@@ -196,6 +197,7 @@ pub const Checkbox = struct {
 
         cross_color: u32 = 0xff,
     };
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     __bool: bool = false,
@@ -238,12 +240,12 @@ pub const Checkbox = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         switch (ev.event) {
             .focusChanged => vt.dirty(),
             .text_input => {},
@@ -267,7 +269,7 @@ pub const Checkbox = struct {
     }
 
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const st = if (self.bool_ptr.*) d.nstyle.color.ableton_checkbox.true else d.nstyle.color.ableton_checkbox.false;
         d.box(vt.area, .{
@@ -280,7 +282,7 @@ pub const Checkbox = struct {
     }
 
     pub fn drawCheck(vt: *iArea, gui: *Gui, d: *DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const is_focused = gui.isFocused(vt);
 
         const bw = 1;
@@ -304,7 +306,7 @@ pub const Checkbox = struct {
     }
 
     pub fn drawDropdown(vt: *iArea, _: *Gui, d: *DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const bw = 1;
         const area = vt.area;
@@ -327,7 +329,7 @@ pub const Checkbox = struct {
 
     //If we click, we need to redraw
     pub fn onclick(vt: *iArea, cb: MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         self.toggle(cb.gui, win);
     }
 };
@@ -343,6 +345,7 @@ pub const Button = struct {
         tab_focus: bool = false,
         user_1: u32 = 0,
     };
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     text: []const u8,
@@ -364,20 +367,20 @@ pub const Button = struct {
                 .draw_fn = opts.custom_draw orelse draw,
                 .focus_ev_fn = fevent,
                 .onclick = onclick,
-                .can_tab_focus = opts.tab_focus,
+                .can_tab_focus = opts.tab_focus and !opts.disable,
             },
         );
         return .good;
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.free(self.text);
         gui.alloc.destroy(self);
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: MouseCbState, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const old = self.is_down;
         self.is_down = switch (cb.state) {
             .high, .rising, .rising_repeat => true,
@@ -388,7 +391,7 @@ pub const Button = struct {
     }
 
     pub fn draw(vt: *iArea, gui: *Gui, d: *DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const is_focused = gui.isFocused(vt);
         const sl = if (self.is_down) d.nstyle.color.button_active_bg else d.nstyle.color.button_bg;
         const tint = if (!is_focused) sl else d.nstyle.color.button_focused_bg;
@@ -401,7 +404,7 @@ pub const Button = struct {
     }
 
     pub fn onclick(vt: *iArea, cb: MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.opts.disable) return;
         vt.dirty();
         self.is_down = true;
@@ -416,7 +419,7 @@ pub const Button = struct {
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.opts.disable) return;
         switch (ev.event) {
             .focusChanged => vt.dirty(),
@@ -439,7 +442,7 @@ pub const Button = struct {
     }
 
     pub fn customButtonDraw_listitem(vt: *iArea, _: *Gui, d: *DrawState) void {
-        const self: *Button = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         d.ctx.rect(vt.area, 0xffff_ffff);
         if (self.opts.user_1 == 1) {
             const SELECTED_FIELD_COLOR = 0x6097dbff;
@@ -453,6 +456,7 @@ pub const Button = struct {
 pub const ScrollBar = struct {
     const NotifyFn = *const fn (*iArea, *Gui, *iWindow) void;
     const shuttle_min_w = 50;
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     parent_vt: *iArea,
@@ -507,7 +511,7 @@ pub const ScrollBar = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 
@@ -527,7 +531,7 @@ pub const ScrollBar = struct {
     }
 
     pub fn onclick(vt: *iArea, cb: MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         const actual_pos = calculateShuttlePos(self.index_ptr.*, self.count, self.usable_h, self.shuttle_h);
         const handle = shuttleRect(vt.area.replace(null, null, null, self.usable_h), actual_pos, self.shuttle_h);
@@ -538,7 +542,7 @@ pub const ScrollBar = struct {
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.count < 2)
             return;
         const usable_width = self.usable_h - self.shuttle_h;
@@ -564,7 +568,7 @@ pub const ScrollBar = struct {
     }
 
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const sp = calculateShuttlePos(self.index_ptr.*, self.count, self.usable_h, self.shuttle_h);
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         //d.ctx.nineSlice(vt.area, sl, d.style.texture, d.scale, 0xffffffff);
@@ -590,6 +594,7 @@ pub const Text = struct {
         bg_col: ?u32 = null,
         col: ?u32 = null,
     };
+    pub var __iArea = g.iAreaReg("vt");
 
     vt: iArea,
 
@@ -639,7 +644,7 @@ pub const Text = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         if (self.is_alloced)
             gui.alloc.free(self.text);
         gui.alloc.destroy(self);
@@ -647,7 +652,7 @@ pub const Text = struct {
 
     pub fn draw(vt: *iArea, gui: *Gui, d: *DrawState) void {
         _ = gui;
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         if (self.opts.bg_col) |bg|
             d.ctx.rect(vt.area, bg);
@@ -657,6 +662,7 @@ pub const Text = struct {
 };
 
 pub const NumberDisplay = struct {
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
 
     num_ptr: *usize,
@@ -677,12 +683,12 @@ pub const NumberDisplay = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.destroy(self);
     }
 
     pub fn draw(vt: *iArea, _: *Gui, d: *DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         //d.ctx.rect(vt.area, 0x5ffff0ff);
         d.ctx.rect(vt.area, self.bg_col);
         const texta = d.textArea(vt.area);
@@ -691,7 +697,7 @@ pub const NumberDisplay = struct {
     }
 
     pub fn pollNumber(vt: *iArea, _: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
 
         if (self.last_drawn != self.num_ptr.*) {
             vt.dirty();

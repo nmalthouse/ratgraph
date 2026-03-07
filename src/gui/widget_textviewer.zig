@@ -26,6 +26,7 @@ pub const TextView = struct {
         index_ptr: ?*usize = null,
     };
     pub var __cbhandle = g.cbReg("cbhandle");
+    pub var __iArea = g.iAreaReg("vt");
     vt: iArea,
     cbhandle: CbHandle = .init(@This()),
 
@@ -87,7 +88,7 @@ pub const TextView = struct {
     }
 
     pub fn fevent(vt: *iArea, ev: g.FocusedEvent) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         switch (ev.event) {
             .keydown => {
                 const b = &Gui.binds.global;
@@ -101,7 +102,7 @@ pub const TextView = struct {
 
     //Every selection can be drawn with 0-3 rectangles
     pub fn onclick(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         const font = cb.gui.dstate.font;
         switch (cb.btn) {
             .left => {
@@ -188,7 +189,7 @@ pub const TextView = struct {
     }
 
     pub fn mouseGrabbed(vt: *iArea, cb: g.MouseCbState, win: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         _ = win;
         if (self.opts.index_ptr) |ind| {
             if (ind.* >= self.lines.items.len) return;
@@ -215,7 +216,7 @@ pub const TextView = struct {
 
     pub fn addOwnedText(self: *@This(), owned: []const u8, gui: *Gui) !void {
         if (self.vt.children.items.len != 1) return;
-        const vscr: *VScroll = @alignCast(@fieldParentPtr("vt", self.vt.children.items[0]));
+        const vscr = self.vt.children.items[0].cast(VScroll);
         const extra_margin = gui.dstate.nstyle.text_h / 3;
         const tw = VScroll.getAreaW(vscr.vt.area.w - extra_margin, gui.dstate.scale);
         switch (self.opts.mode) {
@@ -228,13 +229,13 @@ pub const TextView = struct {
 
     pub fn rebuildScroll(self: *@This(), gui: *Gui, win: *iWindow) void {
         if (self.vt.children.items.len != 1) return;
-        const vscr: *VScroll = @alignCast(@fieldParentPtr("vt", self.vt.children.items[0]));
+        const vscr = self.vt.children.items[0].cast(VScroll);
         vscr.rebuild(gui, win);
     }
 
     pub fn gotoBottom(self: *@This()) void {
         if (self.vt.children.items.len != 1) return;
-        const vscr: *VScroll = @alignCast(@fieldParentPtr("vt", self.vt.children.items[0]));
+        const vscr = self.vt.children.items[0].cast(VScroll);
         vscr.gotoBottom();
     }
 
@@ -268,14 +269,14 @@ pub const TextView = struct {
     }
 
     pub fn deinit(vt: *iArea, gui: *Gui, _: *iWindow) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         gui.alloc.free(self.cat_string);
         self.lines.deinit(gui.alloc);
         gui.alloc.destroy(self);
     }
 
     pub fn draw(vt: *iArea, gui: *Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         d.ctx.rect(vt.area, self.opts.bg_col orelse d.nstyle.color.text_bg);
 
         //TODO make sure the index is santized big dummy

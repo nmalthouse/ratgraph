@@ -40,6 +40,7 @@ pub const BtnContextWindow = struct {
     };
     const BtnCb = Widget.Button.ButtonCallbackT;
     pub var __cbhandle = g.cbReg("cbhandle");
+    pub var __iWindow = g.iWindowReg("vt");
     vt: iWindow,
 
     opts: Opts,
@@ -91,7 +92,7 @@ pub const BtnContextWindow = struct {
     }
 
     pub fn build(vt: *iWindow, gui: *Gui, area: Rect) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         vt.area.area = area;
         vt.area.clearChildren(gui, vt);
 
@@ -141,7 +142,7 @@ pub const BtnContextWindow = struct {
     }
 
     pub fn deinit(vt: *iWindow, gui: *Gui) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("vt", vt));
+        const self = vt.cast(@This());
         vt.deinit(gui);
 
         for (self.buttons.items) |btn|
@@ -149,12 +150,6 @@ pub const BtnContextWindow = struct {
         self.buttons.deinit(gui.alloc);
 
         gui.alloc.destroy(self); //second
-    }
-
-    pub fn draw(vt: *iArea, _: *g.Gui, d: *g.DrawState) void {
-        const self: *@This() = @alignCast(@fieldParentPtr("area", vt));
-        _ = self;
-        _ = d;
     }
 
     fn btn_toggle_child(cb: *g.CbHandle, id: g.Uid, dat: g.MouseCbState, win: *iWindow) void {
@@ -188,6 +183,4 @@ pub const BtnContextWindow = struct {
         self.opts.btn_cb(self.opts.btn_vt, id, dat, win);
         dat.gui.deferTransientClose(win);
     }
-
-    pub fn deinit_area(_: *iArea, _: *Gui, _: *iWindow) void {}
 };
