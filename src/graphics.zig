@@ -1084,6 +1084,15 @@ pub const MultiLineText = struct {
 
     starting_z: u16,
 
+    direction: enum { down, up } = .down,
+
+    fn _advanceY(self: *@This(), px_size: f32) void {
+        switch (self.direction) {
+            .down => self.pos.y += px_size,
+            .up => self.pos.y -= px_size,
+        }
+    }
+
     pub fn start(dctx: *ImmediateDrawingContext, start_pos: Vec2f, font: *FontInterface) @This() {
         defer dctx.zindex +|= 1; //Reserve a z for background rect
         return .{
@@ -1097,13 +1106,15 @@ pub const MultiLineText = struct {
     }
 
     pub fn text(self: *@This(), str: []const u8, px_size: f32, col: u32) void {
+        if (self.direction == .up) self._advanceY(px_size);
         var w: f32 = 0;
         self.ctx.text(self.pos, str, .{ .width_pointer = &w, .color = col, .font = self.font, .px_size = px_size });
         self.max_width = @max(w, self.max_width);
-        self.pos.y += px_size;
+        if (self.direction == .down) self._advanceY(px_size);
     }
 
     pub fn textFmt(self: *@This(), comptime fmt: []const u8, args: anytype, px_size: f32, color: u32) void {
+        if (self.direction == .up) self._advanceY(px_size);
         var w: f32 = 0;
         self.ctx.textFmt(self.pos, fmt, args, .{
             .width_pointer = &w,
@@ -1112,14 +1123,20 @@ pub const MultiLineText = struct {
             .font = self.font,
         });
         self.max_width = @max(w, self.max_width);
-        self.pos.y += px_size;
+        if (self.direction == .down) self._advanceY(px_size);
     }
 
     pub fn drawBgRect(self: *@This(), color: u32, min_width: f32) void {
         const old_z = self.ctx.zindex;
         defer self.ctx.zindex = old_z;
+        const r = (RectBound{
+            .x0 = self.pos_i.x,
+            .x1 = self.pos_i.x + @max(min_width, self.max_width),
+            .y0 = self.pos_i.y,
+            .y1 = self.pos.y,
+        }).toRect();
         self.ctx.zindex = self.starting_z;
-        self.ctx.rect(Rec(self.pos_i.x, self.pos_i.y, @max(min_width, self.max_width), self.pos.y - self.pos_i.y), color);
+        self.ctx.rect(r, color);
     }
 };
 

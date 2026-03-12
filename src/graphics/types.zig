@@ -29,11 +29,16 @@ pub const RectBound = struct {
     y1: f32 = 0,
 
     pub fn toRect(self: @This()) Rect {
+        const x0 = @min(self.x0, self.x1);
+        const x1 = @max(self.x0, self.x1);
+        const y0 = @min(self.y0, self.y1);
+        const y1 = @max(self.y0, self.y1);
+
         return .{
-            .x = self.x0,
-            .y = self.y0,
-            .w = self.x1 - self.x0,
-            .h = self.y1 - self.y0,
+            .x = x0,
+            .y = y0,
+            .w = x1 - x0,
+            .h = y1 - y0,
         };
     }
 

@@ -65,12 +65,13 @@ pub const SerialBinding = struct {
     }
 
     pub fn nameFull(self: @This(), buf: []u8) []const u8 {
-        //const mod_name = graph.keycodes.Keymod.name(self.mod, buf);
-        //if (mod_name.len >= buf.len) return mod_name;
         const mod_name = Keymod.name(Keymod.mask(self.mod), buf);
         var fbs = std.io.FixedBufferStream([]u8){ .buffer = buf, .pos = mod_name.len };
 
-        fbs.writer().print("{s}", .{self.name()}) catch {};
+        fbs.writer().print("{s}{s}", .{ switch (self.button) {
+            else => "",
+            .mouse => "m_",
+        }, self.name() }) catch {};
 
         return buf[0..fbs.pos];
     }
