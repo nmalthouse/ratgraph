@@ -178,6 +178,7 @@ pub const Renderer = struct {
             fac: f32,
             pad: f32,
             index: usize,
+            back_buffer: gl.uint = 0,
         },
         dctx: *DrawCtx,
         pl: anytype,
@@ -269,7 +270,7 @@ pub const Renderer = struct {
                     gl.Clear(gl.COLOR_BUFFER_BIT);
                     gl.ClearColor(0, 0, 0, 0);
                 } else {
-                    self.bindMainFramebufferAndVp(screen_area, screen_dim);
+                    self.bindMainFramebufferAndVp(screen_area, screen_dim, param.back_buffer);
                 }
 
                 const scrsz = if (self.do_hdr_buffer) graph.Vec2i{ .x = self.gbuffer.scr_w, .y = self.gbuffer.scr_h } else graph.Vec2i{ .x = @intFromFloat(screen_area.w), .y = @intFromFloat(screen_area.h) };
@@ -317,7 +318,7 @@ pub const Renderer = struct {
                 }
 
                 if (self.do_hdr_buffer) {
-                    self.bindMainFramebufferAndVp(screen_area, screen_dim);
+                    self.bindMainFramebufferAndVp(screen_area, screen_dim, param.back_buffer);
 
                     const sh1 = self.shader.hdr;
                     gl.UseProgram(sh1);
@@ -332,7 +333,7 @@ pub const Renderer = struct {
                     const y: i32 = @intFromFloat(screen_dim.y - (screen_area.y + screen_area.h));
                     const x: i32 = @intFromFloat(screen_area.x);
                     gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.gbuffer.buffer);
-                    gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0);
+                    gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, param.back_buffer);
                     gl.BlitFramebuffer(
                         0,
                         0,
@@ -345,7 +346,7 @@ pub const Renderer = struct {
                         gl.DEPTH_BUFFER_BIT,
                         gl.NEAREST,
                     );
-                    gl.BindFramebuffer(gl.FRAMEBUFFER, 0);
+                    gl.BindFramebuffer(gl.FRAMEBUFFER, param.back_buffer);
                 }
                 _ = dctx;
             },
@@ -441,9 +442,9 @@ pub const Renderer = struct {
         }
     }
 
-    fn bindMainFramebufferAndVp(_: *Self, screen_area: graph.Rect, screen_dim: graph.Vec2f) void {
+    fn bindMainFramebufferAndVp(_: *Self, screen_area: graph.Rect, screen_dim: graph.Vec2f, fb_id: gl.uint) void {
         const y_: i32 = @intFromFloat(screen_dim.y - (screen_area.y + screen_area.h));
-        gl.BindFramebuffer(gl.FRAMEBUFFER, 0);
+        gl.BindFramebuffer(gl.FRAMEBUFFER, fb_id);
         gl.Viewport(
             @intFromFloat(screen_area.x),
             y_,

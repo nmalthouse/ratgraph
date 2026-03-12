@@ -1043,13 +1043,14 @@ pub const Gui = struct {
 
     pub fn deinit(self: *Self) void {
         self.scratch_arena.deinit();
-        for (self.windows.items) |win|
-            win.deinit_fn(win, self);
 
         for (self.transient_windows.items) |twin| {
             const win = twin orelse continue;
             win.win.deinit_fn(win.win, self);
         }
+
+        for (self.windows.items) |win|
+            win.deinit_fn(win, self);
 
         {
             var it = self.fbos.valueIterator();
