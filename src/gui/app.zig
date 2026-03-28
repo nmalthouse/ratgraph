@@ -11,6 +11,8 @@ pub const Options = struct {
     item_height: ?f32 = null,
     font_size: ?f32 = null,
     gui_scale: ?f32 = null,
+    font_dir: std.fs.Dir,
+    font_path: []const u8,
 
     window_title: [*c]const u8 = "rgui window",
 
@@ -66,7 +68,7 @@ pub const GuiApp = struct {
             .update_vts = .{},
             .main_window = win,
             .alloc = alloc,
-            .font = try graph.OnlineFont.initFromBuffer(alloc, @embedFile("font/roboto.ttf"), scaled_text_height, .{}),
+            .font = try graph.OnlineFont.init(alloc, opts.font_dir, opts.font_path, scaled_text_height, .{}),
             .drawctx = graph.ImmediateDrawingContext.init(alloc),
             .gui = try G.Gui.init(alloc, &self.main_window, &self.font.font, &self.drawctx),
             .workspaces = undefined,

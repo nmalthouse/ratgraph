@@ -85,7 +85,6 @@ pub const Layouts = struct {
     pub fn build(vt: *iWindow, gui: *guis.Gui, area: graph.Rect) void {
         const self = vt.cast(@This());
         self.vt.area.area = area;
-        std.debug.print("Update area {any}\n", .{area});
         _ = gui;
         //self.ws.updateArea(gui.alloc, area.toAbsoluteRect()) catch {};
         //self.ws.rebuildHandles(gui.alloc) catch {};
